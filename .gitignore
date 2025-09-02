@@ -1,0 +1,5 @@
+# Dependency directories
+node_modules/
+
+# Ignore uploads or static files (optional)
+src/public/storage
