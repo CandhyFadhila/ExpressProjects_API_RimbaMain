@@ -3,6 +3,7 @@ const WithoutDataResource = require("../resources/WithoutDataResource");
 const { isTokenBlacklisted, blacklistToken } = require("../utils/tokenBlacklist");
 const logger = require("../utils/logger");
 const knex = require("../config/database");
+const JWT_SECRET = process.env.JWT_SECRET_KEY || "secretkey";
 
 // Middleware untuk autentikasi menggunakan JWT
 const authMiddleware = async (req, res, next) => {
@@ -23,7 +24,7 @@ const authMiddleware = async (req, res, next) => {
     return res.status(401).json(response.toResponse());
   }
 
-  // Cek apakah token sudah di-blacklist
+  // Cek blacklist
   const blacklisted = await isTokenBlacklisted(token);
   if (blacklisted) {
     const response = new WithoutDataResource(
@@ -36,7 +37,7 @@ const authMiddleware = async (req, res, next) => {
   }
 
   // Verifikasi token
-  jwt.verify(token, "secretkey", async (err, decoded) => {
+  jwt.verify(token, JWT_SECRET, async (err, decoded) => {
     if (err && err.name === "TokenExpiredError") {
       const response = new WithoutDataResource(
         401, // HTTP Status Code: Unauthorized
@@ -63,6 +64,14 @@ const authMiddleware = async (req, res, next) => {
 
     // Fungsi untuk cek last_login. jika lebih dari 3 hari, maka login ulang dan token di blacklist
     const userId = decoded.userId;
+    req.userId = userId;
+    req.auth = {
+      userId,
+      roleName: decoded.role || null,
+      abilities: Array.isArray(decoded.abilities) ? decoded.abilities : [],
+      ctx: decoded.ctx || null,
+    };
+
 
     try {
       const user = await knex("users").where({ id: userId }).first();
@@ -82,7 +91,7 @@ const authMiddleware = async (req, res, next) => {
 
       if (diffInDays > 3) {
         // Masukkan token ke blacklist Redis
-        await blacklistToken(token, 86400); // expired dalam 1 hari
+        await blacklistToken(token, 86400); // expired 1 hari
 
         const response = new WithoutDataResource(
           401,

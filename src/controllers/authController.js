@@ -11,106 +11,39 @@ const redisClient = require("../config/redisClient");
 const WithDataResource = require("../resources/WithDataResource");
 const WithoutDataResource = require("../resources/WithoutDataResource");
 const renderEmailTemplate = require("../utils/emailOTP/renderEmailTemplate");
+const userResource = require("../resources/auth/UserResource");
+const dateHelper = require("../helpers/dateHelper");
+const JWT_SECRET = process.env.JWT_SECRET_KEY || "secretkey";
 
 // ========== LOGIN CONTROLLER ==========
-exports.login = async (req, res) => {
-  // Validasi input
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const response = new WithoutDataResource(
-      400, // HTTP Status Code: Bad Request
-      "VALIDATION_FAILED",
-      "Login Gagal.",
-      "Tolong periksa kembali input anda. Pastikan email dan password terisi dengan benar."
-    );
-    return res.status(400).json(response.toResponse());
-  }
+exports.signInAdminSSO = (req, res) =>
+  signInWithContext(req, res, {
+    context: "super_admin",
+    requiredRole: "Super Admin",
+    ability: "super_admin",
+  });
 
-  const { email, password } = req.body;
+exports.signInEducator = (req, res) =>
+  signInWithContext(req, res, {
+    context: "educator",
+    requiredRole: "Educator",
+    ability: "educator",
+  });
 
-  try {
-    // Cek user berdasarkan email
-    const user = await knex("users").where({ email }).first();
-    if (!user) {
-      logger.info(
-        `| Login | - Invalid credentials for email: ${email}, at ${new Date().toISOString()}`
-      );
-      const response = new WithoutDataResource(
-        400, // HTTP Status Code: Bad Request
-        "INVALID_CREDENTIALS",
-        "Login Gagal.",
-        "Password atau email yang anda masukkan tidak valid, silahkan periksa kembali dan pastikan akun anda sudah terdaftar."
-      );
-      return res.status(400).json(response.toResponse());
-    }
-
-    // Verifikasi password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      logger.info(
-        `| Login | - Invalid credentials for email: ${email}, at ${new Date().toISOString()}`
-      );
-      const response = new WithoutDataResource(
-        400, // HTTP Status Code: Bad Request
-        "INVALID_CREDENTIALS",
-        "Login Gagal.",
-        "Password atau email yang anda masukkan tidak valid, silahkan periksa kembali dan pastikan akun anda sudah terdaftar."
-      );
-      return res.status(400).json(response.toResponse());
-    }
-
-    // Update last_login
-    await knex("users")
-      .where({ id: user.id })
-      .update({ last_login: knex.fn.now() });
-
-    // Create JWT token
-    const payload = { userId: user.id };
-    const token = jwt.sign(payload, "secretkey");
-
-    // Log successful login
-    logger.info(
-      `| Login | - Login success for email: ${email}, at ${new Date().toISOString()}`
-    );
-
-    // Filter user info (tidak mengirim password)
-    const filteredUser = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      username: user.username,
-      last_login: user.last_login,
-    };
-
-    const response = new WithDataResource(
-      200, // HTTP Status Code: OK
-      "LOGIN_SUCCESS",
-      "Login Berhasil.",
-      "Selamat datang, anda berhasil login.",
-      { token, user: filteredUser }
-    );
-    res.status(200).json(response.toResponse());
-  } catch (error) {
-    logger.error(`| Auth | - Error function login: ${error.message}`);
-    const response = new WithoutDataResource(
-      500, // HTTP Status Code: Internal Server Error
-      "SERVER_ERROR",
-      "Server Sedang Error",
-      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
-    );
-    res.status(500).json(response.toResponse());
-  }
-};
+exports.signInStudent = (req, res) =>
+  signInWithContext(req, res, {
+    context: "student",
+    requiredRole: "Student",
+    ability: "student",
+  });
 
 // ========== GET USER INFO CONTROLLER ==========
 exports.getUserInfo = async (req, res) => {
-  const userId = req.userId; // Diperoleh dari middleware authMiddleware
+  const userId = req.userId;
 
   try {
     // Ambil data user dari database berdasarkan userId
     const user = await knex("users").where({ id: userId }).first();
-
-    // Jika user tidak ditemukan
     if (!user) {
       const response = new WithoutDataResource(
         401, // HTTP Status Code: Unauthorized
@@ -122,27 +55,17 @@ exports.getUserInfo = async (req, res) => {
       return res.status(401).json(response.toResponse());
     }
 
-    // Sembunyikan atribut sensitif, seperti password
-    const filteredUser = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      username: user.username,
-      last_login: user.last_login,
-    };
-
-    // Log info sukses
     logger.info(
       `| GetUserInfo | - User info fetched for userId: ${userId}, at ${new Date().toISOString()}`
     );
 
-    // Response sukses dengan data pengguna
+    const serialized = await userResource(user);
     const response = new WithDataResource(
       200, // HTTP Status Code: OK
       "SUCCESS_GET_USER_INFO",
       "Berhasil Mendapatkan Data",
       `Data pengguna ${user.name}, berhasil didapatkan.`,
-      { user: filteredUser }
+      { user: serialized }
     );
     res.status(200).json(response.toResponse());
   } catch (error) {
@@ -256,7 +179,7 @@ exports.sendOTP = async (req, res) => {
     });
 
     await transporter.sendMail({
-      from: `"GIS" <${process.env.MAIL_USERNAME}>`,
+      from: `"Rimba" <${process.env.MAIL_USERNAME}>`,
       to: email,
       subject: "Verifikasi Kode OTP Perubahan Password",
       html: htmlBody,
@@ -429,3 +352,146 @@ exports.resetPassword = async (req, res) => {
     return res.status(500).json(response.toResponse());
   }
 };
+
+// 1. bikin token JWT dengan ability
+function signToken({ userId, roleName, ability, context }) {
+  const payload = {
+    userId,
+    role: roleName,
+    abilities: [ability],
+    ctx: context,
+  };
+  return jwt.sign(payload, JWT_SECRET);
+}
+
+// 2. ambil user + role name (1 query)
+async function findUserByEmailWithRole(email) {
+  return knex("users as u")
+    .leftJoin("roles as r", "r.id", "u.role_id")
+    .where("u.email", email)
+    .whereNull("u.deleted_at")
+    .select("u.*", "r.name as role_name", "r.id as role_id")
+    .first();
+}
+
+async function signInWithContext(req, res, { context, requiredRole, ability }) {
+  // Validasi input
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const response = new WithoutDataResource(
+      400,
+      "VALIDATION_FAILED",
+      "Login Gagal.",
+      "Tolong periksa kembali input anda. Pastikan email dan password terisi dengan benar."
+    );
+    return res.status(400).json(response.toResponse());
+  }
+
+  const { email, password } = req.body;
+
+  try {
+    // Ambil user + role
+    const user = await findUserByEmailWithRole(email);
+
+    if (!user) {
+      logger.info(
+        `| Login | - Invalid credentials for email: ${email}, at ${new Date().toISOString()}`
+      );
+      const response = new WithoutDataResource(
+        400,
+        "INVALID_CREDENTIALS",
+        "Login Gagal.",
+        "Password atau email yang anda masukkan tidak valid, silahkan periksa kembali dan pastikan akun anda sudah terdaftar."
+      );
+      return res.status(400).json(response.toResponse());
+    }
+
+    // Validasi status akun: 1 (nonaktif) dan 3 (suspended) -> TOLAK
+    if ([1, 3].includes(Number(user.account_status))) {
+      const since = dateHelper.formatTanggalIndonesia(user.deactivate_at, 1);
+      logger.info(
+        `| Login | - Login failed for email: ${email}, User is not active since ${user.deactivate_at}`
+      );
+      const response = new WithoutDataResource(
+        401,
+        "ACCOUNT_DEACTIVATED",
+        "Akun Nonaktif",
+        `Kami mendeteksi bahwa akun anda telah dinonaktifkan sejak ${since}, silahkan hubungi admin untuk melakukan aktivasi kembali.`
+      );
+      return res.status(401).json(response.toResponse());
+    }
+
+    // Role check (STRICT): harus persis dengan requiredRole
+    const roleName = user.role_name || null;
+    if (roleName !== requiredRole) {
+      logger.info(
+        `| Login | - Forbidden role for email: ${email} on context: ${context} (has: ${roleName}, need: ${requiredRole})`
+      );
+      const response = new WithoutDataResource(
+        403,
+        "FORBIDDEN_ROLE",
+        "Akses Ditolak",
+        `Akun Anda tidak memiliki hak akses untuk konteks ${context}.`
+      );
+      return res.status(403).json(response.toResponse());
+    }
+
+    // Verifikasi password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      logger.info(
+        `| Login | - Invalid credentials for email: ${email}, at ${new Date().toISOString()}`
+      );
+      const response = new WithoutDataResource(
+        400,
+        "INVALID_CREDENTIALS",
+        "Login Gagal.",
+        "Password atau email yang anda masukkan tidak valid, silahkan periksa kembali dan pastikan akun anda sudah terdaftar."
+      );
+      return res.status(400).json(response.toResponse());
+    }
+
+    // Update last_login
+    const now = new Date();
+    await knex("users").where({ id: user.id }).update({ last_login: now });
+
+    // Buat token dengan ability spesifik
+    const token = signToken({ userId: user.id, roleName, ability, context });
+
+    // Serialize & ambil field minimal
+    const serialized = await userResource({ ...user, last_login: now });
+    const minimalUser = {
+      id: serialized.id,
+      role: serialized.role,
+      photo_profile: serialized.photo_profile,
+      name: serialized.name,
+      email: serialized.email,
+      account_status: serialized.account_status,
+      last_login: serialized.last_login,
+    };
+
+    logger.info(
+      `| Login | - Login success for email: ${email}, ctx=${context}, ability=${ability}, at ${now.toISOString()}`
+    );
+
+    const response = new WithDataResource(
+      200,
+      "LOGIN_SUCCESS",
+      "Login Berhasil.",
+      `Selamat datang ${user.name}, anda berhasil login.`,
+      { token, user: minimalUser }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(`| Auth | - Error signInWithContext: ${error.message}`, {
+      stack: error.stack,
+    });
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+}
