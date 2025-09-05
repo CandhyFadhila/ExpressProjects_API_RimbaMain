@@ -5,7 +5,7 @@ const logger = require("../utils/logger");
 class DocumentHelper {
   static async uploadDocuments(files, req) {
     const documentIds = [];
-    const userId = req.user.id;
+    const userId = req.auth?.userId ?? req.auth?.user_id ?? req.auth?.id ?? req.userId ?? req.user?.id;
     try {
       const uploadedFiles = await StorageServerHelper.uploadToServer(files);
 
@@ -13,7 +13,7 @@ class DocumentHelper {
         // Loop untuk setiap file yang berhasil diupload
         for (const uploadedFile of uploadedFiles) {
           if (uploadedFile && uploadedFile.server_file_id) {
-            const [documentId] = await knex("documents")
+            const [{ id }] = await knex("documents")
               .insert({
                 uploaded_by: userId,
                 verified_by: 1,
@@ -24,13 +24,13 @@ class DocumentHelper {
                 file_mime_type: uploadedFile.server_file_mime_type,
                 file_size: uploadedFile.server_file_size,
               })
-              .returning("id");
+              .returning(["id"]);
 
-            documentIds.push(documentId);
+            documentIds.push(Number(id));
             logger.info("| DocumentHelper | - Document uploaded successfully", {
               file_name: uploadedFile.server_file_name,
               file_size: uploadedFile.server_file_size,
-              document_id: documentId,
+              document_id: id,
             });
           } else {
             logger.error(
@@ -46,7 +46,7 @@ class DocumentHelper {
         );
       }
     } catch (error) {
-      logger.error("| DocumentHelper | - Error during document upload", {
+      logger.error("| Document Helper | - Error during document upload", {
         error: error.message,
       });
       throw new Error("Failed to upload documents.");
@@ -79,7 +79,7 @@ class DocumentHelper {
         });
       }
     } catch (error) {
-      logger.error("| DocumentHelper | - Failed to delete document from storage.", {
+      logger.error("| Document Helper | - Failed to delete document from storage.", {
         error: error.message
       });
       throw new Error("Failed to delete documents.");

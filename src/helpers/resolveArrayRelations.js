@@ -1,31 +1,42 @@
 const knex = require("../config/database");
 
 async function resolveArrayRelations(value, table) {
-  if (!value) return [];
+  const ids = normalizeIds(value);
+  if (ids.length === 0) return [];
 
-  let ids = [];
+  const rows = await knex(table).whereIn("id", ids).select("*");
 
-  // Parse JSON jika belum array
+  const map = new Map(rows.map((r) => [Number(r.id), r]));
+  return ids.map((id) => map.get(Number(id))).filter(Boolean);
+}
+
+function normalizeIds(value) {
+  let arr = [];
+
+  if (value == null) return arr;
   if (Array.isArray(value)) {
-    ids = value;
-  } else {
+    arr = value;
+  } else if (typeof value === "string") {
     try {
-      ids = JSON.parse(value);
+      arr = JSON.parse(value);
     } catch {
-      ids = [];
+      arr = [];
     }
+  } else if (typeof value === "object") {
+    arr = value;
   }
 
-  if (!ids.length) return [];
+  // dukung bentuk [2], ["2"], [{id:2}], [{id:"2"}]
+  arr = arr
+    .map((v) => {
+      if (v && typeof v === "object") v = v.id ?? v.value ?? v.ID ?? null;
+      if (typeof v === "bigint") v = Number(v);
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    })
+    .filter((v) => v != null);
 
-  // Ambil data dari tabel (misal: documents) tanpa relasi user
-  const results = await knex(table)
-    .whereIn("id", ids)
-    .select("*");
-
-  // Urutkan sesuai urutan ID input
-  const idMap = new Map(results.map((doc) => [doc.id, doc]));
-  return ids.map((id) => idMap.get(id)).filter(Boolean);
+  return arr;
 }
 
 module.exports = { resolveArrayRelations };

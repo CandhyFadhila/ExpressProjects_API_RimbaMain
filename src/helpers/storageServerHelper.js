@@ -37,19 +37,21 @@ class StorageServerHelper {
     });
   }
 
-  static async login() {
+  static async ensureToken(force = false) {
+    if (this.token && !force) return this.token;
+    return this.login(true);
+  }
+
+  static async login(force = false) {
     this.init();
+    if (this.token && !force) return this.token;
+
     try {
-      const body = new URLSearchParams();
-      body.append("email", this.email);
-      body.append("password", this.password);
-
-      const res = await this.axios().post("/api/rimba/docs/signin", body, {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        validateStatus: () => true,
-      });
-
-      logger.info("| Storage Server Helper | - Login status:", res.status);
+      const res = await this.axios().post(
+        "/api/rimba/docs/signin",
+        { email: this.email, password: this.password },
+        { validateStatus: () => true }
+      );
 
       const payload =
         typeof res.data === "string" ? safeJson(res.data) : res.data;
@@ -89,12 +91,12 @@ class StorageServerHelper {
 
   static async logout() {
     if (!this.token) return;
+
     try {
       const res = await this.axios().get("/api/rimba/docs/signout", {
         headers: { Authorization: `Bearer ${this.token}` },
         validateStatus: () => true,
       });
-      logger.info("| Storage Server Helper | - Logout status:", res.status);
     } catch (err) {
       logger.warn("| Storage Server Helper | - Logout error:", err.message);
     } finally {
@@ -103,7 +105,8 @@ class StorageServerHelper {
   }
 
   static async uploadToServer(files) {
-    await this.login();
+    await this.ensureToken();
+
     try {
       const normalized = normalizeFiles(files);
       if (!normalized.length) {
@@ -194,6 +197,7 @@ class StorageServerHelper {
   }
 
   static async deleteFromServer(fileIds = []) {
+    await this.ensureToken();
     if (!Array.isArray(fileIds) || fileIds.length === 0) {
       logger.error(
         "| Storage Server Helper | - Tidak ada file_id yang dikirim untuk dihapus."
@@ -203,41 +207,51 @@ class StorageServerHelper {
 
     await this.login();
     try {
+      // normalisasi ke string & validasi dasar UUID v4 (opsional, untuk early-fail)
+      const ids = fileIds.map(String).filter(Boolean);
+      const uuidV4 =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const bad = ids.filter((id) => !uuidV4.test(id));
+      if (bad.length) {
+        throw new Error(`ID bukan UUID v4: ${bad.join(", ")}`);
+      }
+
+      const payload = { document_ids: ids }; // <— WAJIB: server dokumen minta 'document_ids'
+
       const res = await this.axios().delete("/api/rimba/docs/delete-file", {
         headers: { Authorization: `Bearer ${this.token}` },
-        data: { file_id: fileIds },
+        data: payload,
         validateStatus: () => true,
       });
 
-      logger.info("| Storage Server Helper | - Delete status:", res.status);
-
-      const payload =
+      const payloadRes =
         typeof res.data === "string" ? safeJson(res.data) : res.data;
 
       if (res.status >= 400) {
         logger.error(
           `| Storage Server Helper | - Delete gagal: Status ${
             res.status
-          }. Body: ${JSON.stringify(payload)}.`
+          }. Body: ${JSON.stringify(payloadRes)}.`
         );
         throw new Error(
-          `Delete gagal. Status ${res.status}. Body: ${JSON.stringify(payload)}`
-        );
-      }
-
-      const data = payload?.data;
-      if (typeof data === "undefined") {
-        logger.error(
-          `| Storage Server Helper | - Response tidak memiliki 'data'. Body: ${JSON.stringify(
-            payload
+          `Delete gagal. Status ${res.status}. Body: ${JSON.stringify(
+            payloadRes
           )}`
         );
-        throw new Error(
-          `Response tidak memiliki 'data'. Body: ${JSON.stringify(payload)}`
-        );
       }
 
-      return data;
+      // === Normalisasi sukses tanpa field 'data' ===
+      const desc = payloadRes?.message?.description || "";
+      const m = desc.match(/menghapus\s+(\d+)\s+dokumen/i);
+      const deletedCount = m ? Number(m[1]) : null;
+
+      return {
+        status: payloadRes?.status ?? res.status,
+        case: payloadRes?.case ?? "DELETE_SUCCESS",
+        message: payloadRes?.message ?? null,
+        deleted_count: deletedCount,
+        raw: payloadRes,
+      };
     } finally {
       await this.logout();
     }

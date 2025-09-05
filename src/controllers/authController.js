@@ -151,12 +151,12 @@ exports.sendOTP = async (req, res) => {
       .first();
     if (!user) {
       const response = new WithoutDataResource(
-        404,
+        200,
         "DATA_NOT_FOUND",
         "Akun Tidak Ditemukan",
         `Akun dengan email '${email}' tidak ditemukan.`
       );
-      return res.status(404).json(response.toResponse());
+      return res.status(200).json(response.toResponse());
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -218,12 +218,12 @@ exports.verifyOTP = async (req, res) => {
       .first();
     if (!user) {
       const response = new WithoutDataResource(
-        404,
+        200,
         "DATA_NOT_FOUND",
         "Akun Tidak Ditemukan",
         `Akun dengan email '${email}' tidak ditemukan.`
       );
-      return res.status(404).json(response.toResponse());
+      return res.status(200).json(response.toResponse());
     }
 
     const key = `otp:${user.id}`;
@@ -286,12 +286,12 @@ exports.resetPassword = async (req, res) => {
       .first();
     if (!user) {
       const response = new WithoutDataResource(
-        404,
+        200,
         "DATA_NOT_FOUND",
         "Akun Tidak Ditemukan",
         `Akun dengan email '${email}' tidak ditemukan.`
       );
-      return res.status(404).json(response.toResponse());
+      return res.status(200).json(response.toResponse());
     }
 
     const key = `otp:${user.id}`;
