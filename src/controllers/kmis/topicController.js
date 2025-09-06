@@ -16,6 +16,7 @@ const documentHelper = require("../../helpers/DocumentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const topicResource = require("../../resources/kmis/topicResource");
+const activityLogHelper = require("../../helpers/activityLogHelper");
 
 exports.index = async (req, res) => {
   const { search, with_trashed } = req.query;
@@ -51,7 +52,11 @@ exports.index = async (req, res) => {
         "topic.created_at",
         "topic.updated_at"
       )
-      .leftJoin("kmis_categories as category", "topic.kmis_categories_id", "category.id")
+      .leftJoin(
+        "kmis_categories as category",
+        "topic.kmis_categories_id",
+        "category.id"
+      )
       .orderBy("topic.created_at", "desc");
 
     if (with_trashed !== "1") {
@@ -191,6 +196,17 @@ exports.store = async (req, res) => {
       })
       .returning("*");
 
+    await activityLogHelper.logCreate(
+      {
+        userId: activityLogHelper.fromReq(req),
+        module: "kmis",
+        subject: "List Topik",
+        // notes: `Judul = '${title}'`, // opsional bisa dicomment jika gak dipake
+        // description: "override manual", // jika mau override template
+      },
+      trx
+    );
+
     await trx.commit();
 
     const response = new WithoutDataResource(
@@ -217,10 +233,7 @@ exports.show = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const topic = await knex("kmis_topics")
-      .select("*")
-      .where("id", id)
-      .first();
+    const topic = await knex("kmis_topics").select("*").where("id", id).first();
     if (!topic) {
       const response = new WithoutDataResource(
         200,
@@ -340,9 +353,7 @@ exports.update = async (req, res) => {
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
-    logger.error(
-      `| Topic KMIS | - Error function update : ${error.message}`
-    );
+    logger.error(`| Topic KMIS | - Error function update : ${error.message}`);
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",

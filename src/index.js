@@ -41,6 +41,10 @@ app.get("/check-db", async (req, res) => {
 
 // Auth
 app.use("/api", authRoutes);
+// TODO: section user info
+// 1. get all activity logs user login
+// 2. change photo profile
+// 3. change password
 
 // KMIS
 // Category

@@ -16,6 +16,7 @@ const documentHelper = require("../../helpers/DocumentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const categoryResource = require("../../resources/kmis/categoryResource");
+const activityLogHelper = require("../../helpers/activityLogHelper");
 
 exports.index = async (req, res) => {
   const { search, with_trashed } = req.query;
@@ -187,6 +188,17 @@ exports.store = async (req, res) => {
         description,
       })
       .returning("*");
+
+    await activityLogHelper.logCreate(
+      {
+        userId: activityLogHelper.fromReq(req),
+        module: "kmis",
+        subject: "List Kategori",
+        // notes: `Judul = '${title}'`, // opsional bisa dicomment jika gak dipake
+        // description: "override manual", // jika mau override template
+      },
+      trx
+    );
 
     await trx.commit();
 
@@ -380,7 +392,9 @@ exports.destroy = async (req, res) => {
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
-    logger.error(`| Category KMIS | - Error function destroy : ${error.message}`);
+    logger.error(
+      `| Category KMIS | - Error function destroy : ${error.message}`
+    );
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -441,7 +455,9 @@ exports.restore = async (req, res) => {
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
-    logger.error(`| Category KMIS | - Error function restore: ${error.message}`);
+    logger.error(
+      `| Category KMIS | - Error function restore: ${error.message}`
+    );
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
