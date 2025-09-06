@@ -342,6 +342,17 @@ exports.update = async (req, res) => {
         updated_at: trx.fn.now(),
       });
 
+    await activityLogHelper.logUpdate(
+      {
+        userId: activityLogHelper.fromReq(req),
+        module: "kmis",
+        subject: "List Topik",
+        // notes: `Judul = '${title}'`, // opsional bisa dicomment jika gak dipake
+        // description: "override manual", // jika mau override template
+      },
+      trx
+    );
+
     await trx.commit();
 
     const response = new WithoutDataResource(
@@ -384,6 +395,17 @@ exports.destroy = async (req, res) => {
     await trx("kmis_topics").where("id", id).update({
       deleted_at: trx.fn.now(),
     });
+
+    await activityLogHelper.logDelete(
+      {
+        userId: activityLogHelper.fromReq(req),
+        module: "kmis",
+        subject: "List Topik",
+        // notes: `Judul = '${title}'`, // opsional bisa dicomment jika gak dipake
+        // description: "override manual", // jika mau override template
+      },
+      trx
+    );
 
     await trx.commit();
 
@@ -446,6 +468,17 @@ exports.restore = async (req, res) => {
       deleted_at: null,
       updated_at: trx.fn.now(),
     });
+
+    await activityLogHelper.logRestore(
+      {
+        userId: activityLogHelper.fromReq(req),
+        module: "kmis",
+        subject: "List Topik",
+        // notes: `Judul = '${title}'`, // opsional bisa dicomment jika gak dipake
+        // description: "override manual", // jika mau override template
+      },
+      trx
+    );
 
     await trx.commit();
 
