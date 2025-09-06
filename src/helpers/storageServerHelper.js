@@ -9,6 +9,7 @@ class StorageServerHelper {
   static baseURL = null;
   static email = null;
   static password = null;
+  static loginPromise = null;
 
   static FILE_FIELD = "files";
 
@@ -38,8 +39,21 @@ class StorageServerHelper {
   }
 
   static async ensureToken(force = false) {
+    this.init();
     if (this.token && !force) return this.token;
-    return this.login(true);
+
+    // lock agar login tidak paralel
+    if (!this.loginPromise) {
+      this.loginPromise = this.login(true)
+        .catch((e) => {
+          throw e;
+        })
+        .finally(() => {
+          this.loginPromise = null;
+        });
+    }
+    await this.loginPromise;
+    return this.token;
   }
 
   static async login(force = false) {
@@ -93,7 +107,7 @@ class StorageServerHelper {
     if (!this.token) return;
 
     try {
-      const res = await this.axios().get("/api/rimba/docs/signout", {
+      await this.axios().get("/api/rimba/docs/signout", {
         headers: { Authorization: `Bearer ${this.token}` },
         validateStatus: () => true,
       });
@@ -107,93 +121,87 @@ class StorageServerHelper {
   static async uploadToServer(files) {
     await this.ensureToken();
 
-    try {
-      const normalized = normalizeFiles(files);
-      if (!normalized.length) {
-        logger.error(
-          "| Storage Server Helper | - Tidak ada file yang dikirim untuk diunggah."
-        );
-        throw new Error("Tidak ada file yang dikirim untuk diunggah.");
-      }
-
-      const form = new FormData();
-
-      for (const f of normalized) {
-        const originalName = f.originalname;
-        const extFromName = path.extname(originalName || "").replace(/^\./, "");
-        const ext = extFromName
-          ? extFromName
-          : this.getExtensionFromMimeType(f.mimetype) || "bin";
-
-        const filename = extFromName ? originalName : `${originalName}.${ext}`;
-
-        if (f.buffer && Buffer.isBuffer(f.buffer)) {
-          form.append(this.FILE_FIELD, f.buffer, {
-            filename,
-            contentType: f.mimetype || "application/octet-stream",
-          });
-        } else if (f.path && fs.existsSync(f.path)) {
-          form.append(this.FILE_FIELD, fs.createReadStream(f.path), {
-            filename,
-            contentType: f.mimetype || "application/octet-stream",
-          });
-        } else {
-          logger.warning(
-            `| Storage Server Helper | - File tidak valid/tiada buffer/path: ${f.originalname}`
-          );
-        }
-      }
-
-      if (!hasFormFile(form, this.FILE_FIELD)) {
-        logger.error(
-          "| Storage Server Helper | - Tidak ada file valid untuk diunggah."
-        );
-        throw new Error("Tidak ada file valid untuk diunggah.");
-      }
-
-      const headers = {
-        ...form.getHeaders(),
-        Authorization: `Bearer ${this.token}`,
-      };
-
-      const res = await this.axios().post("/api/rimba/docs/upload-file", form, {
-        headers,
-        maxBodyLength: Infinity,
-        validateStatus: () => true,
-      });
-
-      logger.info("| Storage Server Helper | - Upload status:", res.status);
-
-      const payload =
-        typeof res.data === "string" ? safeJson(res.data) : res.data;
-
-      if (res.status >= 400) {
-        logger.error(
-          `| Storage Server Helper | - Upload gagal: Status ${
-            res.status
-          }. Body: ${JSON.stringify(payload)}.`
-        );
-        throw new Error(
-          `Upload gagal. Status ${res.status}. Body: ${JSON.stringify(payload)}`
-        );
-      }
-
-      const data = payload?.data;
-      if (typeof data === "undefined") {
-        logger.error(
-          `| Storage Server Helper | - Response tidak memiliki 'data'. Body: ${JSON.stringify(
-            payload
-          )}`
-        );
-        throw new Error(
-          `Response tidak memiliki 'data'. Body: ${JSON.stringify(payload)}`
-        );
-      }
-
-      return data;
-    } finally {
-      await this.logout();
+    const normalized = normalizeFiles(files);
+    if (!normalized.length) {
+      logger.error(
+        "| Storage Server Helper | - Tidak ada file yang dikirim untuk diunggah."
+      );
+      throw new Error("Tidak ada file yang dikirim untuk diunggah.");
     }
+
+    const form = new FormData();
+
+    for (const f of normalized) {
+      const originalName = f.originalname;
+      const extFromName = path.extname(originalName || "").replace(/^\./, "");
+      const ext = extFromName
+        ? extFromName
+        : this.getExtensionFromMimeType(f.mimetype) || "bin";
+
+      const filename = extFromName ? originalName : `${originalName}.${ext}`;
+
+      if (f.buffer && Buffer.isBuffer(f.buffer)) {
+        form.append(this.FILE_FIELD, f.buffer, {
+          filename,
+          contentType: f.mimetype || "application/octet-stream",
+        });
+      } else if (f.path && fs.existsSync(f.path)) {
+        form.append(this.FILE_FIELD, fs.createReadStream(f.path), {
+          filename,
+          contentType: f.mimetype || "application/octet-stream",
+        });
+      } else {
+        logger.warning(
+          `| Storage Server Helper | - File tidak valid/tiada buffer/path: ${f.originalname}`
+        );
+      }
+    }
+
+    if (!hasFormFile(form, this.FILE_FIELD)) {
+      logger.error(
+        "| Storage Server Helper | - Tidak ada file valid untuk diunggah."
+      );
+      throw new Error("Tidak ada file valid untuk diunggah.");
+    }
+
+    const headers = {
+      ...form.getHeaders(),
+      Authorization: `Bearer ${this.token}`,
+    };
+
+    const res = await this.axios().post("/api/rimba/docs/upload-file", form, {
+      headers,
+      maxBodyLength: Infinity,
+      validateStatus: () => true,
+    });
+
+    const payload =
+      typeof res.data === "string" ? safeJson(res.data) : res.data;
+
+    if (res.status >= 400) {
+      logger.error(
+        `| Storage Server Helper | - Upload gagal: Status ${
+          res.status
+        }. Body: ${JSON.stringify(payload)}.`
+      );
+      throw new Error(
+        `Upload gagal. Status ${res.status}. Body: ${JSON.stringify(payload)}`
+      );
+    }
+
+    const data = payload?.data;
+    if (typeof data === "undefined") {
+      logger.error(
+        `| Storage Server Helper | - Response tidak memiliki 'data'. Body: ${JSON.stringify(
+          payload
+        )}`
+      );
+      throw new Error(
+        `Response tidak memiliki 'data'. Body: ${JSON.stringify(payload)}`
+      );
+    }
+
+    return data;
   }
 
   static async deleteFromServer(fileIds = []) {
@@ -206,55 +214,51 @@ class StorageServerHelper {
     }
 
     await this.login();
-    try {
-      // normalisasi ke string & validasi dasar UUID v4 (opsional, untuk early-fail)
-      const ids = fileIds.map(String).filter(Boolean);
-      const uuidV4 =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      const bad = ids.filter((id) => !uuidV4.test(id));
-      if (bad.length) {
-        throw new Error(`ID bukan UUID v4: ${bad.join(", ")}`);
-      }
-
-      const payload = { document_ids: ids }; // <— WAJIB: server dokumen minta 'document_ids'
-
-      const res = await this.axios().delete("/api/rimba/docs/delete-file", {
-        headers: { Authorization: `Bearer ${this.token}` },
-        data: payload,
-        validateStatus: () => true,
-      });
-
-      const payloadRes =
-        typeof res.data === "string" ? safeJson(res.data) : res.data;
-
-      if (res.status >= 400) {
-        logger.error(
-          `| Storage Server Helper | - Delete gagal: Status ${
-            res.status
-          }. Body: ${JSON.stringify(payloadRes)}.`
-        );
-        throw new Error(
-          `Delete gagal. Status ${res.status}. Body: ${JSON.stringify(
-            payloadRes
-          )}`
-        );
-      }
-
-      // === Normalisasi sukses tanpa field 'data' ===
-      const desc = payloadRes?.message?.description || "";
-      const m = desc.match(/menghapus\s+(\d+)\s+dokumen/i);
-      const deletedCount = m ? Number(m[1]) : null;
-
-      return {
-        status: payloadRes?.status ?? res.status,
-        case: payloadRes?.case ?? "DELETE_SUCCESS",
-        message: payloadRes?.message ?? null,
-        deleted_count: deletedCount,
-        raw: payloadRes,
-      };
-    } finally {
-      await this.logout();
+    // normalisasi ke string & validasi dasar UUID v4 (opsional, untuk early-fail)
+    const ids = fileIds.map(String).filter(Boolean);
+    const uuidV4 =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const bad = ids.filter((id) => !uuidV4.test(id));
+    if (bad.length) {
+      throw new Error(`ID bukan UUID v4: ${bad.join(", ")}`);
     }
+
+    const payload = { document_ids: ids }; // <— WAJIB: server dokumen minta 'document_ids'
+
+    const res = await this.axios().delete("/api/rimba/docs/delete-file", {
+      headers: { Authorization: `Bearer ${this.token}` },
+      data: payload,
+      validateStatus: () => true,
+    });
+
+    const payloadRes =
+      typeof res.data === "string" ? safeJson(res.data) : res.data;
+
+    if (res.status >= 400) {
+      logger.error(
+        `| Storage Server Helper | - Delete gagal: Status ${
+          res.status
+        }. Body: ${JSON.stringify(payloadRes)}.`
+      );
+      throw new Error(
+        `Delete gagal. Status ${res.status}. Body: ${JSON.stringify(
+          payloadRes
+        )}`
+      );
+    }
+
+    // === Normalisasi sukses tanpa field 'data' ===
+    const desc = payloadRes?.message?.description || "";
+    const m = desc.match(/menghapus\s+(\d+)\s+dokumen/i);
+    const deletedCount = m ? Number(m[1]) : null;
+
+    return {
+      status: payloadRes?.status ?? res.status,
+      case: payloadRes?.case ?? "DELETE_SUCCESS",
+      message: payloadRes?.message ?? null,
+      deleted_count: deletedCount,
+      raw: payloadRes,
+    };
   }
 
   static getExtensionFromMimeType(mimeType) {

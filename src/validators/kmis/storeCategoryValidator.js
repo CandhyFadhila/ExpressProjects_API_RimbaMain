@@ -13,8 +13,8 @@ exports.storeCategoryValidator = [
 
   body("description")
     .notEmpty()
-    .withMessage("Deskripsi workspace tidak boleh kosong.")
+    .withMessage("Deskripsi kategori tidak boleh kosong.")
     .bail()
     .isString()
-    .withMessage("Deskripsi workspace harus berupa teks."),
+    .withMessage("Deskripsi kategori harus berupa teks."),
 ];

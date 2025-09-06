@@ -15,7 +15,7 @@ const {
 const documentHelper = require("../../helpers/DocumentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
-const categoryResource = require("../../resources/kmis/categoryResource");
+const topicResource = require("../../resources/kmis/topicResource");
 
 exports.index = async (req, res) => {
   const { search, with_trashed } = req.query;
@@ -40,23 +40,25 @@ exports.index = async (req, res) => {
     }
     // ---------------------------------------
 
-    let query = knex("kmis_categories as category")
+    let query = knex("kmis_topics as topic")
       .select(
-        "category.id",
-        "category.category_cover_ids",
-        "category.title",
-        "category.description",
-        "category.deleted_at",
-        "category.created_at",
-        "category.updated_at"
+        "topic.id",
+        "topic.kmis_categories_id",
+        "topic.topic_cover_ids",
+        "topic.title",
+        "topic.description",
+        "topic.deleted_at",
+        "topic.created_at",
+        "topic.updated_at"
       )
-      .orderBy("category.created_at", "desc");
+      .leftJoin("kmis_categories as category", "topic.kmis_categories_id", "category.id")
+      .orderBy("topic.created_at", "desc");
 
     if (with_trashed !== "1") {
-      query.whereNull("category.deleted_at");
+      query.whereNull("topic.deleted_at");
     }
 
-    applySearch(query, search, ["category.title"]);
+    applySearch(query, search, ["topic.title", "category.title"]);
 
     const paginationInfo = applyPagination(query, req.query);
 
@@ -72,14 +74,14 @@ exports.index = async (req, res) => {
     }
 
     const serializedData = await Promise.all(
-      result.data.map((category) => categoryResource(category))
+      result.data.map((category) => topicResource(category))
     );
 
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      "Data kategori berhasil diambil.",
+      "Data topik berhasil diambil.",
       {
         data: serializedData,
         pagination: result.pagination,
@@ -87,7 +89,7 @@ exports.index = async (req, res) => {
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
-    logger.error(`| Category KMIS | - Error function index : ${error.message}`);
+    logger.error(`| Topic KMIS | - Error function index : ${error.message}`);
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -100,7 +102,7 @@ exports.index = async (req, res) => {
 
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
-  const { title, description } = req.body;
+  const { title, description, categoryId } = req.body;
 
   try {
     const errors = validationResult(req);
@@ -159,7 +161,7 @@ exports.store = async (req, res) => {
       }
     }
 
-    const exists = await trx("kmis_categories")
+    const exists = await trx("kmis_topics")
       .whereRaw("lower(title) = lower(?)", [title])
       .whereNull("deleted_at")
       .first();
@@ -168,7 +170,7 @@ exports.store = async (req, res) => {
         400,
         "DUPLICATE_TITLE",
         "Duplikat Data",
-        `Judul kategori '${title}' sudah digunakan. Silakan gunakan judul lain.`
+        `Judul topik '${title}' sudah digunakan. Silakan gunakan judul lain.`
       );
       return res.status(400).json(response.toResponse());
     }
@@ -180,9 +182,10 @@ exports.store = async (req, res) => {
     const firstId = uploadedDocuments?.[0];
     const coverId = Number(firstId);
 
-    await trx("kmis_categories")
+    await trx("kmis_topics")
       .insert({
-        category_cover_ids: asJsonb([coverId]),
+        kmis_categories_id: categoryId,
+        topic_cover_ids: asJsonb([coverId]),
         title,
         description,
       })
@@ -194,12 +197,12 @@ exports.store = async (req, res) => {
       201,
       "SUCCESS_CREATE_DATA",
       "Berhasil Menyimpan Data",
-      `Data kategori '${title}' berhasil ditambahkan.`
+      `Data topik '${title}' berhasil ditambahkan.`
     );
     return res.status(201).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
-    logger.error(`| Category KMIS | - Error function store: ${error.message}`);
+    logger.error(`| Topic KMIS | - Error function store: ${error.message}`);
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -214,31 +217,31 @@ exports.show = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const category = await knex("kmis_categories")
+    const topic = await knex("kmis_topics")
       .select("*")
       .where("id", id)
       .first();
-    if (!category) {
+    if (!topic) {
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Data kategori dengan ID '${id}' tidak ditemukan.`
+        `Data topik dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
 
-    const data = await categoryResource(category);
+    const data = await topicResource(topic);
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      `Detail data kategori '${category.title}' berhasil didapatkan.`,
+      `Detail data topik '${topic.title}' berhasil didapatkan.`,
       data
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
-    logger.error(`| Category KMIS | - Error function show: ${error.message}`);
+    logger.error(`| Topic KMIS | - Error function show: ${error.message}`);
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -251,7 +254,7 @@ exports.show = async (req, res) => {
 
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
-  const { title, description, deleteDocumentIds } = req.body;
+  const { title, description, categoryId, deleteDocumentIds } = req.body;
   const id = req.params.id;
 
   try {
@@ -270,18 +273,18 @@ exports.update = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    const existing = await trx("kmis_categories").where("id", id).first();
+    const existing = await trx("kmis_topics").where("id", id).first();
     if (!existing) {
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Data kategori dengan ID '${id}' tidak ditemukan.`
+        `Data topik dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
 
-    const duplicate = await trx("kmis_categories")
+    const duplicate = await trx("kmis_topics")
       .whereRaw("lower(title) = lower(?)", [title])
       .whereNull("deleted_at")
       .whereNot("id", id)
@@ -291,17 +294,18 @@ exports.update = async (req, res) => {
         400,
         "DUPLICATE_TITLE",
         "Duplikat Data",
-        `Judul '${title}' sudah digunakan pada kategori lain.`
+        `Judul '${title}' sudah digunakan pada topik lain.`
       );
       return res.status(400).json(response.toResponse());
     }
 
-    const oldCoverIds = normJsonbArray(existing.category_cover_ids);
+    const oldCoverIds = normJsonbArray(existing.topic_cover_ids);
     const oldDocId = normIdArray(oldCoverIds, { as: "number" })[0] ?? null;
 
-    const deletedIds = toArray(req.body.deleteDocumentIds).map(String);
+    const deletedIds = toArray(deleteDocumentIds).map(String);
 
     let finalDocId = oldDocId;
+    console.log("oldDocId: ", oldDocId);
     if (finalDocId != null && deletedIds.includes(String(finalDocId))) {
       await documentHelper.deleteDocuments([finalDocId]);
       finalDocId = null;
@@ -315,10 +319,11 @@ exports.update = async (req, res) => {
     const coverId = uploadIds?.[0] ?? finalDocId ?? null;
     const coverArr = coverId != null ? [Number(coverId)] : [];
 
-    await trx("kmis_categories")
+    await trx("kmis_topics")
       .where("id", id)
       .update({
-        category_cover_ids: asJsonb(coverArr),
+        kmis_categories_id: categoryId,
+        topic_cover_ids: asJsonb(coverArr),
         title,
         description,
         updated_at: trx.fn.now(),
@@ -330,13 +335,13 @@ exports.update = async (req, res) => {
       200,
       "SUCCESS_UPDATE_DATA",
       "Berhasil Memperbarui",
-      `Data kategori '${title}' berhasil diperbarui.`
+      `Data topik '${title}' berhasil diperbarui.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
     logger.error(
-      `| Category KMIS | - Error function update : ${error.message}`
+      `| Topic KMIS | - Error function update : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -353,19 +358,19 @@ exports.destroy = async (req, res) => {
   const id = req.params.id;
 
   try {
-    const existing = await trx("kmis_categories").where("id", id).first();
+    const existing = await trx("kmis_topics").where("id", id).first();
     if (!existing) {
       await trx.rollback();
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Kategori dengan ID '${id}' tidak ditemukan.`
+        `Topik dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
 
-    await trx("kmis_categories").where("id", id).update({
+    await trx("kmis_topics").where("id", id).update({
       deleted_at: trx.fn.now(),
     });
 
@@ -375,12 +380,12 @@ exports.destroy = async (req, res) => {
       200,
       "SUCCESS_DELETE_DATA",
       "Berhasil Menghapus Data",
-      `Data kategori '${existing.title}' berhasil dihapus (soft delete).`
+      `Data topik '${existing.title}' berhasil dihapus (soft delete).`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
-    logger.error(`| Category KMIS | - Error function destroy : ${error.message}`);
+    logger.error(`| Topic KMIS | - Error function destroy : ${error.message}`);
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -396,7 +401,7 @@ exports.restore = async (req, res) => {
   const trx = await knex.transaction();
 
   try {
-    const deletedCategory = await trx("kmis_categories")
+    const deletedCategory = await trx("kmis_topics")
       .where("id", id)
       .whereNotNull("deleted_at")
       .first();
@@ -406,12 +411,12 @@ exports.restore = async (req, res) => {
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Kategori dengan ID '${id}' tidak ditemukan atau belum dihapus.`
+        `Topik dengan ID '${id}' tidak ditemukan atau belum dihapus.`
       );
       return res.status(200).json(response.toResponse());
     }
 
-    const isDuplicate = await trx("kmis_categories")
+    const isDuplicate = await trx("kmis_topics")
       .whereRaw("lower(title) = lower(?)", [deletedCategory.title])
       .whereNull("deleted_at")
       .first();
@@ -421,12 +426,12 @@ exports.restore = async (req, res) => {
         400,
         "DUPLICATE_NAME",
         "Duplikat Data",
-        `Judul kategori '${deletedCategory.title}' sudah digunakan oleh entri aktif lain. Silakan ubah nama terlebih dahulu sebelum merestore.`
+        `Judul topik '${deletedCategory.title}' sudah digunakan oleh entri aktif lain. Silakan ubah nama terlebih dahulu sebelum merestore.`
       );
       return res.status(400).json(response.toResponse());
     }
 
-    await trx("kmis_categories").where("id", id).update({
+    await trx("kmis_topics").where("id", id).update({
       deleted_at: null,
       updated_at: trx.fn.now(),
     });
@@ -437,11 +442,11 @@ exports.restore = async (req, res) => {
       200,
       "SUCCESS_RESTORE_DATA",
       "Berhasil Mengembalikan Data",
-      `Data kategori '${deletedCategory.title}' berhasil dikembalikan.`
+      `Data topik '${deletedCategory.title}' berhasil dikembalikan.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
-    logger.error(`| Category KMIS | - Error function restore: ${error.message}`);
+    logger.error(`| Topic KMIS | - Error function restore: ${error.message}`);
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",

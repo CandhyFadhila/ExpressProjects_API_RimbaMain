@@ -4,6 +4,7 @@ const morgan = require("morgan");
 const knex = require("./config/database");
 const authRoutes = require("./routes/authRoutes");
 const categoryRoutes = require("./routes/kmis/categoryRoutes");
+const topicRoutes = require("./routes/kmis/topicRoutes");
 const logger = require("./utils/logger");
 const corsMiddleware = require("./middlewares/cors");
 
@@ -38,13 +39,15 @@ app.get("/check-db", async (req, res) => {
   }
 });
 
-// Route API
+// Auth
 app.use("/api", authRoutes);
 
 // KMIS
 // Category
 app.use("/api/kmis/category", categoryRoutes);
 
+// Topic
+app.use("/api/kmis/topic", topicRoutes);
 
 // Jalankan server
 const PORT = process.env.PORT || 3000;
