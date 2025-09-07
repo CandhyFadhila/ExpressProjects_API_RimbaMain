@@ -2,11 +2,12 @@ require("dotenv").config();
 const express = require("express");
 const morgan = require("morgan");
 const knex = require("./config/database");
+const corsMiddleware = require("./middlewares/cors");
+const logger = require("./utils/logger");
 const authRoutes = require("./routes/authRoutes");
 const categoryRoutes = require("./routes/kmis/categoryRoutes");
 const topicRoutes = require("./routes/kmis/topicRoutes");
-const logger = require("./utils/logger");
-const corsMiddleware = require("./middlewares/cors");
+const educatorRoutes = require("./routes/kmis/educatorRoutes");
 
 const app = express();
 
@@ -39,6 +40,8 @@ app.get("/check-db", async (req, res) => {
   }
 });
 
+// Public Request
+
 // Auth
 app.use("/api", authRoutes);
 // TODO: section user info
@@ -52,6 +55,9 @@ app.use("/api/kmis/category", categoryRoutes);
 
 // Topic
 app.use("/api/kmis/topic", topicRoutes);
+
+// Educator
+app.use("/api/kmis/educator", educatorRoutes);
 
 // Jalankan server
 const PORT = process.env.PORT || 3000;

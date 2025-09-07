@@ -3,6 +3,7 @@ const {
 } = require("../../helpers/resolveArrayRelations");
 const knex = require("../../config/database");
 const categoryResource = require("../../resources/kmis/categoryResource");
+const documentResource = require("../../resources/doc/documentResource");
 
 async function topicResource(topic) {
   const category = topic.kmis_categories_id
@@ -11,18 +12,19 @@ async function topicResource(topic) {
 
   const photos = await resolveArrayRelations(
     topic.topic_cover_ids,
-    "documents"
+    "documents",
+    documentResource
   );
 
   return {
     id: topic.id,
     category: category ? await categoryResource(category) : null,
-    topic_cover: photos,
+    topicCover: photos,
     title: topic.title,
     description: topic.description,
-    created_at: topic.created_at,
-    updated_at: topic.updated_at,
-    deleted_at: topic.deleted_at,
+    createdAt: topic.created_at,
+    updatedAt: topic.updated_at,
+    deeltedAt: topic.deleted_at,
   };
 }
 

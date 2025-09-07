@@ -1,21 +1,23 @@
 const {
   resolveArrayRelations,
 } = require("../../helpers/resolveArrayRelations");
+const documentResource = require("../../resources/doc/documentResource");
 
 async function categoryResource(category) {
   const photos = await resolveArrayRelations(
     category.category_cover_ids,
-    "documents"
+    "documents",
+    documentResource
   );
 
   return {
     id: category.id,
-    category_cover: photos,
+    categoryCover: photos,
     title: category.title,
     description: category.description,
-    created_at: category.created_at,
-    updated_at: category.updated_at,
-    deleted_at: category.deleted_at,
+    createdAt: category.created_at,
+    updatedAt: category.updated_at,
+    deletedAt: category.deleted_at,
   };
 }
 

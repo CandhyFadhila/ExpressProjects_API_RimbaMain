@@ -3,6 +3,7 @@ const {
 } = require("../../helpers/resolveArrayRelations");
 const roleResource = require("../auth/RoleResource");
 const knex = require("../../config/database");
+const documentResource = require("../../resources/doc/documentResource");
 
 async function userResource(user) {
   const role = user.role_id
@@ -11,7 +12,8 @@ async function userResource(user) {
 
   const photos = await resolveArrayRelations(
     user.photo_profile_ids,
-    "documents"
+    "documents",
+    documentResource
   );
 
   return {
@@ -19,29 +21,29 @@ async function userResource(user) {
 
     // Relasi role
     role: role ? await roleResource(role) : null,
-    photo_profile: photos,
+    photoProfile: photos,
 
     // Data identitas (tanpa password)
     name: user.name,
     email: user.email,
-    phone_number: user.phone_number ?? null,
+    phoneNumber: user.phone_number ?? null,
     profession: user.profession ?? null,
     gender: user.gender,
-    birth_date: user.birth_date ?? null,
+    birthDate: user.birth_date ?? null,
     address: user.address ?? null,
 
     // Status akun: kode & label
-    account_status: user.account_status,
+    accountStatus: user.account_status,
 
     // Audit fields / aktivitas
-    register_at: user.register_at ?? null,
-    deactivate_at: user.deactivate_at ?? null,
-    last_login: user.last_login ?? null,
-    last_change_password: user.last_change_password ?? null,
+    registerAt: user.register_at ?? null,
+    deactiveAt: user.deactivate_at ?? null,
+    lastLogin: user.last_login ?? null,
+    lastChangePassword: user.last_change_password ?? null,
 
-    created_at: user.created_at,
-    updated_at: user.updated_at,
-    deleted_at: user.deleted_at,
+    createdAt: user.created_at,
+    updatedAt: user.updated_at,
+    deletedAt: user.deleted_at,
   };
 }
 

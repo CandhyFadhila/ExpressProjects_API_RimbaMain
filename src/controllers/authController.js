@@ -159,16 +159,26 @@ exports.sendOTP = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
+    const status = Number(user.account_status);
+    if (status === 3) {
+      const since = dateHelper.formatTanggalIndonesia(user.deactivate_at, 1);
+      logger.info(
+        `| Send OTP | - Account blocked: deactivated/suspended for email: ${email}, since: ${user.deactivate_at}`
+      );
+      const response = new WithoutDataResource(
+        401,
+        "ACCOUNT_DEACTIVATED",
+        "Akun Nonaktif",
+        `Kami mendeteksi bahwa akun Anda telah dinonaktifkan sejak ${since}, silakan hubungi admin untuk melakukan aktivasi kembali sebelum melakukan reset password.`
+      );
+      return res.status(401).json(response.toResponse());
+    }
+
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const key = `otp:${user.id}`;
     const hash = crypto.createHash("sha256").update(otp).digest("hex");
 
     await redisClient.setEx(key, 1800, hash); // expire in 30 minutes
-
-    const htmlBody = renderEmailTemplate("otp.html", {
-      name: user.name,
-      otp: otp,
-    });
 
     const transporter = nodemailer.createTransport({
       service: "Gmail",
@@ -176,6 +186,11 @@ exports.sendOTP = async (req, res) => {
         user: process.env.MAIL_USERNAME,
         pass: process.env.MAIL_PASSWORD,
       },
+    });
+
+    const htmlBody = renderEmailTemplate("otp.html", {
+      name: user.name,
+      otp: otp,
     });
 
     await transporter.sendMail({
@@ -188,6 +203,7 @@ exports.sendOTP = async (req, res) => {
     logger.info(
       `| Send OTP | - OTP sent to ${email} at ${new Date().toISOString()}`
     );
+
     const response = new WithoutDataResource(
       200,
       "OTP_SENT",
@@ -294,9 +310,23 @@ exports.resetPassword = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
+    const status = Number(user.account_status);
+    if (status === 3) {
+      const since = dateHelper.formatTanggalIndonesia(user.deactivate_at, 1);
+      logger.info(
+        `| Reset Password | - Account blocked: deactivated/suspended for email: ${email}, since: ${user.deactivate_at}`
+      );
+      const response = new WithoutDataResource(
+        401,
+        "ACCOUNT_DEACTIVATED",
+        "Akun Nonaktif",
+        `Kami mendeteksi bahwa akun Anda telah dinonaktifkan sejak ${since}, silakan hubungi admin untuk melakukan aktivasi kembali.`
+      );
+      return res.status(401).json(response.toResponse());
+    }
+
     const key = `otp:${user.id}`;
     const storedHashedOtp = await redisClient.get(key);
-
     if (!storedHashedOtp) {
       const response = new WithoutDataResource(
         400,
@@ -311,7 +341,6 @@ exports.resetPassword = async (req, res) => {
       .createHash("sha256")
       .update(String(otp))
       .digest("hex");
-
     if (hashedInputOtp !== storedHashedOtp) {
       const response = new WithoutDataResource(
         401,
@@ -324,10 +353,15 @@ exports.resetPassword = async (req, res) => {
 
     // Update password
     const hashedPassword = await bcrypt.hash(password, 10);
-    await knex("users").where({ id: user.id }).update({
+    const updatePayload = {
       password: hashedPassword,
       last_change_password: knex.fn.now(),
-    });
+    };
+    if (status === 1) {
+      updatePayload.account_status = 2;
+    }
+
+    await knex("users").where({ id: user.id }).update(updatePayload);
 
     // Hapus OTP dari Redis
     await redisClient.del(key);
@@ -392,7 +426,6 @@ async function signInWithContext(req, res, { context, requiredRole, ability }) {
   try {
     // Ambil user + role
     const user = await findUserByEmailWithRole(email);
-
     if (!user) {
       logger.info(
         `| Login | - Invalid credentials for email: ${email}, at ${new Date().toISOString()}`
@@ -407,16 +440,29 @@ async function signInWithContext(req, res, { context, requiredRole, ability }) {
     }
 
     // Validasi status akun: 1 (nonaktif) dan 3 (suspended) -> TOLAK
-    if ([1, 3].includes(Number(user.account_status))) {
+    const status = Number(user.account_status);
+    if (status === 1) {
+      logger.info(
+        `| Login | - Account blocked: not-activated for email: ${email}, created_at: ${user.created_at}`
+      );
+      const response = new WithoutDataResource(
+        401,
+        "ACCOUNT_RESET_REQUIRED",
+        "Reset Password Diperlukan",
+        "Akun Anda belum dapat digunakan karena masih memakai kata sandi default. Silakan lakukan reset password terlebih dahulu untuk mengaktifkan akun."
+      );
+      return res.status(401).json(response.toResponse());
+    }
+    if (status === 3) {
       const since = dateHelper.formatTanggalIndonesia(user.deactivate_at, 1);
       logger.info(
-        `| Login | - Login failed for email: ${email}, User is not active since ${user.deactivate_at}`
+        `| Login | - Account blocked: deactivated/suspended for email: ${email}, deactivate_at: ${user.deactivate_at}`
       );
       const response = new WithoutDataResource(
         401,
         "ACCOUNT_DEACTIVATED",
         "Akun Nonaktif",
-        `Kami mendeteksi bahwa akun anda telah dinonaktifkan sejak ${since}, silahkan hubungi admin untuk melakukan aktivasi kembali.`
+        `Kami mendeteksi bahwa akun Anda telah dinonaktifkan sejak ${since}, silakan hubungi admin untuk melakukan aktivasi kembali.`
       );
       return res.status(401).json(response.toResponse());
     }
@@ -463,15 +509,15 @@ async function signInWithContext(req, res, { context, requiredRole, ability }) {
     const minimalUser = {
       id: serialized.id,
       role: serialized.role,
-      photo_profile: serialized.photo_profile,
+      photoProfile: serialized.photoProfile,
       name: serialized.name,
       email: serialized.email,
-      account_status: serialized.account_status,
-      last_login: serialized.last_login,
+      accountStatus: serialized.accountStatus,
+      lastLogin: serialized.lastLogin,
     };
 
     logger.info(
-      `| Login | - Login success for email: ${email}, ctx=${context}, ability=${ability}, at ${now.toISOString()}`
+      `| Login | - Login success for email: ${email}, context=${context}, ability=${ability}, at ${now.toISOString()}`
     );
 
     const response = new WithDataResource(

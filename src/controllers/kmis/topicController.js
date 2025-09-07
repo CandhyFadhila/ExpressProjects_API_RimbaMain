@@ -17,30 +17,12 @@ const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const topicResource = require("../../resources/kmis/topicResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
+const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 
 exports.index = async (req, res) => {
-  const { search, with_trashed } = req.query;
+  const { search } = req.query;
 
   try {
-    // --- cek otorisasi untuk with_trashed ---
-    const roleName = String(req?.auth?.roleName || "").toLowerCase();
-    const abilities = (req?.auth?.abilities || []).map((a) =>
-      String(a).toLowerCase()
-    );
-    const isSuperAdmin =
-      roleName === "super admin" || abilities.includes("super_admin");
-
-    if (with_trashed === "1" && !isSuperAdmin) {
-      const response = new WithoutDataResource(
-        403,
-        "FORBIDDEN_TRASHED_FILTER",
-        "Akses Ditolak",
-        "Anda tidak berizin melihat data yang telah dihapus."
-      );
-      return res.status(403).json(response.toResponse());
-    }
-    // ---------------------------------------
-
     let query = knex("kmis_topics as topic")
       .select(
         "topic.id",
@@ -59,9 +41,7 @@ exports.index = async (req, res) => {
       )
       .orderBy("topic.created_at", "desc");
 
-    if (with_trashed !== "1") {
-      query.whereNull("topic.deleted_at");
-    }
+    applyTrashedScope(query, req, "topic.deleted_at");
 
     applySearch(query, search, ["topic.title", "category.title"]);
 

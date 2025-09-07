@@ -1,13 +1,18 @@
 const knex = require("../config/database");
 
-async function resolveArrayRelations(value, table) {
+async function resolveArrayRelations(value, table, mapFn = (r) => r) {
   const ids = normalizeIds(value);
   if (ids.length === 0) return [];
 
   const rows = await knex(table).whereIn("id", ids).select("*");
-
   const map = new Map(rows.map((r) => [Number(r.id), r]));
-  return ids.map((id) => map.get(Number(id))).filter(Boolean);
+
+  return ids
+    .map((id) => {
+      const row = map.get(Number(id));
+      return row ? mapFn(row) : null;
+    })
+    .filter(Boolean);
 }
 
 function normalizeIds(value) {
