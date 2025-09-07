@@ -162,11 +162,7 @@ exports.store = async (req, res) => {
       email: created.email,
       password: rawPassword,
       login_url: process.env.APP_LOGIN_URL || "#",
-      from_name: "Rimba Support",
       from_email: process.env.MAIL_USERNAME,
-      // logo_url:
-      //   process.env.APP_LOGO_URL ||
-      //   "https://upload.wikimedia.org/wikipedia/commons/5/51/Logo_BPN-KemenATR_%282017%29.png",
       year: new Date().getFullYear(),
     });
 

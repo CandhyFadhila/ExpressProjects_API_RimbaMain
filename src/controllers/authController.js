@@ -10,6 +10,7 @@ const knex = require("../config/database");
 const redisClient = require("../config/redisClient");
 const WithDataResource = require("../resources/WithDataResource");
 const WithoutDataResource = require("../resources/WithoutDataResource");
+const { stripTitlesOnly } = require("../helpers/credentialHelper");
 const renderEmailTemplate = require("../utils/emailOTP/renderEmailTemplate");
 const userResource = require("../resources/auth/UserResource");
 const dateHelper = require("../helpers/dateHelper");
@@ -188,15 +189,18 @@ exports.sendOTP = async (req, res) => {
       },
     });
 
+    const displayName = stripTitlesOnly(user.name);
     const htmlBody = renderEmailTemplate("otp.html", {
-      name: user.name,
+      name: displayName,
       otp: otp,
+      from_email: process.env.MAIL_USERNAME,
+      year: new Date().getFullYear(),
     });
 
     await transporter.sendMail({
       from: `"Rimba" <${process.env.MAIL_USERNAME}>`,
       to: email,
-      subject: "Verifikasi Kode OTP Perubahan Password",
+      subject: "Verifikasi Kode OTP Perubahan Kata Sandi",
       html: htmlBody,
     });
 
