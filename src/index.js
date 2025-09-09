@@ -4,6 +4,7 @@ const morgan = require("morgan");
 const knex = require("./config/database");
 const corsMiddleware = require("./middlewares/cors");
 const logger = require("./utils/logger");
+const publicRequestRoute = require("./routes/publicRequest/publicRequestRoute");
 const authRoutes = require("./routes/authRoutes");
 const categoryRoutes = require("./routes/kmis/categoryRoutes");
 const topicRoutes = require("./routes/kmis/topicRoutes");
@@ -40,14 +41,15 @@ app.get("/check-db", async (req, res) => {
   }
 });
 
-// Public Request
-
 // Auth
 app.use("/api", authRoutes);
 // TODO: section user info
 // 1. get all activity logs user login
 // 2. change photo profile
 // 3. change password
+
+// Public Request
+app.use("/api/public-request", publicRequestRoute);
 
 // KMIS
 // Category

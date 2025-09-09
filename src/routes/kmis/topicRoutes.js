@@ -49,7 +49,7 @@ router.patch(
 );
 
 router.delete(
-  "/sso/delete/:id",
+  "/sso/delete",
   rateLimiter,
   authMiddleware,
   requireAbility("super_admin"),
@@ -57,7 +57,7 @@ router.delete(
 );
 
 router.patch(
-  "/sso/restore/:id",
+  "/sso/restore",
   rateLimiter,
   authMiddleware,
   requireAbility("super_admin"),

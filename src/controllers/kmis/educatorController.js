@@ -8,6 +8,9 @@ const {
   applyPagination,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
+const {
+  normIdArray,
+} = require("../../helpers/inputNorm");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const renderEmailTemplate = require("../../utils/emailOTP/renderEmailTemplate");
@@ -242,7 +245,7 @@ exports.show = async (req, res) => {
 
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
-  const { name, email } = req.body;
+  const { name, email, accountStatus } = req.body;
   const id = req.params.id;
 
   try {
@@ -264,6 +267,7 @@ exports.update = async (req, res) => {
     const existing = await trx("users")
       .where("id", id)
       .where("role_id", 2)
+      .whereNot("id", 1)
       .first();
     if (!existing) {
       const response = new WithoutDataResource(
@@ -290,11 +294,21 @@ exports.update = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    await trx("users").where("id", id).update({
+    const patch = {
       name,
       email,
       updated_at: trx.fn.now(),
-    });
+    };
+
+    if (accountStatus === true) {
+      patch.account_status = 2;
+      patch.deactivate_at = null;
+    } else {
+      patch.account_status = 3;
+      patch.deactivate_at = trx.fn.now();
+    }
+
+    await trx("users").where("id", id).update(patch);
 
     await activityLogHelper.logUpdate(
       {
@@ -310,8 +324,12 @@ exports.update = async (req, res) => {
     const response = new WithoutDataResource(
       200,
       "SUCCESS_UPDATE_DATA",
-      "Berhasil Memperbarui",
-      `Data akun pengajar dengan email '${email}' berhasil diperbarui.`
+      accountStatus
+        ? "Berhasil Mengaktifkan Akun"
+        : "Berhasil Menonaktifkan Akun",
+      accountStatus
+        ? `Akun pengajar dengan email '${email}' berhasil diaktifkan dan datanya diperbarui.`
+        : `Akun pengajar dengan email '${email}' berhasil dinonaktifkan dan datanya diperbarui.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
@@ -331,25 +349,54 @@ exports.update = async (req, res) => {
 
 exports.destroy = async (req, res) => {
   const trx = await knex.transaction();
-  const id = req.params.id;
 
   try {
+    const ids = normIdArray(req.body?.deleteIds, { as: "number" }).filter(
+      Number.isFinite
+    );
+    if (ids.length === 0) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        400,
+        "INVALID_INPUT",
+        "Gagal Menghapus Data",
+        "Mohon kirimkan deleteIds berupa array ID numerik, misal: [1,2,3]."
+      );
+      return res.status(400).json(response.toResponse());
+    }
+
+    const MAX_BULK = 50;
+    if (ids.length > MAX_BULK) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        400,
+        "TOO_MANY_IDS",
+        "Terlalu Banyak Data",
+        `Maksimal id yang bisa dihapus adalah ${MAX_BULK} ID.`
+      );
+      return res.status(400).json(response.toResponse());
+    }
+
     const existing = await trx("users")
-      .where("id", id)
+      .whereIn("id", ids)
       .where("role_id", 2)
-      .first();
-    if (!existing) {
+      .whereNot("id", 1)
+      .whereNot("account_status", 3)
+      .select("id", "name");
+    if (existing.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Akun pengajar dengan ID '${id}' tidak ditemukan.`
+        `Tidak ada data pengguna yang cocok atau sudah terhapus.`
       );
       return res.status(200).json(response.toResponse());
     }
 
-    await trx("users").where("id", id).update({
+    const existingIds = existing.map((r) => r.id);
+
+    await trx("users").whereIn("id", existingIds).update({
       account_status: 3,
       deactivate_at: trx.fn.now(),
       deleted_at: trx.fn.now(),
@@ -370,7 +417,7 @@ exports.destroy = async (req, res) => {
       200,
       "SUCCESS_DELETE_DATA",
       "Berhasil Menghapus Data",
-      `Akun pengajar dengan email '${existing.email}' berhasil dihapus (soft delete) dan dinonaktifkan..`
+      `Berhasil menghapus (soft delete) dan menonaktifkan ${existingIds.length} data pengajar.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
@@ -389,47 +436,104 @@ exports.destroy = async (req, res) => {
 };
 
 exports.restore = async (req, res) => {
-  const { id } = req.params;
   const trx = await knex.transaction();
 
   try {
-    const deletedUser = await trx("users")
-      .where("id", id)
+    const ids = normIdArray(req.body?.restoreIds, { as: "number" }).filter(
+      Number.isFinite
+    );
+    if (ids.length === 0) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        400,
+        "INVALID_INPUT",
+        "Gagal Menghapus Data",
+        "Mohon kirimkan restoreIds berupa array ID numerik, misal: [1,2,3]."
+      );
+      return res.status(400).json(response.toResponse());
+    }
+
+    const MAX_BULK = 50;
+    if (ids.length > MAX_BULK) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        400,
+        "TOO_MANY_IDS",
+        "Terlalu Banyak Data",
+        `Maksimal id yang bisa dikembalikan adalah ${MAX_BULK} ID.`
+      );
+      return res.status(400).json(response.toResponse());
+    }
+
+    const softDeleted = await trx("users")
+      .select("id", "email")
+      .whereIn("id", ids)
+      .whereNot("id", 1)
       .where("role_id", 2)
-      .whereNotNull("deleted_at")
-      .first();
-    if (!deletedUser) {
+      .whereNotNull("deleted_at");
+    if (softDeleted.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Akun pengajar dengan ID '${id}' tidak ditemukan atau belum dihapus.`
+        `Tidak ada data akun pengajar terhapus yang cocok untuk direstore.`
       );
       return res.status(200).json(response.toResponse());
     }
 
-    const isDuplicate = await trx("users")
-      .whereRaw("lower(email) = lower(?)", [deletedUser.email])
+    // 1) Cek bentrok email dengan entri aktif lain (case-insensitive)
+    const emailsLower = softDeleted.map((r) => (r.email || "").toLowerCase());
+    const activeWithSameEmail = await trx("users")
+      .select(knex.raw("lower(email) AS lemail"))
       .whereNull("deleted_at")
-      .first();
-    if (isDuplicate) {
-      await trx.rollback();
-      const response = new WithoutDataResource(
-        400,
-        "DUPLICATE_EMAIL",
-        "Duplikat Data",
-        `Akun pengajar dengan email '${deletedUser.email}' sudah digunakan oleh entri aktif lain. Silakan ubah email terlebih dahulu sebelum merestore.`
-      );
-      return res.status(400).json(response.toResponse());
+      .whereIn(knex.raw("lower(email)"), emailsLower);
+
+    const conflictActive = new Set(activeWithSameEmail.map((r) => r.lemail));
+
+    // 2) Cek duplikat email di dalam batch restore sendiri
+    const seenBatch = new Set();
+    const duplicateInBatch = new Set();
+    for (const r of softDeleted) {
+      const le = (r.email || "").toLowerCase();
+      if (seenBatch.has(le)) duplicateInBatch.add(le);
+      else seenBatch.add(le);
     }
 
-    await trx("users").where("id", id).update({
-      account_status: 2,
-      deactivate_at: null,
-      deleted_at: null,
-      updated_at: trx.fn.now(),
-    });
+    // 3) Tentukan mana yang boleh direstore
+    const restorable = [];
+    const skippedConflicts = [];
+    const takenInBatch = new Set(); // pastikan 1 email hanya direstore 1 item dalam batch
+
+    for (const r of softDeleted) {
+      const le = (r.email || "").toLowerCase();
+      const hasActiveConflict = conflictActive.has(le);
+      const hasBatchDup = duplicateInBatch.has(le);
+
+      if (hasActiveConflict || hasBatchDup) {
+        skippedConflicts.push({ id: r.id, email: r.email });
+        continue;
+      }
+      if (takenInBatch.has(le)) {
+        skippedConflicts.push({ id: r.id, email: r.email });
+        continue;
+      }
+      takenInBatch.add(le);
+      restorable.push(r);
+    }
+
+    // 4) Eksekusi restore
+    let restoredCount = 0;
+    if (restorable.length > 0) {
+      const idsToRestore = restorable.map((r) => r.id);
+      await trx("users").whereIn("id", idsToRestore).update({
+        deleted_at: null,
+        account_status: 2,
+        deactivate_at: null,
+        updated_at: trx.fn.now(),
+      });
+      restoredCount = idsToRestore.length;
+    }
 
     await activityLogHelper.logRestore(
       {
@@ -442,11 +546,30 @@ exports.restore = async (req, res) => {
 
     await trx.commit();
 
+    if (restoredCount === 0) {
+      const response = new WithoutDataResource(
+        400,
+        "DUPLICATE_EMAIL",
+        "Restore Gagal",
+        "Semua ID gagal direstore karena duplikat email dengan entri aktif atau duplikat email di dalam batch."
+      );
+      return res.status(400).json(response.toResponse());
+    }
+
+    const descParts = [
+      `Berhasil mengembalikan dan mengaktifkan kembali ${restoredCount} data pengajar.`,
+    ];
+    if (skippedConflicts.length) {
+      descParts.push(
+        `Terlewat ${skippedConflicts.length} karena konflik/duplikat email.`
+      );
+    }
+
     const response = new WithoutDataResource(
       200,
       "SUCCESS_RESTORE_DATA",
       "Berhasil Mengembalikan Data",
-      `Akun pengajar dengan email '${deletedUser.email}' berhasil dikembalikan dan diaktifkan kembali.`
+      descParts.join(" ")
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
@@ -465,76 +588,88 @@ exports.restore = async (req, res) => {
 
 exports.deactivateAccount = async (req, res) => {
   const trx = await knex.transaction();
-  const id = req.params.id;
 
   try {
-    const raw = req.body?.deactivateAccount;
-    const deactivateAccount =
-      typeof raw === "boolean"
-        ? raw
-        : typeof raw === "string"
-        ? ["true", "1", "yes", "on"].includes(raw.toLowerCase())
-        : false;
+    const ids = normIdArray(req.body?.deactivateAccountIds, {
+      as: "number",
+    }).filter(Number.isFinite);
+    if (ids.length === 0) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        400,
+        "INVALID_INPUT",
+        "Gagal Menghapus Data",
+        "Mohon kirimkan deactivateAccountIds berupa array ID numerik, misal: [1,2,3]."
+      );
+      return res.status(400).json(response.toResponse());
+    }
 
-    const existing = await trx("users")
-      .where("id", id)
+    const MAX_BULK = 50;
+    if (ids.length > MAX_BULK) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        400,
+        "TOO_MANY_IDS",
+        "Terlalu Banyak Data",
+        `Maksimal id yang bisa dihapus adalah ${MAX_BULK} ID.`
+      );
+      return res.status(400).json(response.toResponse());
+    }
+
+    // Ambil kandidat yang valid untuk dinonaktifkan
+    const candidates = await trx("users")
+      .select("id", "email")
+      .whereIn("id", ids)
+      .whereNot("id", 1)
       .where("role_id", 2)
-      .first();
-    if (!existing) {
+      .whereNull("deleted_at")
+      .whereNot("account_status", 3);
+    if (candidates.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Akun pengajar dengan ID '${id}' tidak ditemukan.`
+        "Tidak ada akun pengajar yang cocok untuk dinonaktifkan atau akun sudah nonaktif/terhapus."
       );
       return res.status(200).json(response.toResponse());
     }
 
-    if (deactivateAccount === true) {
-      if (existing.account_status === 3) {
-        await trx.commit();
-        const response = new WithoutDataResource(
-          200,
-          "ALREADY_DEACTIVATED",
-          "Akun Sudah Dinonaktifkan",
-          `Akun pengajar dengan email '${existing.email}' sudah dalam status nonaktif.`
-        );
-        return res.status(200).json(response.toResponse());
-      }
+    const idsToDeactivate = candidates.map((r) => r.id);
 
-      await trx("users").where("id", id).update({
-        account_status: 3,
-        deactivate_at: trx.fn.now(),
-        updated_at: trx.fn.now(),
-      });
+    await trx("users").whereIn("id", idsToDeactivate).update({
+      account_status: 3,
+      deactivate_at: trx.fn.now(),
+      updated_at: trx.fn.now(),
+    });
 
-      await activityLogHelper.logUpdate(
-        {
-          userId: activityLogHelper.fromReq(req),
-          module: "kmis",
-          subject: "Akun Pengajar",
-        },
-        trx
-      );
-
-      await trx.commit();
-
-      const response = new WithoutDataResource(
-        200,
-        "SUCCESS_DEACTIVATE_ACCOUNT",
-        "Berhasil Nonaktifkan Akun",
-        `Akun pengajar dengan email '${existing.email}' berhasil dinonaktifkan.`
-      );
-      return res.status(200).json(response.toResponse());
-    }
+    await activityLogHelper.logUpdate(
+      {
+        userId: activityLogHelper.fromReq(req),
+        module: "kmis",
+        subject: "Akun Pengajar",
+      },
+      trx
+    );
 
     await trx.commit();
+
+    const skipped = ids.length - idsToDeactivate.length;
+
+    const parts = [
+      `Berhasil menonaktifkan ${idsToDeactivate.length} akun pengajar.`,
+    ];
+    if (skipped > 0) {
+      parts.push(
+        `Terlewat ${skipped} data, karena sudah nonaktif atau telah dihapus.`
+      );
+    }
+
     const response = new WithoutDataResource(
       200,
-      "NO_ACTION",
-      "Tidak Ada Perubahan",
-      "Payload 'deactivateAccount' bernilai false atau tidak dikirim. Akun tetap seperti semula."
+      "SUCCESS_DEACTIVATE_ACCOUNT",
+      "Berhasil Nonaktifkan Akun",
+      parts.join(" ")
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
@@ -553,80 +688,89 @@ exports.deactivateAccount = async (req, res) => {
 };
 
 exports.activateAccount = async (req, res) => {
-  const { id } = req.params;
   const trx = await knex.transaction();
 
   try {
-    const raw = req.body?.activateAccount;
-    const activateAccount =
-      typeof raw === "boolean"
-        ? raw
-        : typeof raw === "string"
-        ? ["true", "1", "yes", "on"].includes(raw.toLowerCase())
-        : false;
+    const ids = normIdArray(req.body?.activateAccountIds, {
+      as: "number",
+    }).filter(Number.isFinite);
+    if (ids.length === 0) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        400,
+        "INVALID_INPUT",
+        "Gagal Menghapus Data",
+        "Mohon kirimkan activateAccountIds berupa array ID numerik, misal: [1,2,3]."
+      );
+      return res.status(400).json(response.toResponse());
+    }
 
-    const existing = await trx("users")
-      .where("id", id)
+    const MAX_BULK = 50;
+    if (ids.length > MAX_BULK) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        400,
+        "TOO_MANY_IDS",
+        "Terlalu Banyak Data",
+        `Maksimal id yang bisa dihapus adalah ${MAX_BULK} ID.`
+      );
+      return res.status(400).json(response.toResponse());
+    }
+
+    const candidates = await trx("users")
+      .select("id")
+      .whereIn("id", ids)
+      .whereNot("id", 1)
       .where("role_id", 2)
-      .first();
-    if (!existing) {
+      .whereNull("deleted_at")
+      .whereNot("account_status", 2);
+    if (candidates.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Akun pengajar dengan ID '${id}' tidak ditemukan.`
+        "Tidak ada akun pengajar yang cocok untuk diaktifkan atau akun sudah aktif/terhapus."
       );
       return res.status(200).json(response.toResponse());
     }
 
-    if (!activateAccount) {
-      await trx.commit();
-      const response = new WithoutDataResource(
-        200,
-        "NO_ACTION",
-        "Tidak Ada Perubahan",
-        "Payload 'activateAccount' bernilai false atau tidak dikirim. Akun tetap seperti semula."
+    const idsToActivate = candidates.map((r) => r.id);
+
+    await trx("users").whereIn("id", idsToActivate).update({
+      account_status: 2,
+      deactivate_at: null,
+      updated_at: trx.fn.now(),
+    });
+
+    await activityLogHelper.logUpdate(
+      {
+        userId: activityLogHelper.fromReq(req),
+        module: "kmis",
+        subject: "Akun Pengajar",
+      },
+      trx
+    );
+
+    await trx.commit();
+
+    const skipped = ids.length - idsToActivate.length;
+    const parts = [
+      `Berhasil mengaktifkan ${idsToActivate.length} akun pengajar.`,
+    ];
+    if (skipped > 0) {
+      parts.push(
+        `Terlewat ${skipped} karena sudah aktif, bukan educator, atau telah dihapus.`
       );
-      return res.status(200).json(response.toResponse());
     }
 
-    if (existing.account_status === 2) {
-      await trx.commit();
-      const response = new WithoutDataResource(
-        200,
-        "ALREADY_ACTIVE",
-        "Akun Sudah Aktif",
-        `Akun pengajar dengan email '${existing.email}' sudah dalam status aktif.`
-      );
-      return res.status(200).json(response.toResponse());
-    }
-
-    if (existing.account_status === 1 || existing.account_status === 3) {
-      await trx("users").where("id", id).update({
-        account_status: 2,
-        deactivate_at: null,
-        updated_at: trx.fn.now(),
-      });
-
-      await activityLogHelper.logUpdate(
-        {
-          userId: activityLogHelper.fromReq(req),
-          module: "kmis",
-          subject: "Akun Pengajar",
-        },
-        trx
-      );
-
-      await trx.commit();
-      const response = new WithoutDataResource(
-        200,
-        "SUCCESS_ACTIVATE",
-        "Berhasil Mengaktifkan Akun",
-        `Akun pengajar dengan email '${existing.email}' berhasil diaktifkan.`
-      );
-      return res.status(200).json(response.toResponse());
-    }
+    const response = new WithoutDataResource(
+      200,
+      "SUCCESS_ACTIVATE_ACCOUNT",
+      "Berhasil Mengaktifkan Akun",
+      parts.join(" ")
+    );
+    return res.status(200).json(response.toResponse());
   } catch (error) {
     logger.error(
       `| Educator KMIS | - Error function activateAccount: ${error.message}`

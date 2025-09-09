@@ -20,9 +20,9 @@ async function educatorResource(educator) {
     id: user.id,
     user: user ? await UserResource(user) : null,
     totalMaterial,
-    created_at: educator.created_at,
-    updated_at: educator.updated_at,
-    deleted_at: educator.deleted_at,
+    createdAt: educator.created_at,
+    updatedAt: educator.updated_at,
+    deletedAt: educator.deleted_at,
   };
 }
 
