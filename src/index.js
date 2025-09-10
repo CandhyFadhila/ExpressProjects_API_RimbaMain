@@ -9,6 +9,7 @@ const authRoutes = require("./routes/authRoutes");
 const categoryRoutes = require("./routes/kmis/categoryRoutes");
 const topicRoutes = require("./routes/kmis/topicRoutes");
 const educatorRoutes = require("./routes/kmis/educatorRoutes");
+const studentRoutes = require("./routes/kmis/studentRoutes");
 
 const app = express();
 
@@ -60,6 +61,9 @@ app.use("/api/kmis/topic", topicRoutes);
 
 // Educator
 app.use("/api/kmis/educator", educatorRoutes);
+
+// Student
+app.use("/api/kmis/student", studentRoutes);
 
 // Jalankan server
 const PORT = process.env.PORT || 3000;

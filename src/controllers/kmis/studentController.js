@@ -12,7 +12,7 @@ const { normIdArray } = require("../../helpers/inputNorm");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const renderEmailTemplate = require("../../utils/emailOTP/renderEmailTemplate");
-const educatorResource = require("../../resources/kmis/educatorResource");
+const studentResource = require("../../resources/kmis/studentResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const {
   stripTitlesOnly,
@@ -26,7 +26,7 @@ exports.index = async (req, res) => {
   try {
     let query = knex("users as user")
       .leftJoin("roles as role", "user.role_id", "role.id")
-      .where("user.role_id", 2)
+      .where("user.role_id", 3)
       .select("user.*")
       .orderBy("user.created_at", "desc");
 
@@ -50,21 +50,21 @@ exports.index = async (req, res) => {
     // Ambil semua id user di halaman ini
     const ids = result.data.map((r) => r.id);
 
-    // Hitung total material per user sekali saja
-    const totals = await knex("kmis_materials")
-      .whereIn("created_by", ids)
+    // Hitung total topic per user sekali saja
+    const totals = await knex("kmis_quiz_attempts")
+      .whereIn("attempt_by", ids)
       .whereNull("deleted_at")
-      .groupBy("created_by")
-      .select("created_by")
+      .groupBy("attempt_by")
+      .select("attempt_by")
       .count({ total: "*" });
 
     const totalMap = new Map(
-      totals.map((t) => [Number(t.created_by), Number(t.total)])
+      totals.map((t) => [Number(t.attempt_by), Number(t.total)])
     );
 
     const serializedData = await Promise.all(
       result.data.map((row) =>
-        educatorResource({ ...row, total_material: totalMap.get(row.id) ?? 0 })
+        studentResource({ ...row, total_topic: totalMap.get(row.id) ?? 0 })
       )
     );
 
@@ -72,7 +72,7 @@ exports.index = async (req, res) => {
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      "Data akun pengajar berhasil diambil.",
+      "Data akun peserta berhasil diambil.",
       {
         data: serializedData,
         pagination: result.pagination,
@@ -80,7 +80,7 @@ exports.index = async (req, res) => {
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
-    logger.error(`| Educator KMIS | - Error function index : ${error.message}`);
+    logger.error(`| Student KMIS | - Error function index : ${error.message}`);
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -120,7 +120,7 @@ exports.store = async (req, res) => {
         400,
         "DUPLICATE_EMAIL",
         "Duplikat Data",
-        `Email '${email}' sudah digunakan oleh akun pengajar lain. Silakan gunakan email lain.`
+        `Email '${email}' sudah digunakan oleh akun peserta lain. Silakan gunakan email lain.`
       );
       return res.status(400).json(response.toResponse());
     }
@@ -133,7 +133,7 @@ exports.store = async (req, res) => {
       .insert({
         name,
         email,
-        role_id: 2,
+        role_id: 3,
         account_status: 1,
         password: passwordHash,
       })
@@ -143,7 +143,7 @@ exports.store = async (req, res) => {
       {
         userId: activityLogHelper.fromReq(req),
         module: "kmis",
-        subject: "Akun Pengajar",
+        subject: "Akun Peserta",
       },
       trx
     );
@@ -158,7 +158,7 @@ exports.store = async (req, res) => {
       },
     });
 
-    const htmlBody = renderEmailTemplate("credential_educator.html", {
+    const htmlBody = renderEmailTemplate("credential_student.html", {
       name: displayName,
       email: created.email,
       password: rawPassword,
@@ -170,12 +170,12 @@ exports.store = async (req, res) => {
     await transporter.sendMail({
       from: `"Rimba" <${process.env.MAIL_USERNAME}>`,
       to: created.email,
-      subject: "Credential Akun Pengajar RIMBA",
+      subject: "Credential Akun Peserta RIMBA",
       html: htmlBody,
     });
 
     logger.info(
-      `| Educator KMIS | - Credential email sent to ${
+      `| Student KMIS | - Credential email sent to ${
         created.email
       } at ${new Date().toISOString()}`
     );
@@ -184,12 +184,12 @@ exports.store = async (req, res) => {
       201,
       "SUCCESS_CREATE_DATA",
       "Berhasil Menyimpan Data",
-      `Data akun pengajar dengan email '${email}' berhasil ditambahkan.`
+      `Data akun peserta '${displayName}' berhasil ditambahkan.`
     );
     return res.status(201).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
-    logger.error(`| Educator KMIS | - Error function store: ${error.message}`);
+    logger.error(`| Student KMIS | - Error function store: ${error.message}`);
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -207,30 +207,30 @@ exports.show = async (req, res) => {
     const user = await knex("users")
       .select("*")
       .where("id", id)
-      .where("role_id", 2)
+      .where("role_id", 3)
       .first();
     if (!user) {
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Data pengajar dengan ID '${id}' tidak ditemukan.`
+        `Data peserta dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
 
-    const data = await educatorResource(user);
+    const data = await studentResource(user);
     const displayName = stripTitlesOnly(user.name);
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      `Detail data pengajar '${displayName}' berhasil didapatkan.`,
+      `Detail data peserta '${displayName}' berhasil didapatkan.`,
       data
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
-    logger.error(`| Educator KMIS | - Error function show: ${error.message}`);
+    logger.error(`| Student KMIS | - Error function show: ${error.message}`);
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -264,14 +264,14 @@ exports.update = async (req, res) => {
 
     const existing = await trx("users")
       .where("id", id)
-      .where("role_id", 2)
+      .where("role_id", 3)
       .first();
     if (!existing) {
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Data pengajar dengan ID '${id}' tidak ditemukan.`
+        `Data peserta dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
@@ -311,7 +311,7 @@ exports.update = async (req, res) => {
       {
         userId: activityLogHelper.fromReq(req),
         module: "kmis",
-        subject: "Akun Pengajar",
+        subject: "Akun Peserta",
       },
       trx
     );
@@ -325,15 +325,13 @@ exports.update = async (req, res) => {
         ? "Berhasil Mengaktifkan Akun"
         : "Berhasil Menonaktifkan Akun",
       accountStatus
-        ? `Akun pengajar dengan email '${email}' berhasil diaktifkan dan datanya diperbarui.`
-        : `Akun pengajar dengan email '${email}' berhasil dinonaktifkan dan datanya diperbarui.`
+        ? `Akun peserta dengan email '${email}' berhasil diaktifkan dan datanya diperbarui.`
+        : `Akun peserta dengan email '${email}' berhasil dinonaktifkan dan datanya diperbarui.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
-    logger.error(
-      `| Educator KMIS | - Error function update : ${error.message}`
-    );
+    logger.error(`| Student KMIS | - Error function update : ${error.message}`);
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -376,7 +374,7 @@ exports.destroy = async (req, res) => {
 
     const alreadyDeleted = await trx("users")
       .whereIn("id", ids)
-      .where("role_id", 2)
+      .where("role_id", 3)
       .where("account_status", 3)
       .whereNotNull("deactivate_at")
       .select("id", "name");
@@ -395,14 +393,14 @@ exports.destroy = async (req, res) => {
         409,
         "ACCOUNT_ALREADY_DELETED",
         "Akun Sudah Dihapus",
-        `Terdapat ${alreadyDeleted.length} akun pengajar yang sudah dihapus: ${list}${extra}. Operasi dibatalkan.`
+        `Terdapat ${alreadyDeleted.length} akun peserta yang sudah dihapus: ${list}${extra}. Operasi dibatalkan.`
       );
       return res.status(409).json(response.toResponse());
     }
 
     const existing = await trx("users")
       .whereIn("id", ids)
-      .where("role_id", 2)
+      .where("role_id", 3)
       .whereNot("account_status", 3)
       .select("id", "name");
     if (existing.length === 0) {
@@ -428,7 +426,7 @@ exports.destroy = async (req, res) => {
       {
         userId: activityLogHelper.fromReq(req),
         module: "kmis",
-        subject: "Akun Pengajar",
+        subject: "Akun Peserta",
       },
       trx
     );
@@ -439,13 +437,13 @@ exports.destroy = async (req, res) => {
       200,
       "SUCCESS_DELETE_DATA",
       "Berhasil Menghapus Data",
-      `Berhasil menghapus (soft delete) dan menonaktifkan ${existingIds.length} data pengajar.`
+      `Berhasil menghapus (soft delete) dan menonaktifkan ${existingIds.length} data peserta.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
     logger.error(
-      `| Educator KMIS | - Error function destroy : ${error.message}`
+      `| Student KMIS | - Error function destroy : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -489,7 +487,7 @@ exports.restore = async (req, res) => {
 
     const alreadyRestored = await trx("users")
       .whereIn("id", ids)
-      .where("role_id", 2)
+      .where("role_id", 3)
       .where("account_status", 2)
       .whereNull("deleted_at")
       .select("id", "name");
@@ -508,7 +506,7 @@ exports.restore = async (req, res) => {
         409,
         "ACCOUNT_NOT_DELETED",
         "Akun Belum Terhapus",
-        `Terdapat ${alreadyRestored.length} akun pengajar yang belum terhapus atau sudah dikembalikan: ${list}${extra}. Operasi dibatalkan.`
+        `Terdapat ${alreadyRestored.length} akun peserta yang belum terhapus atau sudah dikembalikan: ${list}${extra}. Operasi dibatalkan.`
       );
       return res.status(409).json(response.toResponse());
     }
@@ -516,7 +514,7 @@ exports.restore = async (req, res) => {
     const softDeleted = await trx("users")
       .select("id", "email")
       .whereIn("id", ids)
-      .where("role_id", 2)
+      .where("role_id", 3)
       .where("account_status", 3)
       .whereNotNull("deleted_at");
     if (softDeleted.length === 0) {
@@ -525,7 +523,7 @@ exports.restore = async (req, res) => {
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Tidak ada data akun pengajar terhapus yang cocok untuk direstore.`
+        `Tidak ada data akun peserta terhapus yang cocok untuk direstore.`
       );
       return res.status(200).json(response.toResponse());
     }
@@ -587,7 +585,7 @@ exports.restore = async (req, res) => {
       {
         userId: activityLogHelper.fromReq(req),
         module: "kmis",
-        subject: "Akun Pengajar",
+        subject: "Akun Peserta",
       },
       trx
     );
@@ -605,7 +603,7 @@ exports.restore = async (req, res) => {
     }
 
     const descParts = [
-      `Berhasil mengembalikan dan mengaktifkan kembali ${restoredCount} data pengajar.`,
+      `Berhasil mengembalikan dan mengaktifkan kembali ${restoredCount} data peserta.`,
     ];
     if (skippedConflicts.length) {
       descParts.push(
@@ -621,9 +619,7 @@ exports.restore = async (req, res) => {
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
-    logger.error(
-      `| Educator KMIS | - Error function restore: ${error.message}`
-    );
+    logger.error(`| Student KMIS | - Error function restore: ${error.message}`);
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -666,7 +662,7 @@ exports.deactivateAccount = async (req, res) => {
 
     const alreadyInactive = await trx("users")
       .whereIn("id", ids)
-      .where("role_id", 2)
+      .where("role_id", 3)
       .where("account_status", 3)
       .select("id", "name");
     if (alreadyInactive.length > 0) {
@@ -684,7 +680,7 @@ exports.deactivateAccount = async (req, res) => {
         409,
         "ACCOUNT_ALREADY_INACTIVE",
         "Akun Sudah Nonaktif",
-        `Terdapat ${alreadyInactive.length} akun pengajar yang sudah nonaktif: ${list}${extra}. Operasi dibatalkan.`
+        `Terdapat ${alreadyInactive.length} akun peserta yang sudah nonaktif: ${list}${extra}. Operasi dibatalkan.`
       );
       return res.status(409).json(response.toResponse());
     }
@@ -693,7 +689,7 @@ exports.deactivateAccount = async (req, res) => {
     const candidates = await trx("users")
       .select("id", "email")
       .whereIn("id", ids)
-      .where("role_id", 2)
+      .where("role_id", 3)
       .whereNull("deleted_at")
       .whereNot("account_status", 3);
     if (candidates.length === 0) {
@@ -702,7 +698,7 @@ exports.deactivateAccount = async (req, res) => {
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        "Tidak ada akun pengajar yang cocok untuk dinonaktifkan atau akun sudah nonaktif/terhapus."
+        "Tidak ada akun peserta yang cocok untuk dinonaktifkan atau akun sudah nonaktif/terhapus."
       );
       return res.status(200).json(response.toResponse());
     }
@@ -719,7 +715,7 @@ exports.deactivateAccount = async (req, res) => {
       {
         userId: activityLogHelper.fromReq(req),
         module: "kmis",
-        subject: "Akun Pengajar",
+        subject: "Akun Peserta",
       },
       trx
     );
@@ -729,7 +725,7 @@ exports.deactivateAccount = async (req, res) => {
     const skipped = ids.length - idsToDeactivate.length;
 
     const parts = [
-      `Berhasil menonaktifkan ${idsToDeactivate.length} akun pengajar.`,
+      `Berhasil menonaktifkan ${idsToDeactivate.length} akun peserta.`,
     ];
     if (skipped > 0) {
       parts.push(
@@ -747,7 +743,7 @@ exports.deactivateAccount = async (req, res) => {
   } catch (error) {
     await trx.rollback();
     logger.error(
-      `| Educator KMIS | - Error function deactivateAccount : ${error.message}`
+      `| Student KMIS | - Error function deactivateAccount : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -789,9 +785,9 @@ exports.activateAccount = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-        const alreadyActive = await trx("users")
+    const alreadyActive = await trx("users")
       .whereIn("id", ids)
-      .where("role_id", 2)
+      .where("role_id", 3)
       .where("account_status", 2)
       .select("id", "name");
     if (alreadyActive.length > 0) {
@@ -809,7 +805,7 @@ exports.activateAccount = async (req, res) => {
         409,
         "ACCOUNT_ALREADY_ACTIVE",
         "Akun Sudah Aktif",
-        `Terdapat ${alreadyActive.length} akun pengajar yang sudah aktif: ${list}${extra}. Operasi dibatalkan.`
+        `Terdapat ${alreadyActive.length} akun peserta yang sudah aktif: ${list}${extra}. Operasi dibatalkan.`
       );
       return res.status(409).json(response.toResponse());
     }
@@ -817,7 +813,7 @@ exports.activateAccount = async (req, res) => {
     const candidates = await trx("users")
       .select("id")
       .whereIn("id", ids)
-      .where("role_id", 2)
+      .where("role_id", 3)
       .whereNull("deleted_at")
       .whereNot("account_status", 2);
     if (candidates.length === 0) {
@@ -826,7 +822,7 @@ exports.activateAccount = async (req, res) => {
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        "Tidak ada akun pengajar yang cocok untuk diaktifkan atau akun sudah aktif/terhapus."
+        "Tidak ada akun peserta yang cocok untuk diaktifkan atau akun sudah aktif/terhapus."
       );
       return res.status(200).json(response.toResponse());
     }
@@ -843,7 +839,7 @@ exports.activateAccount = async (req, res) => {
       {
         userId: activityLogHelper.fromReq(req),
         module: "kmis",
-        subject: "Akun Pengajar",
+        subject: "Akun Peserta",
       },
       trx
     );
@@ -852,7 +848,7 @@ exports.activateAccount = async (req, res) => {
 
     const skipped = ids.length - idsToActivate.length;
     const parts = [
-      `Berhasil mengaktifkan ${idsToActivate.length} akun pengajar.`,
+      `Berhasil mengaktifkan ${idsToActivate.length} akun peserta.`,
     ];
     if (skipped > 0) {
       parts.push(
@@ -869,7 +865,7 @@ exports.activateAccount = async (req, res) => {
     return res.status(200).json(response.toResponse());
   } catch (error) {
     logger.error(
-      `| Educator KMIS | - Error function activateAccount: ${error.message}`
+      `| Student KMIS | - Error function activateAccount: ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
