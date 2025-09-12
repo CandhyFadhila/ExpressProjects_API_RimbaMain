@@ -7,7 +7,9 @@ const documentResource = require("../../resources/doc/documentResource");
 
 async function topicResource(topic) {
   const category = topic.kmis_categories_id
-    ? await knex("kmis_categories").where("id", topic.kmis_categories_id).first()
+    ? await knex("kmis_categories")
+        .where("id", topic.kmis_categories_id)
+        .first()
     : null;
 
   const photos = await resolveArrayRelations(
@@ -24,7 +26,7 @@ async function topicResource(topic) {
     description: topic.description,
     createdAt: topic.created_at,
     updatedAt: topic.updated_at,
-    deeltedAt: topic.deleted_at,
+    deletedAt: topic.deleted_at,
   };
 }
 

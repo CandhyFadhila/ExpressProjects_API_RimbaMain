@@ -565,3 +565,11 @@ exports.getUserbyId = async (req, res) => {
 };
 
 // Material
+// TODO: Buat material
+// get all material
+// get material by category id - (id param)
+// get material by topic id - (id param)
+// get material by created id, kecuali id super admin - (id param)
+// get material by uploaded id - (id param)
+// get material by material_types (string) - (payload)
+// get material by is_public (boolean) - (payload)
