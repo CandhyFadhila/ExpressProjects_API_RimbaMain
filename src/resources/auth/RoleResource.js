@@ -1,5 +1,3 @@
-const { update } = require("../../config/database");
-
 async function roleResource(roles) {
   return {
     id: roles.id,

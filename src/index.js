@@ -46,12 +46,79 @@ app.get("/check-db", async (req, res) => {
 // Auth
 app.use("/api", authRoutes);
 // TODO: section user info
-// 1. get all activity logs user login
+// 1. get all activity logs user login, kalau yang login superadmin bisa lihat activity logs semua role. Contoh output ini
+// {
+//   [
+//     {
+//       role: "superadmin",
+//       dataActivity: [
+//         {
+//           user; "superadmin1",
+//           activity: [
+//             {
+//               activity: "login",
+//             }
+//           ],
+//         },
+//         {
+//           user; "superadmin2",
+//           activity: [
+//             {
+//               activity: "login",
+//             }
+//           ],
+//         },
+//       ],
+//     },
+//     {
+//       role: "educator",
+//       dataActivity: [
+//         {
+//           user; "educator1",
+//           activity: [
+//             {
+//               activity: "login",
+//             }
+//           ],
+//         },
+//         {
+//           user; "educator2",
+//           activity: [
+//             {
+//               activity: "login",
+//             }
+//           ],
+//         },
+//       ],
+//     },
+//     {
+//       role: "student",
+//       dataActivity: [
+//         {
+//           user; "student1",
+//           activity: [
+//             {
+//               activity: "login",
+//             }
+//           ],
+//         },
+//         {
+//           user; "student2",
+//           activity: [
+//             {
+//               activity: "login",
+//             }
+//           ],
+//         },
+//       ],
+//     },
+//   ];
+// }
 // 2. change photo profile
 // 3. change password
 
 // Public Request
-app.use("/api/public-request", publicRequestRoute);
+app.use("/api/kmis/public-request", publicRequestRoute);
 
 // KMIS
 // Category

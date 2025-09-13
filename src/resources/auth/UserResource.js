@@ -26,20 +26,20 @@ async function userResource(user) {
     // Data identitas (tanpa password)
     name: user.name,
     email: user.email,
-    phoneNumber: user.phone_number ?? null,
-    profession: user.profession ?? null,
+    phoneNumber: user.phone_number,
+    profession: user.profession,
     gender: user.gender,
-    birthDate: user.birth_date ?? null,
-    address: user.address ?? null,
+    birthDate: user.birth_date,
+    address: user.address,
 
     // Status akun: kode & label
     accountStatus: user.account_status,
 
     // Audit fields / aktivitas
-    registerAt: user.register_at ?? null,
-    deactiveAt: user.deactivate_at ?? null,
-    lastLogin: user.last_login ?? null,
-    lastChangePassword: user.last_change_password ?? null,
+    registerAt: user.register_at,
+    deactiveAt: user.deactivate_at,
+    lastLogin: user.last_login,
+    lastChangePassword: user.last_change_password,
 
     createdAt: user.created_at,
     updatedAt: user.updated_at,

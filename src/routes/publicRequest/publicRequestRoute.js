@@ -73,4 +73,53 @@ router.get(
   publicRequestController.getUserbyId
 );
 
+// Material
+router.get(
+  "/get-all-material",
+  rateLimiter,
+  publicRequestController.getAllMaterial
+);
+
+router.get(
+  "/get-material/:id",
+  rateLimiter,
+  publicRequestController.getMaterialbyId
+);
+
+router.get(
+  "/get-material-by-category/:id",
+  rateLimiter,
+  publicRequestController.getMaterialbyCategoryId
+);
+
+router.get(
+  "/get-material-by-topic/:id",
+  rateLimiter,
+  publicRequestController.getMaterialbyTopicId
+);
+
+router.get(
+  "/get-material-by-created/:id",
+  rateLimiter,
+  publicRequestController.getMaterialbyCreatedId
+);
+
+router.get(
+  "/get-material-by-uploaded/:id",
+  rateLimiter,
+  publicRequestController.getMaterialbyUploadedId
+);
+
+router.get(
+  "/get-material-by-type",
+  rateLimiter,
+  publicRequestController.getMaterialbyMaterialTypes
+);
+
+router.get(
+  "/get-material-by-public",
+  rateLimiter,
+  publicRequestController.getMaterialbyIsPublic
+);
+
 module.exports = router;
