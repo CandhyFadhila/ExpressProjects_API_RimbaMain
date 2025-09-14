@@ -7,7 +7,7 @@ const documentResource = require("../../resources/doc/documentResource");
 
 async function userResource(user) {
   const role = user.role_id
-    ? await knex("roles").where({ id: user.role_id }).first()
+    ? await knex("roles").where("id", user.role_id).first()
     : null;
 
   const photos = await resolveArrayRelations(

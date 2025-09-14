@@ -9,6 +9,11 @@ const {
   normIdArray,
 } = require("../helpers/inputNorm");
 const {
+  applySearch,
+  applyPagination,
+  formatPaginationResult,
+} = require("../helpers/queryHelper");
+const {
   stripTitlesOnly,
   makeInitialPasswordFromName,
 } = require("../helpers/credentialHelper");
@@ -18,6 +23,7 @@ const renderEmailTemplate = require("../utils/emailOTP/renderEmailTemplate");
 const WithDataResource = require("../resources/WithDataResource");
 const WithoutDataResource = require("../resources/WithoutDataResource");
 const UserResource = require("../resources/auth/UserResource");
+const activityLogResource = require("../resources/auth/activityLogResource");
 const activityLogHelper = require("../helpers/activityLogHelper");
 
 exports.getUserProfile = async (req, res) => {
@@ -65,6 +71,77 @@ exports.getUserProfile = async (req, res) => {
       "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
     );
     res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getUserActivitybyUserId = async (req, res) => {
+  const { id } = req.params;
+  const { search } = req.query;
+
+  try {
+    const user = await knex("users as user")
+      .where("user.id", id)
+      .whereNot("user.role_id", 1) // Skip super admin
+      .whereNull("user.deleted_at")
+      .first();
+    if (!user) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data akun pengguna dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    let query = knex("activity_logs as activity")
+      .leftJoin("users as user", "user.id", "activity.user_id") // agar bisa search nama user (opsional)
+      .select("activity.*")
+      .where("activity.user_id", user.id)
+      .whereNull("activity.deleted_at")
+      .orderBy("activity.created_at", "desc");
+
+    applySearch(query, search, ["activity.module", "activity.key", "user.name"]);
+
+    const paginationInfo = applyPagination(query, req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((row) => activityLogResource(row, user))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data aktivitas pengguna berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Profile | - Error function getUserActivitybyUserId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
   }
 };
 

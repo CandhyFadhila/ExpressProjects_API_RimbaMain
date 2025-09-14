@@ -12,13 +12,19 @@ const uploadMaterialFields = upload.fields([{ name: "files", maxCount: 1 }]);
 
 router.use(
   rateLimiter,
-  authMiddleware,
-  requireAnyAbility(["super_admin", "educator", "student"])
+  authMiddleware
 );
 
 router.get(
   "/get-user-profile",
+  requireAnyAbility(["super_admin", "educator", "student"]),
   profileController.getUserProfile
+);
+
+router.get(
+  "/activity-log/:id",
+  requireAnyAbility(["super_admin", "educator"]),
+  profileController.getUserActivitybyUserId
 );
 
 router.patch(
@@ -26,6 +32,7 @@ router.patch(
   uploadMaterialFields,
   profileValidator,
   validate,
+  requireAnyAbility(["super_admin", "educator", "student"]),
   profileController.updateUserData
 );
 

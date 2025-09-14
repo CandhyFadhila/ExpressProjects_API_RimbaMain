@@ -345,7 +345,7 @@ exports.getAllUser = async (req, res) => {
 
   try {
     let query = knex("users as user")
-      .whereNot("user.id", 1) // Skip super admin
+      .whereNot("user.role_id", 1) // Skip super admin
       .where("user.account_status", 2)
       .leftJoin("roles as role", "user.role_id", "role.id")
       .select([
@@ -529,7 +529,7 @@ exports.getAllUserbyRoleId = async (req, res) => {
 
   try {
     let query = knex("users as user")
-      .whereNot("user.id", 1) // Skip super admin
+      .whereNot("user.role_id", 1) // Skip super admin
       .where("user.account_status", 2)
       .where("user.role_id", id)
       .leftJoin("roles as role", "user.role_id", "role.id")
@@ -592,7 +592,7 @@ exports.getUserbyId = async (req, res) => {
   try {
     const user = await knex("users")
       .select(["name", "email", "role_id", "photo_profile_ids"])
-      .whereNot("id", 1) // Skip super admin
+      .whereNot("role_id", 1) // Skip super admin
       .where("id", id)
       .where("account_status", 2)
       .whereNull("deleted_at")
