@@ -1,5 +1,6 @@
 const knex = require("../config/database");
 const StorageServerHelper = require("../helpers/storageServerHelper");
+const { encodeUrl } = require("../helpers/urlEncoderHelper");
 const logger = require("../utils/logger");
 
 class DocumentHelper {
@@ -20,7 +21,7 @@ class DocumentHelper {
                 file_id: uploadedFile.server_file_id,
                 file_name: uploadedFile.server_file_name,
                 file_path: uploadedFile.server_file_path,
-                file_url: uploadedFile.server_file_url,
+                file_url: encodeUrl(uploadedFile.server_file_url),
                 file_mime_type: uploadedFile.server_file_mime_type,
                 file_size: uploadedFile.server_file_size,
               })

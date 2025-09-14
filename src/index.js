@@ -47,76 +47,7 @@ app.get("/check-db", async (req, res) => {
 // Auth
 app.use("/api", authRoutes);
 // TODO: section user info
-// 1. get all activity logs user login, kalau yang login superadmin bisa lihat activity logs semua role, kalau yang login educator bisa lihat activity logs educator dia sendiri (id educator yang login) dan activity logs student. Contoh output ini
-// {
-//   [
-//     {
-//       role: "superadmin",
-//       dataActivity: [
-//         {
-//           user; "superadmin1",
-//           activity: [
-//             {
-//               activity: "login",
-//             }
-//           ],
-//         },
-//         {
-//           user; "superadmin2",
-//           activity: [
-//             {
-//               activity: "login",
-//             }
-//           ],
-//         },
-//       ],
-//     },
-//     {
-//       role: "educator",
-//       dataActivity: [
-//         {
-//           user; "educator1",
-//           activity: [
-//             {
-//               activity: "login",
-//             }
-//           ],
-//         },
-//         {
-//           user; "educator2",
-//           activity: [
-//             {
-//               activity: "login",
-//             }
-//           ],
-//         },
-//       ],
-//     },
-//     {
-//       role: "student",
-//       dataActivity: [
-//         {
-//           user; "student1",
-//           activity: [
-//             {
-//               activity: "login",
-//             }
-//           ],
-//         },
-//         {
-//           user; "student2",
-//           activity: [
-//             {
-//               activity: "login",
-//             }
-//           ],
-//         },
-//       ],
-//     },
-//   ];
-// }
-// 2. change photo profile
-// 3. change password
+// 1. get all activity logs by user id (yang bisa hanya superadmin)
 
 app.use("/api/profile", profileRoutes);
 

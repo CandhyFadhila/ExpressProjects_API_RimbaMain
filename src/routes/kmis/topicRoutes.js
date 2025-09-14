@@ -9,7 +9,6 @@ const rateLimiter = require("../../middlewares/rateLimitMiddleware");
 const requireAbility = require("../../middlewares/requireAbility");
 const multer = require("multer");
 const upload = multer();
-const uploadMaterialFields = upload.fields([{ name: "files", maxCount: 1 }]);
 
 router.use(
   rateLimiter,
@@ -29,7 +28,7 @@ router.get(
 
 router.post(
   "/sso/create",
-  uploadMaterialFields,
+  upload.array("files", 1),
   storeTopicValidator,
   validate,
   topicController.store
@@ -37,7 +36,7 @@ router.post(
 
 router.patch(
   "/sso/update/:id",
-  uploadMaterialFields,
+  upload.array("files", 1),
   updateTopicValidator,
   validate,
   topicController.update
