@@ -9,58 +9,47 @@ const rateLimiter = require("../../middlewares/rateLimitMiddleware");
 const requireAbility = require("../../middlewares/requireAbility");
 const multer = require("multer");
 const upload = multer();
+const uploadMaterialFields = upload.fields([{ name: "files", maxCount: 1 }]);
+
+router.use(
+  rateLimiter,
+  authMiddleware,
+  requireAbility("super_admin")
+);
 
 router.get(
   "/sso/index",
-  rateLimiter,
-  authMiddleware,
-  requireAbility("super_admin"),
   topicController.index
 );
 
 router.get(
   "/sso/show/:id",
-  rateLimiter,
-  authMiddleware,
-  requireAbility("super_admin"),
   topicController.show
 );
 
 router.post(
   "/sso/create",
-  rateLimiter,
-  authMiddleware,
-  upload.array("files", 1),
+  uploadMaterialFields,
   storeTopicValidator,
   validate,
-  requireAbility("super_admin"),
   topicController.store
 );
 
 router.patch(
   "/sso/update/:id",
-  rateLimiter,
-  authMiddleware,
-  upload.array("files", 1),
+  uploadMaterialFields,
   updateTopicValidator,
   validate,
-  requireAbility("super_admin"),
   topicController.update
 );
 
 router.delete(
   "/sso/delete",
-  rateLimiter,
-  authMiddleware,
-  requireAbility("super_admin"),
   topicController.destroy
 );
 
 router.patch(
   "/sso/restore",
-  rateLimiter,
-  authMiddleware,
-  requireAbility("super_admin"),
   topicController.restore
 );
 

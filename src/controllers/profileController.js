@@ -1,6 +1,7 @@
 const { validationResult } = require("express-validator");
 const knex = require("../config/database");
 const bcrypt = require("bcryptjs");
+const nodemailer = require("nodemailer");
 const logger = require("../utils/logger");
 const {
   toArray,
