@@ -175,7 +175,7 @@ exports.store = async (req, res) => {
     });
 
     logger.info(
-      `| Educator KMIS | - Credential email sent to ${
+      `| Educator KMIS | - Credential email successfully sent to ${
         created.email
       } at ${new Date().toISOString()}`
     );
@@ -789,7 +789,7 @@ exports.activateAccount = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-        const alreadyActive = await trx("users")
+    const alreadyActive = await trx("users")
       .whereIn("id", ids)
       .where("role_id", 2)
       .where("account_status", 2)

@@ -16,8 +16,8 @@ async function getPgClientWindows() {
 async function getPgClientLinux() {
   const client = new Client({
     host: "localhost",
-    user: "gisuser",
-    database: "gisdb",
+    user: "user_rimba",
+    database: "db_rimba",
     password: "password_kuat",
     port: 5432,
   });

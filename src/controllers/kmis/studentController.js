@@ -175,7 +175,7 @@ exports.store = async (req, res) => {
     });
 
     logger.info(
-      `| Student KMIS | - Credential email sent to ${
+      `| Student KMIS | - Credential email successfully sent to ${
         created.email
       } at ${new Date().toISOString()}`
     );

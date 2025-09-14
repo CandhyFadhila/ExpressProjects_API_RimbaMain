@@ -11,6 +11,7 @@ const topicRoutes = require("./routes/kmis/topicRoutes");
 const educatorRoutes = require("./routes/kmis/educatorRoutes");
 const studentRoutes = require("./routes/kmis/studentRoutes");
 const materialRoutes = require("./routes/kmis/materialRoutes");
+const profileRoutes = require("./routes/profileRoutes");
 
 const app = express();
 
@@ -46,7 +47,7 @@ app.get("/check-db", async (req, res) => {
 // Auth
 app.use("/api", authRoutes);
 // TODO: section user info
-// 1. get all activity logs user login, kalau yang login superadmin bisa lihat activity logs semua role. Contoh output ini
+// 1. get all activity logs user login, kalau yang login superadmin bisa lihat activity logs semua role, kalau yang login educator bisa lihat activity logs educator dia sendiri (id educator yang login) dan activity logs student. Contoh output ini
 // {
 //   [
 //     {
@@ -116,6 +117,9 @@ app.use("/api", authRoutes);
 // }
 // 2. change photo profile
 // 3. change password
+
+app.use("/api/profile", profileRoutes);
+
 
 // Public Request
 app.use("/api/kmis/public-request", publicRequestRoute);
