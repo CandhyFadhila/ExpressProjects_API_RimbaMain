@@ -46,16 +46,12 @@ app.get("/check-db", async (req, res) => {
 
 // Auth
 app.use("/api", authRoutes);
-// TODO: section user info
-// 1. get all activity logs by user id (yang bisa hanya superadmin)
-
 app.use("/api/profile", profileRoutes);
-
 
 // Public Request
 app.use("/api/kmis/public-request", publicRequestRoute);
 
-// KMIS
+//! ======== KMIS MODULE ========
 // Category
 app.use("/api/kmis/category", categoryRoutes);
 
@@ -70,6 +66,7 @@ app.use("/api/kmis/student", studentRoutes);
 
 // Material
 app.use("/api/kmis/material", materialRoutes);
+//! ======== KMIS MODULE ========
 
 // Jalankan server
 const PORT = process.env.PORT || 3000;

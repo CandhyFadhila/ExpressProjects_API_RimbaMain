@@ -12,7 +12,7 @@ const {
   applyPagination,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
-const documentHelper = require("../../helpers/DocumentHelper");
+const DocumentHelper = require("../../helpers/DocumentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const categoryResource = require("../../resources/kmis/categoryResource");
@@ -154,7 +154,7 @@ exports.store = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    const uploadedDocuments = await documentHelper.uploadDocuments(
+    const uploadedDocuments = await DocumentHelper.uploadDocuments(
       req.files,
       req
     );
@@ -295,13 +295,13 @@ exports.update = async (req, res) => {
 
     let finalDocId = oldDocId;
     if (finalDocId != null && deletedIds.includes(String(finalDocId))) {
-      await documentHelper.deleteDocuments([finalDocId]);
+      await DocumentHelper.deleteDocuments([finalDocId]);
       finalDocId = null;
     }
 
     let uploadIds = null;
     if (Array.isArray(req.files) && req.files.length > 0) {
-      uploadIds = await documentHelper.uploadDocuments(req.files, req);
+      uploadIds = await DocumentHelper.uploadDocuments(req.files, req);
     }
 
     const coverId = uploadIds?.[0] ?? finalDocId ?? null;
@@ -553,7 +553,9 @@ exports.restore = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    const descParts = [`Berhasil mengembalikan ${restoredCount} data yang terhapus.`];
+    const descParts = [
+      `Berhasil mengembalikan ${restoredCount} data yang terhapus.`,
+    ];
     if (skippedConflicts.length) {
       descParts.push(
         `Terlewat ${skippedConflicts.length} karena bentrok/duplikat data.`

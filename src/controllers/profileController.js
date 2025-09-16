@@ -18,7 +18,7 @@ const {
   makeInitialPasswordFromName,
 } = require("../helpers/credentialHelper");
 const { asJsonb } = require("../helpers/dbJson");
-const documentHelper = require("../helpers/DocumentHelper");
+const DocumentHelper = require("../helpers/DocumentHelper");
 const renderEmailTemplate = require("../utils/emailOTP/renderEmailTemplate");
 const WithDataResource = require("../resources/WithDataResource");
 const WithoutDataResource = require("../resources/WithoutDataResource");
@@ -101,7 +101,11 @@ exports.getUserActivitybyUserId = async (req, res) => {
       .whereNull("activity.deleted_at")
       .orderBy("activity.created_at", "desc");
 
-    applySearch(query, search, ["activity.module", "activity.key", "user.name"]);
+    applySearch(query, search, [
+      "activity.module",
+      "activity.key",
+      "user.name",
+    ]);
 
     const paginationInfo = applyPagination(query, req.query);
 
@@ -205,7 +209,7 @@ exports.updateUserData = async (req, res) => {
 
     let newDocId = null;
     if (hasNewUpload) {
-      const uploadedIds = await documentHelper.uploadDocuments(
+      const uploadedIds = await DocumentHelper.uploadDocuments(
         [uploadedFile],
         req
       );
@@ -275,7 +279,7 @@ exports.updateUserData = async (req, res) => {
 
     // Hapus foto lama hanya pada case REPLACE (ada foto lama & ada upload baru & ID berubah)
     if (hasOldPhoto && hasNewUpload && newDocId && newDocId !== oldDocId) {
-      documentHelper.deleteDocuments([oldDocId]).catch((err) => {
+      DocumentHelper.deleteDocuments([oldDocId]).catch((err) => {
         logger.warn(`Gagal hapus foto lama user ${userId}: ${err.message}`);
       });
     }
