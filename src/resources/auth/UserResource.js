@@ -1,11 +1,11 @@
 const {
   resolveArrayRelations,
 } = require("../../helpers/resolveArrayRelations");
-const roleResource = require("../auth/RoleResource");
+const RoleResource = require("../auth/RoleResource");
 const knex = require("../../config/database");
 const documentResource = require("../../resources/doc/documentResource");
 
-async function userResource(user) {
+async function UserResource(user) {
   const role = user.role_id
     ? await knex("roles").where("id", user.role_id).first()
     : null;
@@ -20,7 +20,7 @@ async function userResource(user) {
     id: user.id,
 
     // Relasi role
-    role: role ? await roleResource(role) : null,
+    role: role ? await RoleResource(role) : null,
     photoProfile: photos,
 
     // Data identitas (tanpa password)
@@ -47,4 +47,4 @@ async function userResource(user) {
   };
 }
 
-module.exports = userResource;
+module.exports = UserResource;

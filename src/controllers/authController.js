@@ -12,7 +12,7 @@ const WithDataResource = require("../resources/WithDataResource");
 const WithoutDataResource = require("../resources/WithoutDataResource");
 const { stripTitlesOnly } = require("../helpers/credentialHelper");
 const renderEmailTemplate = require("../utils/emailOTP/renderEmailTemplate");
-const userResource = require("../resources/auth/UserResource");
+const UserResource = require("../resources/auth/UserResource");
 const dateHelper = require("../helpers/dateHelper");
 const JWT_SECRET = process.env.JWT_SECRET_KEY || "secretkey";
 
@@ -60,7 +60,7 @@ exports.getUserInfo = async (req, res) => {
       `| GetUserInfo | - User info fetched for userId: ${userId}, at ${new Date().toISOString()}`
     );
 
-    const serialized = await userResource(user);
+    const serialized = await UserResource(user);
     const response = new WithDataResource(
       200, // HTTP Status Code: OK
       "SUCCESS_GET_USER_INFO",
@@ -509,7 +509,7 @@ async function signInWithContext(req, res, { context, requiredRole, ability }) {
     const token = signToken({ userId: user.id, roleName, ability, context });
 
     // Serialize & ambil field minimal
-    const serialized = await userResource({ ...user, last_login: now });
+    const serialized = await UserResource({ ...user, last_login: now });
     const minimalUser = {
       id: serialized.id,
       role: serialized.role,

@@ -1,4 +1,4 @@
-async function roleResource(roles) {
+async function RoleResource(roles) {
   return {
     id: roles.id,
     name: roles.name,
@@ -9,4 +9,4 @@ async function roleResource(roles) {
   };
 }
 
-module.exports = roleResource;
+module.exports = RoleResource;

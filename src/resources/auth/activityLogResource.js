@@ -1,9 +1,9 @@
-const userResource = require("../auth/UserResource");
+const UserResource = require("../auth/UserResource");
 
 async function activityLogResource(activity, user = null) {
   return {
     id: activity.id,
-    user: user ? await userResource(user) : null,
+    user: user ? await UserResource(user) : null,
     module: activity.module,
     key: activity.key,
     description: activity.description,
