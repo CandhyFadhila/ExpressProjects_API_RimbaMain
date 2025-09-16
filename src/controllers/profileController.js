@@ -18,7 +18,7 @@ const {
   makeInitialPasswordFromName,
 } = require("../helpers/credentialHelper");
 const { asJsonb } = require("../helpers/dbJson");
-const DocumentHelper = require("../helpers/DocumentHelper");
+const documentHelper = require("../helpers/documentHelper");
 const renderEmailTemplate = require("../utils/emailOTP/renderEmailTemplate");
 const WithDataResource = require("../resources/WithDataResource");
 const WithoutDataResource = require("../resources/WithoutDataResource");
@@ -209,7 +209,7 @@ exports.updateUserData = async (req, res) => {
 
     let newDocId = null;
     if (hasNewUpload) {
-      const uploadedIds = await DocumentHelper.uploadDocuments(
+      const uploadedIds = await documentHelper.uploadDocuments(
         [uploadedFile],
         req
       );
@@ -279,7 +279,7 @@ exports.updateUserData = async (req, res) => {
 
     // Hapus foto lama hanya pada case REPLACE (ada foto lama & ada upload baru & ID berubah)
     if (hasOldPhoto && hasNewUpload && newDocId && newDocId !== oldDocId) {
-      DocumentHelper.deleteDocuments([oldDocId]).catch((err) => {
+      documentHelper.deleteDocuments([oldDocId]).catch((err) => {
         logger.warn(`Gagal hapus foto lama user ${userId}: ${err.message}`);
       });
     }

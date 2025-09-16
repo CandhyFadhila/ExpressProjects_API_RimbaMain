@@ -3,10 +3,15 @@ const StorageServerHelper = require("../helpers/storageServerHelper");
 const { encodeUrl } = require("../helpers/urlEncoderHelper");
 const logger = require("../utils/logger");
 
-class DocumentHelper {
+class documentHelper {
   static async uploadDocuments(files, req) {
     const documentIds = [];
-    const userId = req.auth?.userId ?? req.auth?.user_id ?? req.auth?.id ?? req.userId ?? req.user?.id;
+    const userId =
+      req.auth?.userId ??
+      req.auth?.user_id ??
+      req.auth?.id ??
+      req.userId ??
+      req.user?.id;
     try {
       const uploadedFiles = await StorageServerHelper.uploadToServer(files);
 
@@ -28,21 +33,21 @@ class DocumentHelper {
               .returning(["id"]);
 
             documentIds.push(Number(id));
-            logger.info("| DocumentHelper | - Document uploaded successfully", {
+            logger.info("| documentHelper | - Document uploaded successfully", {
               file_name: uploadedFile.server_file_name,
               file_size: uploadedFile.server_file_size,
               document_id: id,
             });
           } else {
             logger.error(
-              "| DocumentHelper | - Failed to save document. No file_id in response.",
+              "| documentHelper | - Failed to save document. No file_id in response.",
               uploadedFile
             );
           }
         }
       } else {
         logger.error(
-          "| DocumentHelper | - Invalid upload response format.",
+          "| documentHelper | - Invalid upload response format.",
           uploadedFiles
         );
       }
@@ -63,7 +68,7 @@ class DocumentHelper {
         .select("file_id")
         .whereIn("id", documentIdsToDelete);
 
-      const fileIds = documents.map(doc => doc.file_id);
+      const fileIds = documents.map((doc) => doc.file_id);
 
       // 1) Soft delete database dulu
       await knex("documents")
@@ -73,19 +78,22 @@ class DocumentHelper {
       // 2) Setelah commit, baru hapus file di storage server
       if (fileIds.length > 0) {
         const res = await StorageServerHelper.deleteFromServer(fileIds);
-        logger.info("| DocumentHelper | - Documents deleted from storage.", {
+        logger.info("| documentHelper | - Documents deleted from storage.", {
           file_ids: fileIds,
           document_ids: documentIdsToDelete,
-          result: res
+          result: res,
         });
       }
     } catch (error) {
-      logger.error("| Document Helper | - Failed to delete document from storage.", {
-        error: error.message
-      });
+      logger.error(
+        "| Document Helper | - Failed to delete document from storage.",
+        {
+          error: error.message,
+        }
+      );
       throw new Error("Failed to delete documents.");
     }
   }
 }
 
-module.exports = DocumentHelper;
+module.exports = documentHelper;

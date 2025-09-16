@@ -13,7 +13,7 @@ const {
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
 const { hasAbility } = require("../../middlewares/requireAbility");
-const DocumentHelper = require("../../helpers/DocumentHelper");
+const documentHelper = require("../../helpers/documentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
@@ -270,10 +270,10 @@ exports.store = async (req, res) => {
     let uploadedCoverIds = [];
     let uploadedFileIds = [];
     if (coverFiles.length > 0) {
-      uploadedCoverIds = await DocumentHelper.uploadDocuments(coverFiles, req);
+      uploadedCoverIds = await documentHelper.uploadDocuments(coverFiles, req);
     }
     if (materiFiles.length > 0) {
-      uploadedFileIds = await DocumentHelper.uploadDocuments(materiFiles, req);
+      uploadedFileIds = await documentHelper.uploadDocuments(materiFiles, req);
     }
     const coverFromBody = normIdArray(req.body.materialCovers, {
       as: "number",
@@ -555,13 +555,13 @@ exports.update = async (req, res) => {
     let uploadedFileIds = [];
     if (coverFiles.length > 0) {
       uploadedCoverIds = normIdArray(
-        await DocumentHelper.uploadDocuments(coverFiles, req),
+        await documentHelper.uploadDocuments(coverFiles, req),
         { as: "number" }
       );
     }
     if (materiFiles.length > 0) {
       uploadedFileIds = normIdArray(
-        await DocumentHelper.uploadDocuments(materiFiles, req),
+        await documentHelper.uploadDocuments(materiFiles, req),
         { as: "number" }
       );
     }
@@ -656,7 +656,7 @@ exports.update = async (req, res) => {
     );
     if (willDelete.length) {
       try {
-        await DocumentHelper.deleteDocuments(willDelete);
+        await documentHelper.deleteDocuments(willDelete);
       } catch (e) {
         logger?.error?.(
           `| Material KMIS | - Gagal hapus dokumen: ${e.message}`

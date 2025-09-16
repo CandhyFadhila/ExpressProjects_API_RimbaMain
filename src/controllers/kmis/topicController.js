@@ -12,7 +12,7 @@ const {
   applyPagination,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
-const DocumentHelper = require("../../helpers/DocumentHelper");
+const documentHelper = require("../../helpers/documentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const topicResource = require("../../resources/kmis/topicResource");
@@ -160,7 +160,7 @@ exports.store = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    const uploadedDocuments = await DocumentHelper.uploadDocuments(
+    const uploadedDocuments = await documentHelper.uploadDocuments(
       req.files,
       req
     );
@@ -300,13 +300,13 @@ exports.update = async (req, res) => {
     let finalDocId = oldDocId;
     console.log("oldDocId: ", oldDocId);
     if (finalDocId != null && deletedIds.includes(String(finalDocId))) {
-      await DocumentHelper.deleteDocuments([finalDocId]);
+      await documentHelper.deleteDocuments([finalDocId]);
       finalDocId = null;
     }
 
     let uploadIds = null;
     if (Array.isArray(req.files) && req.files.length > 0) {
-      uploadIds = await DocumentHelper.uploadDocuments(req.files, req);
+      uploadIds = await documentHelper.uploadDocuments(req.files, req);
     }
 
     const coverId = uploadIds?.[0] ?? finalDocId ?? null;
