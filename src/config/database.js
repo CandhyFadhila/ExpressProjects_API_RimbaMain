@@ -15,7 +15,7 @@ const connections = {
     port: 5432,
     user: "user_rimba",
     password: "password_kuat",
-    database: "db_rimba",
+    database: "main_rimba",
   },
 };
 
