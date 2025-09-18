@@ -13,18 +13,39 @@ class StorageServerHelper {
 
   static FILE_FIELD = "files";
 
+  static getStaticDocumentAccount() {
+    return {
+      email: "rimba.development@gmail.com",
+      password: "dokumenrimbaadmin123",
+    };
+  }
+
+  static resolveBaseURL() {
+    const env = String(process.env.PG_ENV || "windows")
+      .trim()
+      .toLowerCase();
+    switch (env) {
+      case "linux":
+        return "https://doc.rimbaexium.org";
+      case "windows":
+      default:
+        return "http://localhost:3001";
+    }
+  }
+
   static init() {
     if (!this.baseURL) {
-      this.baseURL = process.env.DOCUMENT_SERVER_URL;
-      this.email = process.env.DOCUMENT_SERVER_EMAIL;
-      this.password = process.env.DOCUMENT_SERVER_PASSWORD;
+      this.baseURL = this.resolveBaseURL();
+      const staticAcc = this.getStaticDocumentAccount();
+      this.email = staticAcc.email;
+      this.password = staticAcc.password;
 
       if (!this.baseURL || !this.email || !this.password) {
         logger.error(
-          `| Storage Server Helper | - Init error: ENV tidak lengkap. Pastikan DOCUMENT_SERVER_URL, DOCUMENT_SERVER_EMAIL, DOCUMENT_SERVER_PASSWORD terisi.`
+          `| Storage Server Helper | - Init error: ENV tidak lengkap. Pastikan DOCUMENT_SERVER_EMAIL, DOCUMENT_SERVER_PASSWORD terisi.`
         );
         throw new Error(
-          "ENV tidak lengkap. Pastikan DOCUMENT_SERVER_URL, DOCUMENT_SERVER_EMAIL, DOCUMENT_SERVER_PASSWORD terisi."
+          "ENV tidak lengkap. Pastikan DOCUMENT_SERVER_EMAIL, DOCUMENT_SERVER_PASSWORD terisi."
         );
       }
     }

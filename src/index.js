@@ -15,10 +15,29 @@ const profileRoutes = require("./routes/profileRoutes");
 
 const app = express();
 
+function isLinux() {
+  return (
+    String(process.env.PG_ENV || "windows")
+      .trim()
+      .toLowerCase() === "linux"
+  );
+}
+
+function resolvePublicBaseUrl(port) {
+  return isLinux() ? "https://rimbaexium.org" : `http://localhost:${port}`;
+}
+
 // Middleware
 app.use(corsMiddleware);
 app.use(express.json());
 app.use(morgan("dev"));
+
+if (isLinux()) {
+  app.set("trust proxy", 1);
+}
+
+const PORT = 3000;
+app.locals.baseUrl = resolvePublicBaseUrl(PORT);
 
 // Cek API root
 app.get("/", (req, res) => {
@@ -69,7 +88,9 @@ app.use("/api/kmis/material", materialRoutes);
 //! ======== KMIS MODULE ========
 
 // Jalankan server
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server berjalan di http://localhost:${PORT}`);
+  // Di windows akan log: http://localhost:3000
+  // Di linux akan log:   https://rimbaexium.org
+  logger.info(`Server berjalan di ${app.locals.baseUrl} (listen port ${PORT})`);
+  console.log(`Server berjalan di ${app.locals.baseUrl} (listen port ${PORT})`);
 });
