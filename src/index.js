@@ -91,6 +91,5 @@ app.use("/api/kmis/material", materialRoutes);
 app.listen(PORT, () => {
   // Di windows akan log: http://localhost:3000
   // Di linux akan log:   https://rimbaexium.org
-  logger.info(`Server berjalan di ${app.locals.baseUrl} (listen port ${PORT})`);
   console.log(`Server berjalan di ${app.locals.baseUrl} (listen port ${PORT})`);
 });

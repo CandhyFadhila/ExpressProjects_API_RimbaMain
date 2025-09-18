@@ -7,6 +7,7 @@ const validate = require("../../middlewares/validate");
 const authMiddleware = require("../../middlewares/authMiddleware");
 const rateLimiter = require("../../middlewares/rateLimitMiddleware");
 const requireAbility = require("../../middlewares/requireAbility");
+const requirePermission = require("../../middlewares/requirePermission");
 const multer = require("multer");
 const upload = multer();
 
@@ -28,6 +29,7 @@ router.get(
 
 router.post(
   "/sso/create",
+  requirePermission(["create.kmis_category"]),
   upload.array("files", 1),
   storeCategoryValidator,
   validate,
@@ -36,6 +38,7 @@ router.post(
 
 router.patch(
   "/sso/update/:id",
+  requirePermission(["update.kmis_category"]),
   upload.array("files", 1),
   updateCategoryValidator,
   validate,
@@ -44,11 +47,13 @@ router.patch(
 
 router.delete(
   "/sso/delete",
+  requirePermission(["delete.kmis_category"]),
   categoryController.destroy
 );
 
 router.patch(
   "/sso/restore",
+  requirePermission(["restore.kmis_category"]),
   categoryController.restore
 );
 

@@ -11,6 +11,7 @@ const validate = require("../../middlewares/validate");
 const authMiddleware = require("../../middlewares/authMiddleware");
 const rateLimiter = require("../../middlewares/rateLimitMiddleware");
 const { requireAnyAbility } = require("../../middlewares/requireAbility");
+const requirePermission = require("../../middlewares/requirePermission");
 const multer = require("multer");
 const upload = multer();
 const uploadMaterialFields = upload.fields([
@@ -36,6 +37,7 @@ router.get(
 
 router.post(
   "/create",
+  requirePermission(["create.kmis_material"]),
   uploadMaterialFields,
   storeMaterialValidator,
   validate,
@@ -44,6 +46,7 @@ router.post(
 
 router.patch(
   "/update/:id",
+  requirePermission(["update.kmis_material"]),
   uploadMaterialFields,
   updateMaterialValidator,
   validate,
@@ -52,11 +55,13 @@ router.patch(
 
 router.delete(
   "/delete",
+  requirePermission(["delete.kmis_material"]),
   materialController.destroy
 );
 
 router.patch(
   "/restore",
+  requirePermission(["restore.kmis_material"]),
   materialController.restore
 );
 
