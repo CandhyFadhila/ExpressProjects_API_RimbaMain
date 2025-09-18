@@ -19,11 +19,13 @@ router.use(
 
 router.get(
   "/sso/index",
+  requirePermission(["view.kmis_topic"]),
   topicController.index
 );
 
 router.get(
   "/sso/show/:id",
+  requirePermission(["view.kmis_topic"]),
   topicController.show
 );
 

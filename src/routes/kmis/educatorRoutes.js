@@ -17,11 +17,13 @@ router.use(
 
 router.get(
   "/sso/index",
+  requirePermission(["view.kmis_educator"]),
   educatorController.index
 );
 
 router.get(
   "/sso/show/:id",
+  requirePermission(["view.kmis_educator"]),
   educatorController.show
 );
 

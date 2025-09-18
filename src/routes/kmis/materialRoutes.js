@@ -27,11 +27,13 @@ router.use(
 
 router.get(
   "/index",
+  requirePermission(["view.kmis_material"]),
   materialController.index
 );
 
 router.get(
   "/show/:id",
+  requirePermission(["view.kmis_material"]),
   materialController.show
 );
 
