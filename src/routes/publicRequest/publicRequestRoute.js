@@ -86,16 +86,10 @@ router.get(
   publicRequestController.getMaterialbyId
 );
 
-router.get(
-  "/get-material-by-category/:id",
+router.post(
+  "/get-material-by-category-topic",
   rateLimiter,
-  publicRequestController.getMaterialbyCategoryId
-);
-
-router.get(
-  "/get-material-by-topic/:id",
-  rateLimiter,
-  publicRequestController.getMaterialbyTopicId
+  publicRequestController.getMaterialbyTopicIdorCategoryId
 );
 
 router.get(
@@ -110,13 +104,13 @@ router.get(
   publicRequestController.getMaterialbyUploadedId
 );
 
-router.get(
+router.post(
   "/get-material-by-type",
   rateLimiter,
   publicRequestController.getMaterialbyMaterialTypes
 );
 
-router.get(
+router.post(
   "/get-material-by-public",
   rateLimiter,
   publicRequestController.getMaterialbyIsPublic

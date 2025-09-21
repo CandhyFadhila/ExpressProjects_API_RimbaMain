@@ -4,12 +4,6 @@ const UserResource = require("../../resources/auth/UserResource");
 async function studentResource(student) {
   const user = await knex("users").where("id", student.id).first();
 
-  const countRow = await knex("kmis_quiz_attempts")
-    .where("attempt_by", user.id)
-    .whereNull("deleted_at")
-    .count({ c: "*" })
-    .first();
-
   const statsRow = await knex("kmis_quiz_attempts")
     .where("attempt_by", user.id)
     .whereNull("deleted_at")

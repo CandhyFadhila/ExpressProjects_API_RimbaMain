@@ -5,6 +5,7 @@ const {
   applyPagination,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
+const { normIdArray } = require("../../helpers/inputNorm");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const categoryResource = require("../../resources/kmis/categoryResource");
@@ -752,11 +753,82 @@ exports.getMaterialbyId = async (req, res) => {
   }
 };
 
-exports.getMaterialbyCategoryId = async (req, res) => {
+exports.getMaterialbyTopicIdorCategoryId = async (req, res) => {
   const { search } = req.query;
-  const { id } = req.params;
+  const categoryIds = [
+    ...new Set(
+      normIdArray(
+        req.body?.categoryIds ??
+          req.body?.categoryId ??
+          req.query?.categoryIds ??
+          req.query?.categoryId,
+        { as: "number" }
+      )
+    ),
+  ];
+  const topicIds = [
+    ...new Set(
+      normIdArray(
+        req.body?.topicIds ??
+          req.body?.topicId ??
+          req.query?.topicIds ??
+          req.query?.topicId,
+        { as: "number" }
+      )
+    ),
+  ];
 
   try {
+    if (categoryIds.length === 0 && topicIds.length === 0) {
+      const response = new WithoutDataResource(
+        400,
+        "FAILED_VALIDATION",
+        "Format Data Tidak Sesuai Ketentuan",
+        "Payload harus diisi minimal salah satu: categoryId[] atau topicId[]."
+      );
+      return res.status(400).json(response.toResponse());
+    }
+
+    if (categoryIds.length > 0) {
+      const existCatTxt = await knex("kmis_categories")
+        .whereIn("id", categoryIds)
+        .pluck("id");
+
+      const missCat = categoryIds
+        .map(String)
+        .filter((id) => !existCatTxt.includes(id));
+
+      if (missCat.length > 0) {
+        const response = new WithoutDataResource(
+          400,
+          "FAILED_VALIDATION",
+          "Validasi Gagal",
+          `Beberapa categoryId tidak ditemukan: [${missCat.join(", ")}].`
+        );
+        return res.status(400).json(response.toResponse());
+      }
+    }
+
+    if (topicIds.length > 0) {
+      const existTopTxt = await knex("kmis_topics")
+        .whereIn("id", topicIds)
+        .pluck("id");
+
+      const missTop = topicIds
+        .map(String)
+        .filter((id) => !existTopTxt.includes(id));
+
+      if (missTop.length > 0) {
+        const response = new WithoutDataResource(
+          400,
+          "FAILED_VALIDATION",
+          "Validasi Gagal",
+          `Beberapa topicId tidak ditemukan: [${missTop.join(", ")}].`
+        );
+        return res.status(400).json(response.toResponse());
+      }
+    }
+
     let query = knex("kmis_materials as material")
       .leftJoin(
         "kmis_categories as category",
@@ -773,9 +845,13 @@ exports.getMaterialbyCategoryId = async (req, res) => {
         "material.kmis_categories_id",
         "material.kmis_topics_id",
       ])
-      .where("material.kmis_categories_id", id)
       .whereNull("material.deleted_at")
       .orderBy("material.created_at", "desc");
+
+    if (categoryIds.length > 0)
+      query.whereIn("material.kmis_categories_id", categoryIds);
+    if (topicIds.length > 0)
+      query.whereIn("material.kmis_topics_id", topicIds);
 
     applySearch(query, search, [
       "material.title",
@@ -804,7 +880,7 @@ exports.getMaterialbyCategoryId = async (req, res) => {
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      "Data materi berdasarkan kategori berhasil diambil.",
+      "Data materi berdasarkan categori atau topik berhasil diambil.",
       {
         data: serializedData,
         pagination: result.pagination,
@@ -813,80 +889,7 @@ exports.getMaterialbyCategoryId = async (req, res) => {
     return res.status(200).json(response.toResponse());
   } catch (error) {
     logger.error(
-      `| Public Request | - Error function getMaterialbyCategoryId: ${error.message}`
-    );
-    const response = new WithoutDataResource(
-      500,
-      "SERVER_ERROR",
-      "Server Sedang Error",
-      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
-    );
-    res.status(500).json(response.toResponse());
-  }
-};
-
-exports.getMaterialbyTopicId = async (req, res) => {
-  const { search } = req.query;
-  const { id } = req.params;
-
-  try {
-    let query = knex("kmis_materials as material")
-      .leftJoin(
-        "kmis_categories as category",
-        "category.id",
-        "material.kmis_categories_id"
-      )
-      .leftJoin("kmis_topics as topic", "topic.id", "material.kmis_topics_id")
-      .select([
-        "material.title",
-        "material.description",
-        "material.material_types",
-        "material.created_by",
-        "material.uploaded_by",
-        "material.kmis_categories_id",
-        "material.kmis_topics_id",
-      ])
-      .where("material.kmis_topics_id", id)
-      .whereNull("material.deleted_at")
-      .orderBy("material.created_at", "desc");
-
-    applySearch(query, search, [
-      "material.title",
-      "category.title",
-      "topic.title",
-    ]);
-
-    const paginationInfo = applyPagination(query, req.query);
-
-    const result = await formatPaginationResult(query, paginationInfo, knex);
-    if (result.data.length === 0) {
-      const response = new WithoutDataResource(
-        200,
-        "DATA_NOT_FOUND",
-        "Data Tidak Ditemukan",
-        "Tidak ada data yang sesuai dengan filter atau pencarian."
-      );
-      return res.status(200).json(response.toResponse());
-    }
-
-    const serializedData = await Promise.all(
-      result.data.map((material) => materialResource(material))
-    );
-
-    const response = new WithDataResource(
-      200,
-      "SUCCESS_GET_DATA",
-      "Berhasil Mengambil Data",
-      "Data materi berdasarkan topik berhasil diambil.",
-      {
-        data: serializedData,
-        pagination: result.pagination,
-      }
-    );
-    return res.status(200).json(response.toResponse());
-  } catch (error) {
-    logger.error(
-      `| Public Request | - Error function getMaterialbyTopicId: ${error.message}`
+      `| Public Request | - Error function getMaterialbyTopicIdorCategoryId: ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
