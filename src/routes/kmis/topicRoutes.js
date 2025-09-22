@@ -1,8 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const topicController = require("../../controllers/kmis/topicController");
-const { storeTopicValidator } = require("../../validators/kmis/storeTopicValidator");
-const { updateTopicValidator } = require("../../validators/kmis/updateTopicValidator");
+const {
+  storeTopicValidator,
+} = require("../../validators/kmis/storeTopicValidator");
+const {
+  updateTopicValidator,
+} = require("../../validators/kmis/updateTopicValidator");
 const validate = require("../../middlewares/validate");
 const authMiddleware = require("../../middlewares/authMiddleware");
 const rateLimiter = require("../../middlewares/rateLimitMiddleware");
@@ -11,11 +15,7 @@ const requirePermission = require("../../middlewares/requirePermission");
 const multer = require("multer");
 const upload = multer();
 
-router.use(
-  rateLimiter,
-  authMiddleware,
-  requireAbility("super_admin")
-);
+router.use(rateLimiter, authMiddleware, requireAbility("super_admin"));
 
 router.get(
   "/sso/index",
@@ -40,7 +40,7 @@ router.post(
 
 router.patch(
   "/sso/update/:id",
-  requirePermission(["update.kmis_topic"]),
+  requirePermission(["edit.kmis_topic"]),
   upload.array("files", 1),
   updateTopicValidator,
   validate,

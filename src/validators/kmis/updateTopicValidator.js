@@ -3,7 +3,8 @@ const knex = require("../../config/database");
 
 exports.updateTopicValidator = [
   body("categoryId")
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
+    .bail()
     .isInt()
     .withMessage("Kategori topik harus berupa angka.")
     .bail()

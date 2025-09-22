@@ -2,7 +2,7 @@ const knex = require("../config/database");
 const logger = require("../utils/logger");
 const dateHelper = require("../helpers/dateHelper");
 
-const ALLOWED_MODULES = new Set(["profile", "kmis", "cms", "monev"]);
+const ALLOWED_MODULES = new Set(["profile", "kmis", "cms", "monev", "master_data"]);
 const ALLOWED_KEYS = new Set(["create", "update", "delete", "restore"]);
 
 class ActivityLogHelper {

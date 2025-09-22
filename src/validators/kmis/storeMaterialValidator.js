@@ -131,7 +131,7 @@ exports.storeMaterialValidator = [
 
   body("materialData")
     .if(body("materialTypes").not().equals("video"))
-    .optional({ nullable: true })
+    .optional({ nullable: true, checkFalsy: true })
     .isString()
     .withMessage("materialData harus berupa teks.")
     .bail()
@@ -139,7 +139,7 @@ exports.storeMaterialValidator = [
 
   // === isPublic (opsional) ===
   body("isPublic")
-    .optional({ nullable: true })
+    .optional({ nullable: true, checkFalsy: true })
     .isBoolean()
     .withMessage("isPublic harus berupa boolean.")
     .toBoolean(),

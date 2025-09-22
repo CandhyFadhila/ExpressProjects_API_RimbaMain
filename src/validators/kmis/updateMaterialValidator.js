@@ -4,7 +4,7 @@ const knex = require("../../config/database");
 exports.updateMaterialValidator = [
   // === materialTypes (wajib) + normalisasi ===
   body("materialTypes")
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
     .bail()
     .isString()
     .withMessage("Tipe materi harus berupa teks.")
@@ -22,7 +22,7 @@ exports.updateMaterialValidator = [
 
   // === title (wajib untuk semua) ===
   body("title")
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
     .bail()
     .isString()
     .withMessage("Judul materi harus berupa teks.")
@@ -32,7 +32,7 @@ exports.updateMaterialValidator = [
 
   // === description (wajib untuk semua) ===
   body("description")
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
     .bail()
     .isString()
     .withMessage("Deskripsi materi harus berupa teks."),

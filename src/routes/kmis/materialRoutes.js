@@ -48,7 +48,7 @@ router.post(
 
 router.patch(
   "/update/:id",
-  requirePermission(["update.kmis_material"]),
+  requirePermission(["edit.kmis_material"]),
   uploadMaterialFields,
   updateMaterialValidator,
   validate,

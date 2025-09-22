@@ -1,19 +1,19 @@
 const express = require("express");
 const router = express.Router();
 const educatorController = require("../../controllers/kmis/educatorController");
-const { storeEducatorValidator } = require("../../validators/kmis/storeEducatorValidator");
-const { updateEducatorValidator } = require("../../validators/kmis/updateEducatorValidator");
+const {
+  storeEducatorValidator,
+} = require("../../validators/kmis/storeEducatorValidator");
+const {
+  updateEducatorValidator,
+} = require("../../validators/kmis/updateEducatorValidator");
 const validate = require("../../middlewares/validate");
 const authMiddleware = require("../../middlewares/authMiddleware");
 const rateLimiter = require("../../middlewares/rateLimitMiddleware");
 const requireAbility = require("../../middlewares/requireAbility");
 const requirePermission = require("../../middlewares/requirePermission");
 
-router.use(
-  rateLimiter,
-  authMiddleware,
-  requireAbility("super_admin")
-);
+router.use(rateLimiter, authMiddleware, requireAbility("super_admin"));
 
 router.get(
   "/sso/index",
@@ -37,7 +37,7 @@ router.post(
 
 router.patch(
   "/sso/update/:id",
-  requirePermission(["update.kmis_educator"]),
+  requirePermission(["edit.kmis_educator"]),
   updateEducatorValidator,
   validate,
   educatorController.update
@@ -57,13 +57,13 @@ router.patch(
 
 router.patch(
   "/sso/deactivate",
-  requirePermission(["update.kmis_educator"]),
+  requirePermission(["edit.kmis_educator"]),
   educatorController.deactivateAccount
 );
 
 router.patch(
   "/sso/activate",
-  requirePermission(["update.kmis_educator"]),
+  requirePermission(["edit.kmis_educator"]),
   educatorController.activateAccount
 );
 

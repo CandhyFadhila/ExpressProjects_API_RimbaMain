@@ -12,6 +12,8 @@ const educatorRoutes = require("./routes/kmis/educatorRoutes");
 const studentRoutes = require("./routes/kmis/studentRoutes");
 const materialRoutes = require("./routes/kmis/materialRoutes");
 const profileRoutes = require("./routes/profileRoutes");
+const newsCategoryRoutes = require("./routes/masterData/newsCategoryRoutes");
+const eventCategoryRoutes = require("./routes/masterData/eventCategoryRoutes");
 
 const app = express();
 
@@ -70,6 +72,12 @@ app.use("/api/profile", profileRoutes);
 // Public Request
 app.use("/api/kmis/public-request", publicRequestRoute);
 
+//! ======== CMS MODULE ========
+// News
+
+// Event
+//! ======== CMS MODULE ========
+
 //! ======== KMIS MODULE ========
 // Category
 app.use("/api/kmis/category", categoryRoutes);
@@ -86,6 +94,14 @@ app.use("/api/kmis/student", studentRoutes);
 // Material
 app.use("/api/kmis/material", materialRoutes);
 //! ======== KMIS MODULE ========
+
+//! ======== MASTER DATA MODULE ========
+// News Category
+app.use("/api/master-data/news-category", newsCategoryRoutes);
+
+// Event Category
+app.use("/api/master-data/event-category", eventCategoryRoutes);
+//! ======== MASTER DATA MODULE ========
 
 // Jalankan server
 app.listen(PORT, () => {
