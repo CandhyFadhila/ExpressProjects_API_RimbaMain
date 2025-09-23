@@ -1,4 +1,4 @@
-function eventCategoryResource(eventCategory) {
+async function eventCategoryResource(eventCategory) {
   return {
     id: eventCategory.id,
     name: eventCategory.name,

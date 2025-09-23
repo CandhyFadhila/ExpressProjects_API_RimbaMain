@@ -8,11 +8,15 @@ const {
 const { normIdArray } = require("../../helpers/inputNorm");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
-const categoryResource = require("../../resources/kmis/categoryResource");
-const topicResource = require("../../resources/kmis/topicResource");
 const UserResource = require("../../resources/auth/UserResource");
 const RoleResource = require("../../resources/auth/RoleResource");
+const categoryResource = require("../../resources/kmis/categoryResource");
+const topicResource = require("../../resources/kmis/topicResource");
 const materialResource = require("../../resources/kmis/materialResource");
+const newsCategoryResource = require("../../resources/masterData/newsCategoryResource");
+const newsResource = require("../../resources/cms/newsResource");
+const eventCategoryResource = require("../../resources/masterData/eventCategoryResource");
+const eventResource = require("../../resources/cms/eventResource");
 
 // Role
 exports.getAllRole = async (req, res) => {
@@ -850,8 +854,7 @@ exports.getMaterialbyTopicIdorCategoryId = async (req, res) => {
 
     if (categoryIds.length > 0)
       query.whereIn("material.kmis_categories_id", categoryIds);
-    if (topicIds.length > 0)
-      query.whereIn("material.kmis_topics_id", topicIds);
+    if (topicIds.length > 0) query.whereIn("material.kmis_topics_id", topicIds);
 
     applySearch(query, search, [
       "material.title",
@@ -1242,6 +1245,582 @@ exports.getMaterialbyIsPublic = async (req, res) => {
   } catch (error) {
     logger.error(
       `| Public Request | - Error function getMaterialbyIsPublic: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
+// News Category
+exports.getAllNewsCategory = async (req, res) => {
+  const { search } = req.query;
+
+  try {
+    let query = knex("cms_news_categories as category")
+      .select(["category.name", "category.description"])
+      .whereNull("category.deleted_at")
+      .orderBy("category.created_at", "desc");
+
+    applySearch(query, search, ["category.name"]);
+
+    const paginationInfo = applyPagination(query, req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((news) => newsCategoryResource(news))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data kategori berita berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAllNewsCategory : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getNewsCategorybyId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const category = await knex("cms_news_categories")
+      .select(["name", "description"])
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!category) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data kategori berita dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const data = await newsCategoryResource(category);
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      `Detail data kategori berita '${category.name}' berhasil didapatkan.`,
+      data
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getNewsCategorybyId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
+// Event Category
+exports.getAllEventCategory = async (req, res) => {
+  const { search } = req.query;
+
+  try {
+    let query = knex("cms_events_categories as category")
+      .select(["category.name", "category.description"])
+      .whereNull("category.deleted_at")
+      .orderBy("category.created_at", "desc");
+
+    applySearch(query, search, ["category.name"]);
+
+    const paginationInfo = applyPagination(query, req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((event) => eventCategoryResource(event))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data kategori kegiatan berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAllEventCategory : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getEventCategorybyId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const category = await knex("cms_events_categories")
+      .select(["name", "description"])
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!category) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data kategori kegiatan dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const data = await newsCategoryResource(category);
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      `Detail data kategori kegiatan '${category.name}' berhasil didapatkan.`,
+      data
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getEventCategorybyId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
+// Event
+exports.getAllEvent = async (req, res) => {
+  const { search } = req.query;
+
+  try {
+    let query = knex("cms_events as event")
+      .select([
+        "event.cms_event_category_id",
+        "event.title",
+        "event.description",
+        "event.event_content",
+        "event.thumbnail_ids",
+      ])
+      .whereNull("event.deleted_at")
+      .orderBy("event.created_at", "desc");
+
+    applySearch(query, search, ["event.title"]);
+
+    const paginationInfo = applyPagination(query, req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((event) => eventResource(event))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data kegiatan berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAllEvent : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getEventbyId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const event = await knex("cms_events")
+      .select([
+        "cms_event_category_id",
+        "title",
+        "description",
+        "event_content",
+        "thumbnail_ids",
+      ])
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!event) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data kegiatan dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const data = await eventResource(event);
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      `Detail data kegiatan '${event.title}' berhasil didapatkan.`,
+      data
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getEventbyId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getEventbyEventCategoryId = async (req, res) => {
+  const { search } = req.query;
+  const { id } = req.params;
+
+  try {
+    let query = knex("cms_events as event")
+      .leftJoin(
+        "cms_events_categories as category",
+        "category.id",
+        "event.cms_event_category_id"
+      )
+      .select([
+        "event.cms_event_category_id",
+        "event.title",
+        "event.description",
+        "event.event_content",
+      ])
+      .whereNull("event.deleted_at")
+      .where("event.cms_event_category_id", id)
+      .orderBy("event.created_at", "desc");
+
+    applySearch(query, search, ["event.title", "category.name"]);
+
+    const paginationInfo = applyPagination(query, req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((event) => eventResource(event))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data kegiatan berdasarkan kategori berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getEventbyEventCategoryId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
+// News
+exports.getAllNews = async (req, res) => {
+  const { search } = req.query;
+
+  try {
+    let query = knex("cms_news as news")
+      .select([
+        "news.cms_news_category_id",
+        "news.thumbnail_ids",
+        "news.title",
+        "news.slug",
+        "news.description",
+        "news.news_content",
+      ])
+      .whereNull("news.deleted_at")
+      .orderBy("news.created_at", "desc");
+
+    applySearch(query, search, ["news.title"]);
+
+    const paginationInfo = applyPagination(query, req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((news) => newsResource(news))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data berita berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAllNews : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getNewsbyId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const news = await knex("cms_news")
+      .select(["thumbnail_ids", "cms_news_category_id", "title", "slug", "description", "news_content"])
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!news) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data berita dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const data = await newsResource(news);
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      `Detail data berita '${news.title}' berhasil didapatkan.`,
+      data
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getNewsbyId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getNewsbyNewsCategoryId = async (req, res) => {
+  const { search } = req.query;
+  const { id } = req.params;
+
+  try {
+    let query = knex("cms_news as news")
+      .leftJoin(
+        "cms_news_categories as category",
+        "category.id",
+        "news.cms_news_category_id"
+      )
+      .select([
+        "news.cms_news_category_id",
+        "news.title",
+        "news.slug",
+        "news.description",
+        "news.news_content",
+      ])
+      .whereNull("news.deleted_at")
+      .where("news.cms_news_category_id", id)
+      .orderBy("news.created_at", "desc");
+
+    applySearch(query, search, ["news.title", "category.name"]);
+
+    const paginationInfo = applyPagination(query, req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((news) => newsResource(news))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data berita berdasarkan kategori berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getNewsbyNewsCategoryId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getNewsbySlug = async (req, res) => {
+  const { slug } = req.params;
+
+  try {
+    const news = await knex("cms_news")
+      .select(["thumbnail_ids", "cms_news_category_id", "title", "slug", "description", "news_content"])
+      .where("slug", slug)
+      .whereNull("deleted_at")
+      .first();
+    if (!news) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data berita dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const data = await newsResource(news);
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      `Detail data berita '${news.title}' berdasarkan 'slug' berhasil didapatkan.`,
+      data
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getNewsbySlug: ${error.message}`
     );
     const response = new WithoutDataResource(
       500,

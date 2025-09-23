@@ -10,38 +10,6 @@ router.get(
   publicRequestController.getAllRole
 );
 
-// Category
-router.get(
-  "/get-all-category",
-  rateLimiter,
-  publicRequestController.getAllCategory
-);
-
-router.get(
-  "/get-category/:id",
-  rateLimiter,
-  publicRequestController.getCategorybyId
-);
-
-// Topic
-router.get(
-  "/get-all-topic",
-  rateLimiter,
-  publicRequestController.getAllTopic
-);
-
-router.get(
-  "/get-topic/:id",
-  rateLimiter,
-  publicRequestController.getTopicbyId
-);
-
-router.get(
-  "/get-topic-by-category/:id",
-  rateLimiter,
-  publicRequestController.getTopicbyCategoryId
-);
-
 // User
 router.get(
   "/get-all-user",
@@ -71,49 +39,6 @@ router.get(
   "/get-user/:id",
   rateLimiter,
   publicRequestController.getUserbyId
-);
-
-// Material
-router.get(
-  "/get-all-material",
-  rateLimiter,
-  publicRequestController.getAllMaterial
-);
-
-router.get(
-  "/get-material/:id",
-  rateLimiter,
-  publicRequestController.getMaterialbyId
-);
-
-router.post(
-  "/get-material-by-category-topic",
-  rateLimiter,
-  publicRequestController.getMaterialbyTopicIdorCategoryId
-);
-
-router.get(
-  "/get-material-by-created/:id",
-  rateLimiter,
-  publicRequestController.getMaterialbyCreatedId
-);
-
-router.get(
-  "/get-material-by-uploaded/:id",
-  rateLimiter,
-  publicRequestController.getMaterialbyUploadedId
-);
-
-router.post(
-  "/get-material-by-type",
-  rateLimiter,
-  publicRequestController.getMaterialbyMaterialTypes
-);
-
-router.post(
-  "/get-material-by-public",
-  rateLimiter,
-  publicRequestController.getMaterialbyIsPublic
 );
 
 module.exports = router;

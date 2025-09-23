@@ -1,4 +1,4 @@
-function newsCategoryResource(newsCategory) {
+async function newsCategoryResource(newsCategory) {
   return {
     id: newsCategory.id,
     name: newsCategory.name,

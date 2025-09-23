@@ -10,7 +10,10 @@ exports.storeTopicValidator = [
     .withMessage("Kategori topik harus berupa angka.")
     .bail()
     .custom(async (value) => {
-      const category = await knex("kmis_categories").where("id", value).first();
+      const category = await knex("kmis_categories")
+        .where("id", value)
+        .whereNull("deleted_at")
+        .first();
       if (!category) {
         throw new Error("Kategori topik yang Anda pilih tidak ditemukan.");
       }

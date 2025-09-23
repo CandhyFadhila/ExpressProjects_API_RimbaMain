@@ -5,6 +5,8 @@ const knex = require("./config/database");
 const corsMiddleware = require("./middlewares/cors");
 const logger = require("./utils/logger");
 const publicRequestRoute = require("./routes/publicRequest/publicRequestRoute");
+const cmspublicRequestRoute = require("./routes/publicRequest/cmspublicRequestRoute");
+const kmispublicRequestRoute = require("./routes/publicRequest/kmispublicRequestRoute");
 const authRoutes = require("./routes/authRoutes");
 const categoryRoutes = require("./routes/kmis/categoryRoutes");
 const topicRoutes = require("./routes/kmis/topicRoutes");
@@ -14,6 +16,8 @@ const materialRoutes = require("./routes/kmis/materialRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const newsCategoryRoutes = require("./routes/masterData/newsCategoryRoutes");
 const eventCategoryRoutes = require("./routes/masterData/eventCategoryRoutes");
+const newsRoutes = require("./routes/cms/newsRoutes");
+const eventRoutes = require("./routes/cms/eventRoutes");
 
 const app = express();
 
@@ -70,12 +74,16 @@ app.use("/api", authRoutes);
 app.use("/api/profile", profileRoutes);
 
 // Public Request
-app.use("/api/kmis/public-request", publicRequestRoute);
+app.use("/api/public-request", publicRequestRoute);
+app.use("/api/kmis/public-request", kmispublicRequestRoute);
+app.use("/api/cms/public-request", cmspublicRequestRoute);
 
 //! ======== CMS MODULE ========
 // News
+app.use("/api/cms/news", newsRoutes);
 
 // Event
+app.use("/api/cms/event", eventRoutes);
 //! ======== CMS MODULE ========
 
 //! ======== KMIS MODULE ========
