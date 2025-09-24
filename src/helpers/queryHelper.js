@@ -21,6 +21,51 @@ function applySearch(queryBuilder, search, columns) {
   return queryBuilder;
 }
 
+function escapeLike(val) {
+  return String(val).replace(/[\\%_]/g, "\\$&");
+}
+
+function applyJsonbSearch(queryBuilder, search, exprs, opts = {}) {
+  const { mode = "or", split = false } = opts;
+  if (!search || !Array.isArray(exprs) || exprs.length === 0)
+    return queryBuilder;
+
+  const terms = split
+    ? String(search).trim().split(/\s+/).filter(Boolean)
+    : [String(search).trim()];
+
+  if (terms.length === 0) return queryBuilder;
+
+  queryBuilder.andWhere(function () {
+    terms.forEach((t, ti) => {
+      const like = `%${escapeLike(t)}%`;
+      const cond = (ctx) => {
+        exprs.forEach((e, ei) => {
+          const sql = `(${e}) ILIKE ? ESCAPE '\\'`;
+          if (ei === 0) ctx.whereRaw(sql, [like]);
+          else ctx.orWhereRaw(sql, [like]);
+        });
+      };
+      if (ti === 0) {
+        this.where(function () {
+          cond(this);
+        });
+      } else {
+        if (mode === "and")
+          this.andWhere(function () {
+            cond(this);
+          });
+        else
+          this.orWhere(function () {
+            cond(this);
+          });
+      }
+    });
+  });
+
+  return queryBuilder;
+}
+
 function applyPagination(queryBuilder, { page = 1, limit = 10 }) {
   const offset = (page - 1) * limit;
   queryBuilder.limit(limit).offset(offset);
@@ -68,6 +113,7 @@ async function formatPaginationResult(
 module.exports = {
   applyFilters,
   applySearch,
+  applyJsonbSearch,
   applyPagination,
   formatPaginationResult,
 };

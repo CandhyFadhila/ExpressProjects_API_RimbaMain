@@ -2,7 +2,6 @@ const { validationResult } = require("express-validator");
 const knex = require("../../config/database");
 const logger = require("../../utils/logger");
 const {
-  toArray,
   normJsonbArray,
   normIdArray,
   parseJsonSafe,

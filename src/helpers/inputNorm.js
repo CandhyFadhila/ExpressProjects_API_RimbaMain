@@ -132,6 +132,106 @@ function normUUIDv4Array(value, key = "id") {
     .filter((s) => typeof s === "string" && uuidV4.test(s));
 }
 
+/**
+ * handleLocalizedText:
+ * - Menerima object {id, en} atau string JSON serupa.
+ * - Trimming, validasi tipe string, panjang (opsional), dan dukung partial (untuk update).
+ * - Return { value: { id?, en? } } (object JS siap disimpan ke kolom JSONB).
+ */
+function handleLocalizedText(raw, opts = {}) {
+  const {
+    allowPartial = false, // true untuk update (boleh hanya id atau en saja)
+    maxLen = 255, // default batas name; set undefined/null untuk no-limit (mis. description)
+    fieldLabel = "teks", // label untuk pesan error
+  } = opts;
+
+  let obj = raw;
+  if (typeof obj === "string") {
+    const parsed = parseJsonSafe(obj);
+    obj = parsed ?? obj; // kalau bukan JSON valid, biarkan string untuk fail di bawah
+  }
+
+  if (!isPlainObject(obj)) {
+    return {
+      error: {
+        code: "INVALID_CONTENT_FORMAT",
+        message: `Format ${fieldLabel} harus berupa objek { id, en }.`,
+      },
+    };
+  }
+
+  const out = {};
+  const hasId = Object.prototype.hasOwnProperty.call(obj, "id");
+  const hasEn = Object.prototype.hasOwnProperty.call(obj, "en");
+
+  if (hasId) {
+    if (typeof obj.id !== "string") {
+      return {
+        error: {
+          code: "INVALID_CONTENT_FORMAT",
+          message: `${fieldLabel}.id harus string.`,
+        },
+      };
+    }
+    out.id = obj.id.trim();
+    if (!allowPartial && out.id === "") {
+      return {
+        error: {
+          code: "INVALID_CONTENT_FORMAT",
+          message: `${fieldLabel}.id tidak boleh kosong.`,
+        },
+      };
+    }
+    if (typeof maxLen === "number" && out.id && out.id.length > maxLen) {
+      return {
+        error: {
+          code: "INVALID_CONTENT_FORMAT",
+          message: `${fieldLabel}.id maksimal ${maxLen} karakter.`,
+        },
+      };
+    }
+  }
+
+  if (hasEn) {
+    if (typeof obj.en !== "string") {
+      return {
+        error: {
+          code: "INVALID_CONTENT_FORMAT",
+          message: `${fieldLabel}.en harus string.`,
+        },
+      };
+    }
+    out.en = obj.en.trim();
+    if (!allowPartial && out.en === "") {
+      return {
+        error: {
+          code: "INVALID_CONTENT_FORMAT",
+          message: `${fieldLabel}.en tidak boleh kosong.`,
+        },
+      };
+    }
+    if (typeof maxLen === "number" && out.en && out.en.length > maxLen) {
+      return {
+        error: {
+          code: "INVALID_CONTENT_FORMAT",
+          message: `${fieldLabel}.en maksimal ${maxLen} karakter.`,
+        },
+      };
+    }
+  }
+
+  if (!allowPartial && (!hasId || !hasEn)) {
+    return {
+      error: {
+        code: "INVALID_CONTENT_FORMAT",
+        message: `${fieldLabel} harus memiliki properti id dan en.`,
+      },
+    };
+  }
+
+  return { value: out };
+}
+
 module.exports = {
   toArray,
   normJsonbArray,
@@ -139,4 +239,5 @@ module.exports = {
   normUUIDv4Array,
   parseJsonSafe,
   isPlainObject,
+  handleLocalizedText,
 };

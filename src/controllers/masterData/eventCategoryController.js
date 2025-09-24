@@ -1,9 +1,13 @@
 const { validationResult } = require("express-validator");
 const knex = require("../../config/database");
 const logger = require("../../utils/logger");
-const { normIdArray } = require("../../helpers/inputNorm");
 const {
-  applySearch,
+  isPlainObject,
+  normIdArray,
+  handleLocalizedText,
+} = require("../../helpers/inputNorm");
+const {
+  applyJsonbSearch,
   applyPagination,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
@@ -30,7 +34,20 @@ exports.index = async (req, res) => {
 
     applyTrashedScope(query, req, "category.deleted_at");
 
-    applySearch(query, search, ["category.name"]);
+    applyJsonbSearch(
+      query,
+      search,
+      [
+        "category.name->>'id'",
+        "category.name->>'en'",
+        "category.description->>'id'",
+        "category.description->>'en'",
+      ],
+      {
+        mode: "or",
+        split: true,
+      }
+    );
 
     const paginationInfo = applyPagination(query, req.query);
 
@@ -94,26 +111,58 @@ exports.store = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
+    const nameNorm = handleLocalizedText(name, {
+      allowPartial: false,
+      maxLen: 255,
+      fieldLabel: "name",
+    });
+    if (nameNorm.error) {
+      const r = new WithoutDataResource(
+        400,
+        "INVALID_CONTENT_FORMAT",
+        "Format Konten Salah",
+        nameNorm.error.message
+      );
+      return res.status(400).json(r.toResponse());
+    }
+
+    const descNorm = handleLocalizedText(description, {
+      allowPartial: false,
+      maxLen: undefined,
+      fieldLabel: "description",
+    });
+    if (descNorm.error) {
+      const r = new WithoutDataResource(
+        400,
+        "INVALID_CONTENT_FORMAT",
+        "Format Konten Salah",
+        descNorm.error.message
+      );
+      return res.status(400).json(r.toResponse());
+    }
+
     const exists = await trx("cms_events_categories")
-      .whereRaw("lower(name) = lower(?)", [name])
       .whereNull("deleted_at")
+      .andWhere(function () {
+        this.whereRaw("lower(name->>'id') = lower(?)", [
+          nameNorm.value.id,
+        ]).orWhereRaw("lower(name->>'en') = lower(?)", [nameNorm.value.en]);
+      })
       .first();
     if (exists) {
       const response = new WithoutDataResource(
         400,
         "DUPLICATE_TITLE",
         "Duplikat Data",
-        `Judul kategori kegiatan '${name}' sudah digunakan. Silakan gunakan judul lain.`
+        "Nama kategori kegiatan ini sudah digunakan pada kategori lain."
       );
       return res.status(400).json(response.toResponse());
     }
 
-    await trx("cms_events_categories")
-      .insert({
-        name,
-        description,
-      })
-      .returning("*");
+    await trx("cms_events_categories").insert({
+      name: { id: nameNorm.value.id, en: nameNorm.value.en },
+      description: { id: descNorm.value.id, en: descNorm.value.en },
+    });
 
     await activityLogHelper.logCreate(
       {
@@ -130,7 +179,7 @@ exports.store = async (req, res) => {
       201,
       "SUCCESS_CREATE_DATA",
       "Berhasil Menyimpan Data",
-      `Data kategori kegiatan '${name}' berhasil ditambahkan.`
+      `Data kategori kegiatan '${nameNorm.value.id}' berhasil ditambahkan.`
     );
     return res.status(201).json(response.toResponse());
   } catch (error) {
@@ -221,24 +270,123 @@ exports.update = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const duplicate = await trx("cms_events_categories")
-      .whereRaw("lower(name) = lower(?)", [name])
-      .whereNull("deleted_at")
-      .whereNot("id", id)
-      .first();
-    if (duplicate) {
-      const response = new WithoutDataResource(
-        400,
-        "DUPLICATE_TITLE",
-        "Duplikat Data",
-        `Judul kategori kegiatan '${name}' sudah digunakan pada kategori lain.`
-      );
-      return res.status(400).json(response.toResponse());
+    const exName = isPlainObject(existing.name)
+      ? existing.name
+      : parseJsonSafe(existing.name) ?? { id: "", en: "" };
+
+    const exDesc = isPlainObject(existing.description)
+      ? existing.description
+      : parseJsonSafe(existing.description) ?? { id: "", en: "" };
+
+    let nextName = exName;
+    if (typeof name !== "undefined") {
+      const norm = handleLocalizedText(name, {
+        allowPartial: true,
+        maxLen: 255,
+        fieldLabel: "nama",
+      });
+      if (norm.error) {
+        const r = new WithoutDataResource(
+          400,
+          "INVALID_CONTENT_FORMAT",
+          "Format Konten Salah",
+          norm.error.message
+        );
+        return res.status(400).json(r.toResponse());
+      }
+      const n = { ...exName, ...norm.value };
+      // abaikan string kosong yang dikirim
+      if (
+        Object.prototype.hasOwnProperty.call(norm.value, "id") &&
+        String(norm.value.id).trim() === ""
+      )
+        n.id = exName.id;
+      if (
+        Object.prototype.hasOwnProperty.call(norm.value, "en") &&
+        String(norm.value.en).trim() === ""
+      )
+        n.en = exName.en;
+
+      // pastikan id & en akhir tidak kosong
+      if (!n.id || !n.en) {
+        const r = new WithoutDataResource(
+          400,
+          "INVALID_CONTENT_FORMAT",
+          "Format Konten Salah",
+          "Nama harus memiliki id dan en yang tidak kosong."
+        );
+        return res.status(400).json(r.toResponse());
+      }
+      nextName = { id: String(n.id).trim(), en: String(n.en).trim() };
+    }
+
+    let nextDescription = exDesc;
+    if (typeof description !== "undefined") {
+      const norm = handleLocalizedText(description, {
+        allowPartial: true,
+        maxLen: undefined, // deskripsi bebas
+        fieldLabel: "deskripsi",
+      });
+      if (norm.error) {
+        const r = new WithoutDataResource(
+          400,
+          "INVALID_CONTENT_FORMAT",
+          "Format Konten Salah",
+          norm.error.message
+        );
+        return res.status(400).json(r.toResponse());
+      }
+      const d = { ...exDesc, ...norm.value };
+      if (
+        Object.prototype.hasOwnProperty.call(norm.value, "id") &&
+        String(norm.value.id).trim() === ""
+      )
+        d.id = exDesc.id;
+      if (
+        Object.prototype.hasOwnProperty.call(norm.value, "en") &&
+        String(norm.value.en).trim() === ""
+      )
+        d.en = exDesc.en;
+
+      if (!d.id || !d.en) {
+        const r = new WithoutDataResource(
+          400,
+          "INVALID_CONTENT_FORMAT",
+          "Format Konten Salah",
+          "Deskripsi harus memiliki id dan en yang tidak kosong."
+        );
+        return res.status(400).json(r.toResponse());
+      }
+      nextDescription = { id: String(d.id).trim(), en: String(d.en).trim() };
+    }
+
+    const nameChanged =
+      (nextName.id ?? "").toLowerCase() !== (exName.id ?? "").toLowerCase() ||
+      (nextName.en ?? "").toLowerCase() !== (exName.en ?? "").toLowerCase();
+    if (nameChanged) {
+      const duplicate = await trx("cms_events_categories")
+        .whereNull("deleted_at")
+        .whereNot("id", id)
+        .andWhere(function () {
+          this.whereRaw("lower(name->>'id') = lower(?)", [
+            nextName.id,
+          ]).orWhereRaw("lower(name->>'en') = lower(?)", [nextName.en]);
+        })
+        .first();
+      if (duplicate) {
+        const response = new WithoutDataResource(
+          400,
+          "DUPLICATE_TITLE",
+          "Duplikat Data",
+          "Nama kategori berita (ID/EN) sudah digunakan pada kategori lain."
+        );
+        return res.status(400).json(response.toResponse());
+      }
     }
 
     await trx("cms_events_categories").where("id", id).update({
-      name,
-      description,
+      name: nextName,
+      description: nextDescription,
       updated_at: trx.fn.now(),
     });
 
@@ -257,7 +405,7 @@ exports.update = async (req, res) => {
       200,
       "SUCCESS_UPDATE_DATA",
       "Berhasil Memperbarui",
-      `Data kategori kegiatan '${name}' berhasil diperbarui.`
+      `Data kategori kegiatan '${nextName.id}' berhasil diperbarui.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {

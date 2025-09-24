@@ -2,6 +2,7 @@ const knex = require("../../config/database");
 const logger = require("../../utils/logger");
 const {
   applySearch,
+  applyJsonbSearch,
   applyPagination,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
@@ -1267,7 +1268,20 @@ exports.getAllNewsCategory = async (req, res) => {
       .whereNull("category.deleted_at")
       .orderBy("category.created_at", "desc");
 
-    applySearch(query, search, ["category.name"]);
+    applyJsonbSearch(
+      query,
+      search,
+      [
+        "category.name->>'id'",
+        "category.name->>'en'",
+        "category.description->>'id'",
+        "category.description->>'en'",
+      ],
+      {
+        mode: "or",
+        split: true,
+      }
+    );
 
     const paginationInfo = applyPagination(query, req.query);
 
@@ -1363,7 +1377,20 @@ exports.getAllEventCategory = async (req, res) => {
       .whereNull("category.deleted_at")
       .orderBy("category.created_at", "desc");
 
-    applySearch(query, search, ["category.name"]);
+    applyJsonbSearch(
+      query,
+      search,
+      [
+        "category.name->>'id'",
+        "category.name->>'en'",
+        "category.description->>'id'",
+        "category.description->>'en'",
+      ],
+      {
+        mode: "or",
+        split: true,
+      }
+    );
 
     const paginationInfo = applyPagination(query, req.query);
 
@@ -1465,7 +1492,15 @@ exports.getAllEvent = async (req, res) => {
       .whereNull("event.deleted_at")
       .orderBy("event.created_at", "desc");
 
-    applySearch(query, search, ["event.title"]);
+    applyJsonbSearch(
+      query,
+      search,
+      ["event.title->>'id'", "event.title->>'en'"],
+      {
+        mode: "or",
+        split: true,
+      }
+    );
 
     const paginationInfo = applyPagination(query, req.query);
 
@@ -1573,6 +1608,7 @@ exports.getEventbyEventCategoryId = async (req, res) => {
         "event.title",
         "event.description",
         "event.event_content",
+        "event.thumbnail_ids",
       ])
       .whereNull("event.deleted_at")
       .where("event.cms_event_category_id", id)
@@ -1639,7 +1675,15 @@ exports.getAllNews = async (req, res) => {
       .whereNull("news.deleted_at")
       .orderBy("news.created_at", "desc");
 
-    applySearch(query, search, ["news.title"]);
+    applyJsonbSearch(
+      query,
+      search,
+      ["news.title->>'id'", "news.title->>'en'"],
+      {
+        mode: "or",
+        split: true,
+      }
+    );
 
     const paginationInfo = applyPagination(query, req.query);
 
@@ -1749,6 +1793,7 @@ exports.getNewsbyNewsCategoryId = async (req, res) => {
         "news.slug",
         "news.description",
         "news.news_content",
+        "news.thumbnail_ids",
       ])
       .whereNull("news.deleted_at")
       .where("news.cms_news_category_id", id)
@@ -1811,8 +1856,13 @@ exports.getNewsbySlug = async (req, res) => {
         "description",
         "news_content",
       ])
-      .where("slug", slug)
       .whereNull("deleted_at")
+      .andWhere(function () {
+        this.whereRaw("lower(slug->>'id') = lower(?)", [slug]).orWhereRaw(
+          "lower(slug->>'en') = lower(?)",
+          [slug]
+        );
+      })
       .first();
     if (!news) {
       const response = new WithoutDataResource(
@@ -1825,11 +1875,14 @@ exports.getNewsbySlug = async (req, res) => {
     }
 
     const data = await newsResource(news);
+
+    const displayTitle =
+      (news.title && (news.title.id || news.title.en)) || "Tanpa Judul";
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      `Detail data berita '${news.title}' berdasarkan 'slug' berhasil didapatkan.`,
+      `Detail data berita '${displayTitle}' berdasarkan 'slug' berhasil didapatkan.`,
       data
     );
     return res.status(200).json(response.toResponse());

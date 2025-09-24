@@ -21,29 +21,14 @@ exports.updateEventValidator = [
     }),
 
   body("title")
-    .trim()
-    .notEmpty()
-    .withMessage("Judul kegiatan tidak boleh kosong.")
-    .bail()
-    .isString()
-    .withMessage("Judul kegiatan harus berupa teks.")
-    .bail()
-    .isLength({ max: 255 })
-    .withMessage("Judul kegiatan maksimal 255 karakter."),
+    .optional({ nullable: true, checkFalsy: true })
+    .custom(() => true),
 
   body("description")
-    .trim()
-    .notEmpty()
-    .withMessage("Deskripsi kegiatan tidak boleh kosong.")
-    .bail()
-    .isString()
-    .withMessage("Deskripsi kegiatan harus berupa teks."),
+    .optional({ nullable: true, checkFalsy: true })
+    .custom(() => true),
 
   body("eventContent")
-    .trim()
-    .notEmpty()
-    .withMessage("Konten kegiatan tidak boleh kosong.")
-    .bail()
-    .isString()
-    .withMessage("Konten kegiatan harus berupa teks."),
+    .optional({ nullable: true, checkFalsy: true })
+    .custom(() => true),
 ];

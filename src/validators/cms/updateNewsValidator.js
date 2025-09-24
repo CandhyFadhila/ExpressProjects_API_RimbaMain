@@ -20,37 +20,17 @@ exports.updateNewsValidator = [
       return true;
     }),
 
-  body("title")
-    .notEmpty()
-    .withMessage("Judul berita tidak boleh kosong.")
-    .bail()
-    .isString()
-    .withMessage("Judul berita harus berupa teks.")
-    .bail()
-    .isLength({ max: 255 })
-    .withMessage("Judul berita maksimal 255 karakter."),
+  body("title").notEmpty().withMessage("Judul berita tidak boleh kosong."),
 
   body("slug")
-    .notEmpty()
-    .withMessage("Slug berita tidak boleh kosong.")
-    .bail()
-    .isString()
-    .withMessage("Slug berita harus berupa teks.")
-    .bail()
-    .isLength({ max: 255 })
-    .withMessage("Slug berita maksimal 255 karakter."),
+    .optional({ nullable: true, checkFalsy: true })
+    .custom(() => true),
 
   body("description")
-    .notEmpty()
-    .withMessage("Deskripsi berita tidak boleh kosong.")
-    .bail()
-    .isString()
-    .withMessage("Deskripsi berita harus berupa teks."),
+    .optional({ nullable: true, checkFalsy: true })
+    .custom(() => true),
 
   body("newsContent")
-    .notEmpty()
-    .withMessage("Konten berita tidak boleh kosong.")
-    .bail()
-    .isString()
-    .withMessage("Konten berita harus berupa teks."),
+    .optional({ nullable: true, checkFalsy: true })
+    .custom(() => true),
 ];

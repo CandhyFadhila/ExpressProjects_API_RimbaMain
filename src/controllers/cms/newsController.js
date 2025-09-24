@@ -5,10 +5,12 @@ const {
   toArray,
   normJsonbArray,
   normIdArray,
+  isPlainObject,
+  handleLocalizedText,
 } = require("../../helpers/inputNorm");
 const { asJsonb } = require("../../helpers/dbJson");
 const {
-  applySearch,
+  applyJsonbSearch,
   applyPagination,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
@@ -40,7 +42,15 @@ exports.index = async (req, res) => {
 
     applyTrashedScope(query, req, "news.deleted_at");
 
-    applySearch(query, search, ["news.title"]);
+    applyJsonbSearch(
+      query,
+      search,
+      ["news.title->>'id'", "news.title->>'en'"],
+      {
+        mode: "or",
+        split: true,
+      }
+    );
 
     const paginationInfo = applyPagination(query, req.query);
 
@@ -102,6 +112,66 @@ exports.store = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
+    const titleNorm = handleLocalizedText(title, {
+      allowPartial: false,
+      maxLen: 255,
+      fieldLabel: "title",
+    });
+    if (titleNorm.error) {
+      const r = new WithoutDataResource(
+        400,
+        "INVALID_CONTENT_FORMAT",
+        "Format Konten Salah",
+        titleNorm.error.message
+      );
+      return res.status(400).json(r.toResponse());
+    }
+
+    const slugNorm = handleLocalizedText(slug, {
+      allowPartial: false,
+      maxLen: 255,
+      fieldLabel: "slug",
+    });
+    if (slugNorm.error) {
+      const r = new WithoutDataResource(
+        400,
+        "INVALID_CONTENT_FORMAT",
+        "Format Konten Salah",
+        slugNorm.error.message
+      );
+      return res.status(400).json(r.toResponse());
+    }
+
+    const descNorm = handleLocalizedText(description, {
+      allowPartial: false,
+      maxLen: undefined,
+      fieldLabel: "description",
+    });
+    if (descNorm.error) {
+      const r = new WithoutDataResource(
+        400,
+        "INVALID_CONTENT_FORMAT",
+        "Format Konten Salah",
+        descNorm.error.message
+      );
+      return res.status(400).json(r.toResponse());
+    }
+
+    const contentNorm = handleLocalizedText(newsContent, {
+      allowPartial: false,
+      maxLen: undefined,
+      fieldLabel: "newsContent",
+    });
+    if (contentNorm.error) {
+      const r = new WithoutDataResource(
+        400,
+        "INVALID_CONTENT_FORMAT",
+        "Format Konten Salah",
+        contentNorm.error.message
+      );
+      return res.status(400).json(r.toResponse());
+    }
+
     if (!req.files || req.files.length === 0) {
       const response = new WithoutDataResource(
         400,
@@ -144,15 +214,19 @@ exports.store = async (req, res) => {
     }
 
     const exists = await trx("cms_news")
-      .whereRaw("lower(title) = lower(?)", [title])
       .whereNull("deleted_at")
+      .andWhere(function () {
+        this.whereRaw("lower(title->>'id') = lower(?)", [
+          titleNorm.value.id,
+        ]).orWhereRaw("lower(title->>'en') = lower(?)", [titleNorm.value.en]);
+      })
       .first();
     if (exists) {
       const response = new WithoutDataResource(
         400,
         "DUPLICATE_TITLE",
         "Duplikat Data",
-        `Judul berita '${title}' sudah digunakan. Silakan gunakan judul lain.`
+        "Judul berita (ID/EN) sudah digunakan. Silakan gunakan judul lain."
       );
       return res.status(400).json(response.toResponse());
     }
@@ -168,10 +242,10 @@ exports.store = async (req, res) => {
       .insert({
         cms_news_category_id: categoryId,
         thumbnail_ids: asJsonb([thumbnailId]),
-        title,
-        slug,
-        description,
-        news_content: newsContent
+        title: { id: titleNorm.value.id, en: titleNorm.value.en },
+        slug: { id: slugNorm.value.id, en: slugNorm.value.en },
+        description: { id: descNorm.value.id, en: descNorm.value.en },
+        news_content: { id: contentNorm.value.id, en: contentNorm.value.en },
       })
       .returning("*");
 
@@ -190,7 +264,7 @@ exports.store = async (req, res) => {
       201,
       "SUCCESS_CREATE_DATA",
       "Berhasil Menyimpan Data",
-      `Data berita '${title}' berhasil ditambahkan.`
+      `Data berita '${titleNorm.value.id}' berhasil ditambahkan.`
     );
     return res.status(201).json(response.toResponse());
   } catch (error) {
@@ -210,10 +284,7 @@ exports.show = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const news = await knex("cms_news")
-      .select("*")
-      .where("id", id)
-      .first();
+    const news = await knex("cms_news").select("*").where("id", id).first();
     if (!news) {
       const response = new WithoutDataResource(
         200,
@@ -247,7 +318,14 @@ exports.show = async (req, res) => {
 
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
-  const { categoryId, title, slug, description, newsContent, deleteDocumentIds } = req.body;
+  const {
+    categoryId,
+    title,
+    slug,
+    description,
+    newsContent,
+    deleteDocumentIds,
+  } = req.body;
   const id = req.params.id;
 
   try {
@@ -277,19 +355,209 @@ exports.update = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const duplicate = await trx("cms_news")
-      .whereRaw("lower(title) = lower(?)", [title])
-      .whereNull("deleted_at")
-      .whereNot("id", id)
-      .first();
-    if (duplicate) {
-      const response = new WithoutDataResource(
-        400,
-        "DUPLICATE_TITLE",
-        "Duplikat Data",
-        `Judul berita '${title}' sudah digunakan pada berita lain.`
-      );
-      return res.status(400).json(response.toResponse());
+    const exTitle = isPlainObject(existing.title)
+      ? existing.title
+      : parseJsonSafe(existing.title) ?? { id: "", en: "" };
+    const exSlug = isPlainObject(existing.slug)
+      ? existing.slug
+      : parseJsonSafe(existing.slug) ?? { id: "", en: "" };
+    const exDesc = isPlainObject(existing.description)
+      ? existing.description
+      : parseJsonSafe(existing.description) ?? { id: "", en: "" };
+    const exContent = isPlainObject(existing.news_content)
+      ? existing.news_content
+      : parseJsonSafe(existing.news_content) ?? { id: "", en: "" };
+
+    let nextTitle = exTitle;
+    if (typeof title !== "undefined") {
+      const t = handleLocalizedText(title, {
+        allowPartial: true,
+        maxLen: 255,
+        fieldLabel: "title",
+      });
+      if (t.error) {
+        const r = new WithoutDataResource(
+          400,
+          "INVALID_CONTENT_FORMAT",
+          "Format Konten Salah",
+          t.error.message
+        );
+        return res.status(400).json(r.toResponse());
+      }
+      const merged = { ...exTitle, ...t.value };
+      if (
+        Object.prototype.hasOwnProperty.call(t.value, "id") &&
+        String(t.value.id).trim() === ""
+      )
+        merged.id = exTitle.id;
+      if (
+        Object.prototype.hasOwnProperty.call(t.value, "en") &&
+        String(t.value.en).trim() === ""
+      )
+        merged.en = exTitle.en;
+      if (!merged.id || !merged.en) {
+        const r = new WithoutDataResource(
+          400,
+          "INVALID_CONTENT_FORMAT",
+          "Format Konten Salah",
+          "Judul harus memiliki id dan en yang tidak kosong."
+        );
+        return res.status(400).json(r.toResponse());
+      }
+      nextTitle = {
+        id: String(merged.id).trim(),
+        en: String(merged.en).trim(),
+      };
+    }
+
+    let nextSlug = exSlug;
+    if (typeof slug !== "undefined") {
+      const t = handleLocalizedText(slug, {
+        allowPartial: true,
+        maxLen: 255,
+        fieldLabel: "slug",
+      });
+      if (t.error) {
+        const r = new WithoutDataResource(
+          400,
+          "INVALID_CONTENT_FORMAT",
+          "Format Konten Salah",
+          t.error.message
+        );
+        return res.status(400).json(r.toResponse());
+      }
+      const merged = { ...exSlug, ...t.value };
+      if (
+        Object.prototype.hasOwnProperty.call(t.value, "id") &&
+        String(t.value.id).trim() === ""
+      )
+        merged.id = exSlug.id;
+      if (
+        Object.prototype.hasOwnProperty.call(t.value, "en") &&
+        String(t.value.en).trim() === ""
+      )
+        merged.en = exSlug.en;
+      if (!merged.id || !merged.en) {
+        const r = new WithoutDataResource(
+          400,
+          "INVALID_CONTENT_FORMAT",
+          "Format Konten Salah",
+          "Slug harus memiliki id dan en yang tidak kosong."
+        );
+        return res.status(400).json(r.toResponse());
+      }
+      nextSlug = {
+        id: String(merged.id).trim(),
+        en: String(merged.en).trim(),
+      };
+    }
+
+    let nextDescription = exDesc;
+    if (typeof description !== "undefined") {
+      const d = handleLocalizedText(description, {
+        allowPartial: true,
+        maxLen: undefined,
+        fieldLabel: "description",
+      });
+      if (d.error) {
+        const r = new WithoutDataResource(
+          400,
+          "INVALID_CONTENT_FORMAT",
+          "Format Konten Salah",
+          d.error.message
+        );
+        return res.status(400).json(r.toResponse());
+      }
+      const merged = { ...exDesc, ...d.value };
+      if (
+        Object.prototype.hasOwnProperty.call(d.value, "id") &&
+        String(d.value.id).trim() === ""
+      )
+        merged.id = exDesc.id;
+      if (
+        Object.prototype.hasOwnProperty.call(d.value, "en") &&
+        String(d.value.en).trim() === ""
+      )
+        merged.en = exDesc.en;
+      if (!merged.id || !merged.en) {
+        const r = new WithoutDataResource(
+          400,
+          "INVALID_CONTENT_FORMAT",
+          "Format Konten Salah",
+          "Deskripsi harus memiliki id dan en yang tidak kosong."
+        );
+        return res.status(400).json(r.toResponse());
+      }
+      nextDescription = {
+        id: String(merged.id).trim(),
+        en: String(merged.en).trim(),
+      };
+    }
+
+    let nextContent = exContent;
+    if (typeof newsContent !== "undefined") {
+      const c = handleLocalizedText(newsContent, {
+        allowPartial: true,
+        maxLen: undefined,
+        fieldLabel: "newsContent",
+      });
+      if (c.error) {
+        const r = new WithoutDataResource(
+          400,
+          "INVALID_CONTENT_FORMAT",
+          "Format Konten Salah",
+          c.error.message
+        );
+        return res.status(400).json(r.toResponse());
+      }
+      const merged = { ...exContent, ...c.value };
+      if (
+        Object.prototype.hasOwnProperty.call(c.value, "id") &&
+        String(c.value.id).trim() === ""
+      )
+        merged.id = exContent.id;
+      if (
+        Object.prototype.hasOwnProperty.call(c.value, "en") &&
+        String(c.value.en).trim() === ""
+      )
+        merged.en = exContent.en;
+      if (!merged.id || !merged.en) {
+        const r = new WithoutDataResource(
+          400,
+          "INVALID_CONTENT_FORMAT",
+          "Format Konten Salah",
+          "Konten acara harus memiliki id dan en yang tidak kosong."
+        );
+        return res.status(400).json(r.toResponse());
+      }
+      nextContent = {
+        id: String(merged.id).trim(),
+        en: String(merged.en).trim(),
+      };
+    }
+
+    const titleChanged =
+      (nextTitle.id ?? "").toLowerCase() !== (exTitle.id ?? "").toLowerCase() ||
+      (nextTitle.en ?? "").toLowerCase() !== (exTitle.en ?? "").toLowerCase();
+    if (titleChanged) {
+      const duplicate = await trx("cms_news")
+        .whereNull("deleted_at")
+        .whereNot("id", id)
+        .andWhere(function () {
+          this.whereRaw("lower(title->>'id') = lower(?)", [
+            nextTitle.id,
+          ]).orWhereRaw("lower(title->>'en') = lower(?)", [nextTitle.en]);
+        })
+        .first();
+      if (duplicate) {
+        const response = new WithoutDataResource(
+          400,
+          "DUPLICATE_TITLE",
+          "Duplikat Data",
+          "Judul berita (ID/EN) sudah digunakan pada berita lain."
+        );
+        return res.status(400).json(response.toResponse());
+      }
     }
 
     const oldCoverIds = normJsonbArray(existing.thumbnail_ids);
@@ -316,10 +584,10 @@ exports.update = async (req, res) => {
       .update({
         cms_news_category_id: categoryId,
         thumbnail_ids: asJsonb(coverArr),
-        title,
-        slug,
-        description,
-        news_content: newsContent,
+        title: nextTitle,
+        slug: nextSlug,
+        description: nextDescription,
+        news_content: nextContent,
         updated_at: trx.fn.now(),
       });
 
@@ -338,14 +606,12 @@ exports.update = async (req, res) => {
       200,
       "SUCCESS_UPDATE_DATA",
       "Berhasil Memperbarui",
-      `Data berita '${title}' berhasil diperbarui.`
+      `Data berita '${nextTitle.id}' berhasil diperbarui.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
-    logger.error(
-      `| News CMS | - Error function update : ${error.message}`
-    );
+    logger.error(`| News CMS | - Error function update : ${error.message}`);
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -427,9 +693,7 @@ exports.destroy = async (req, res) => {
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
-    logger.error(
-      `| News CMS | - Error function destroy : ${error.message}`
-    );
+    logger.error(`| News CMS | - Error function destroy : ${error.message}`);
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -573,9 +837,7 @@ exports.restore = async (req, res) => {
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
-    logger.error(
-      `| News CMS | - Error function restore: ${error.message}`
-    );
+    logger.error(`| News CMS | - Error function restore: ${error.message}`);
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",

@@ -20,37 +20,27 @@ exports.storeNewsValidator = [
       return true;
     }),
 
-  body("title")
-    .notEmpty()
-    .withMessage("Judul berita tidak boleh kosong.")
-    .bail()
-    .isString()
-    .withMessage("Judul berita harus berupa teks.")
-    .bail()
-    .isLength({ max: 255 })
-    .withMessage("Judul berita maksimal 255 karakter."),
+  body("title").custom((v) => {
+    if (typeof v === "undefined")
+      throw new Error("Judul berita tidak boleh kosong.");
+    return true;
+  }),
 
-  body("slug")
-    .notEmpty()
-    .withMessage("Slug berita tidak boleh kosong.")
-    .bail()
-    .isString()
-    .withMessage("Slug berita harus berupa teks.")
-    .bail()
-    .isLength({ max: 255 })
-    .withMessage("Slug berita maksimal 255 karakter."),
+  body("slug").custom((v) => {
+    if (typeof v === "undefined")
+      throw new Error("Slug berita tidak boleh kosong.");
+    return true;
+  }),
 
-  body("description")
-    .notEmpty()
-    .withMessage("Deskripsi berita tidak boleh kosong.")
-    .bail()
-    .isString()
-    .withMessage("Deskripsi berita harus berupa teks."),
+  body("description").custom((v) => {
+    if (typeof v === "undefined")
+      throw new Error("Deskripsi berita tidak boleh kosong.");
+    return true;
+  }),
 
-  body("newsContent")
-    .notEmpty()
-    .withMessage("Konten berita tidak boleh kosong.")
-    .bail()
-    .isString()
-    .withMessage("Konten berita harus berupa teks."),
+  body("newsContent").custom((v) => {
+    if (typeof v === "undefined")
+      throw new Error("Konten berita tidak boleh kosong.");
+    return true;
+  }),
 ];
