@@ -16,6 +16,7 @@ const materialRoutes = require("./routes/kmis/materialRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const newsCategoryRoutes = require("./routes/masterData/newsCategoryRoutes");
 const eventCategoryRoutes = require("./routes/masterData/eventCategoryRoutes");
+const contentRoutes = require("./routes/cms/contentRoutes");
 const newsRoutes = require("./routes/cms/newsRoutes");
 const eventRoutes = require("./routes/cms/eventRoutes");
 
@@ -79,6 +80,9 @@ app.use("/api/kmis/public-request", kmispublicRequestRoute);
 app.use("/api/cms/public-request", cmspublicRequestRoute);
 
 //! ======== CMS MODULE ========
+// Content
+app.use("/api/cms/content", contentRoutes);
+
 // News
 app.use("/api/cms/news", newsRoutes);
 

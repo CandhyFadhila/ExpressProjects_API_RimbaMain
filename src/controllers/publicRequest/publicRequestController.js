@@ -17,6 +17,7 @@ const newsCategoryResource = require("../../resources/masterData/newsCategoryRes
 const newsResource = require("../../resources/cms/newsResource");
 const eventCategoryResource = require("../../resources/masterData/eventCategoryResource");
 const eventResource = require("../../resources/cms/eventResource");
+const contentResource = require("../../resources/cms/contentResource");
 
 // Role
 exports.getAllRole = async (req, res) => {
@@ -1687,7 +1688,14 @@ exports.getNewsbyId = async (req, res) => {
 
   try {
     const news = await knex("cms_news")
-      .select(["thumbnail_ids", "cms_news_category_id", "title", "slug", "description", "news_content"])
+      .select([
+        "thumbnail_ids",
+        "cms_news_category_id",
+        "title",
+        "slug",
+        "description",
+        "news_content",
+      ])
       .where("id", id)
       .whereNull("deleted_at")
       .first();
@@ -1795,7 +1803,14 @@ exports.getNewsbySlug = async (req, res) => {
 
   try {
     const news = await knex("cms_news")
-      .select(["thumbnail_ids", "cms_news_category_id", "title", "slug", "description", "news_content"])
+      .select([
+        "thumbnail_ids",
+        "cms_news_category_id",
+        "title",
+        "slug",
+        "description",
+        "news_content",
+      ])
       .where("slug", slug)
       .whereNull("deleted_at")
       .first();
@@ -1829,5 +1844,217 @@ exports.getNewsbySlug = async (req, res) => {
       "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
     );
     res.status(500).json(response.toResponse());
+  }
+};
+
+// Content
+exports.getAllContent = async (req, res) => {
+  try {
+    // Content
+    const contentRows = await knex("cms_contents as content")
+      .select([
+        "content.type",
+        "content.content",
+        "content.content_file_ids",
+        knex.raw(`"content"."order" as ord`), // quote kolom "order"
+      ])
+      .whereNull("content.deleted_at")
+      .orderBy(knex.raw(`"content"."order"`), "asc");
+
+    const contents = {};
+    for (const row of contentRows) {
+      const key = `${row.ord}`;
+      contents[key] = await contentResource(row);
+    }
+
+    // Event
+    const eventRows = await knex("cms_events as event")
+      .select([
+        "event.cms_event_category_id",
+        "event.title",
+        "event.description",
+        "event.event_content",
+        "event.thumbnail_ids",
+      ])
+      .whereNull("event.deleted_at")
+      .orderBy("event.created_at", "desc")
+      .limit(3);
+
+    const events = await Promise.all(eventRows.map(eventResource));
+
+    // News
+    const newsRows = await knex("cms_news as news")
+      .select([
+        "news.cms_news_category_id",
+        "news.thumbnail_ids",
+        "news.title",
+        "news.slug",
+        "news.description",
+        "news.news_content",
+      ])
+      .whereNull("news.deleted_at")
+      .orderBy("news.created_at", "desc");
+
+    const news = await Promise.all(newsRows.map(newsResource));
+
+    if (
+      Object.keys(contents).length === 0 &&
+      events.length === 0 &&
+      news.length === 0
+    ) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Belum ada konten, event, atau berita yang tersedia."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data konten CMS berhasil diambil.",
+      {
+        contents,
+        events,
+        news,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAllContent : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getContentbyOrder = async (req, res) => {
+  const ord = Number(req.params.id);
+  if (!Number.isInteger(ord) || ord < 0) {
+    const response = new WithoutDataResource(
+      400,
+      "FAILED_VALIDATION",
+      "Format Data Tidak Sesuai Ketentuan",
+      "Parameter order harus bilangan bulat >= 0."
+    );
+    return res.status(400).json(response.toResponse());
+  }
+
+  try {
+    const row = await knex("cms_contents as content")
+      .select([
+        "content.type",
+        "content.content",
+        "content.content_file_ids",
+        knex.raw(`"content"."order" as ord`),
+      ])
+      .whereRaw(`"content"."order" = ?`, [ord]) // quote kolom "order"
+      .whereNull("content.deleted_at")
+      .orderBy("content.created_at", "desc")
+      .first();
+
+    if (!row) {
+      const response = new WithoutDataResource(
+        404,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Konten dengan order '${ord}' tidak ditemukan.`
+      );
+      return res.status(404).json(response.toResponse());
+    }
+
+    const serialized = await contentResource(row);
+
+    const payload = { [String(row.ord)]: serialized };
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data konten berdasarkan order berhasil diambil.",
+      payload
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getContentbyOrder : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getContentHero = async (req, res) => {
+  let orderIds = [
+    ...new Set(
+      normIdArray(req.body?.orderIds ?? req.query?.orderIds, { as: "number" })
+    ),
+  ].filter((n) => Number.isInteger(n) && n >= 0);
+
+  if (orderIds.length === 0) orderIds = [1, 2, 3, 4, 5];
+
+  try {
+    const rows = await knex("cms_contents as content")
+      .select([
+        "content.type",
+        "content.content",
+        "content.content_file_ids",
+        knex.raw(`"content"."order" as ord`), // quote kolom "order"
+      ])
+      .whereIn(knex.raw(`"content"."order"`), orderIds)
+      .whereNull("content.deleted_at")
+      .orderBy(knex.raw(`"content"."order"`), "asc");
+
+    const payload = {};
+    for (const row of rows) {
+      const key = String(row.ord);
+      if (!payload[key]) {
+        payload[key] = await contentResource(row);
+      }
+    }
+
+    if (Object.keys(payload).length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Belum ada konten hero yang tersedia."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data konten hero berhasil diambil.",
+      payload
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAllContentHero : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
   }
 };
