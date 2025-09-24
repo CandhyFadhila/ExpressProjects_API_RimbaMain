@@ -1,7 +1,6 @@
 require("dotenv").config();
 const express = require("express");
 const morgan = require("morgan");
-const knex = require("./config/database");
 const corsMiddleware = require("./middlewares/cors");
 const logger = require("./utils/logger");
 const publicRequestRoute = require("./routes/publicRequest/publicRequestRoute");
@@ -54,17 +53,23 @@ app.get("/", (req, res) => {
 // Cek db
 app.get("/check-db", async (req, res) => {
   try {
-    const result = await knex.raw("SELECT NOW()");
+    // Cek koneksi berdasarkan environment (Linux/Windows)
+    const env = process.env.PG_ENV || "windows";
+    const dbConnection = require("./config/database"); // ini file database.js
+
+    // Panggil query untuk cek waktu server database
+    const result = await dbConnection.raw("SELECT NOW()");
+
     res.json({
       status: "success",
-      message: "Koneksi database berhasil.",
+      message: `Koneksi database (${env}) berhasil.`,
       server_time: result.rows[0].now,
     });
   } catch (error) {
     logger.error("DB Connection Error:", error.message);
     res.status(500).json({
       status: "error",
-      message: "Gagal terhubung ke database.",
+      message: "Gagal terhubung ke database. Pastikan environment sudah benar dan database sudah dijalankan.",
       error: error.message,
     });
   }
