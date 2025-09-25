@@ -1,12 +1,12 @@
 const express = require("express");
 const router = express.Router();
-const educatorController = require("../../controllers/kmis/educatorController");
+const quizController = require("../../controllers/kmis/quizController");
 const {
-  storeEducatorValidator,
-} = require("../../validators/kmis/storeEducatorValidator");
+  storeQuizValidator,
+} = require("../../validators/kmis/storeQuizValidator");
 const {
-  updateEducatorValidator,
-} = require("../../validators/kmis/updateEducatorValidator");
+  updateQuizValidator,
+} = require("../../validators/kmis/updateQuizValidator");
 const validate = require("../../middlewares/validate");
 const authMiddleware = require("../../middlewares/authMiddleware");
 const rateLimiter = require("../../middlewares/rateLimitMiddleware");
@@ -15,60 +15,62 @@ const requirePermission = require("../../middlewares/requirePermission");
 const multer = require("multer");
 const upload = multer();
 
-router.use(rateLimiter, authMiddleware, requireAbility("super_admin"));
+router.use(rateLimiter, authMiddleware, requireAbility("educator"));
 
 router.get(
-  "/sso/index",
+  "/educator/index",
   requirePermission(["view.kmis_educator"]),
-  educatorController.index
+  quizController.index
 );
 
 router.get(
-  "/sso/show/:id",
+  "/educator/show/:id",
   requirePermission(["view.kmis_educator"]),
-  educatorController.show
+  quizController.show
 );
 
 router.post(
-  "/sso/create",
+  "/educator/create",
   requirePermission(["create.kmis_educator"]),
   upload.none(),
-  storeEducatorValidator,
+  storeQuizValidator,
   validate,
-  educatorController.store
+  quizController.store
 );
 
 router.patch(
-  "/sso/update/:id",
+  "/educator/update/:id",
   requirePermission(["edit.kmis_educator"]),
   upload.none(),
-  updateEducatorValidator,
+  updateQuizValidator,
   validate,
-  educatorController.update
+  quizController.update
 );
 
 router.delete(
-  "/sso/delete",
+  "/educator/delete",
   requirePermission(["delete.kmis_educator"]),
-  educatorController.destroy
+  quizController.destroy
 );
 
 router.patch(
-  "/sso/restore",
+  "/educator/restore",
   requirePermission(["restore.kmis_educator"]),
-  educatorController.restore
+  quizController.restore
 );
 
-router.patch(
-  "/sso/deactivate",
-  requirePermission(["edit.kmis_educator"]),
-  educatorController.deactivateAccount
+router.get(
+  "/educator/download-template",
+  requirePermission(["create.kmis_educator"]),
+  quizController.downloadTemplate
 );
 
-router.patch(
-  "/sso/activate",
-  requirePermission(["edit.kmis_educator"]),
-  educatorController.activateAccount
+router.post(
+  "/educator/import",
+  requirePermission(["create.kmis_educator"]),
+  upload.array("files", 1),
+  validate,
+  quizController.importTemplate
 );
 
 module.exports = router;

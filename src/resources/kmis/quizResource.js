@@ -1,24 +1,18 @@
 const knex = require("../../config/database");
-const UserResource = require("../../resources/auth/UserResource");
 const categoryResource = require("../../resources/kmis/categoryResource");
 const topicResource = require("../../resources/kmis/topicResource");
 
 async function quizResource(quiz) {
-  const user = quiz.created_by
-    ? await knex("users").where("id", quiz.created_by).first()
-    : null;
-
   const category = quiz.kmis_categories_id
-    ? await knex("categories").where("id", quiz.kmis_categories_id).first()
+    ? await knex("kmis_categories").where("id", quiz.kmis_categories_id).first()
     : null;
 
   const topic = quiz.kmis_topics_id
-    ? await knex("topics").where("id", quiz.kmis_topics_id).first()
+    ? await knex("kmis_topics").where("id", quiz.kmis_topics_id).first()
     : null;
 
   return {
     id: quiz.id,
-    userCreated: user ? await UserResource(user) : null,
     category: category ? await categoryResource(category) : null,
     topic: topic ? await topicResource(topic) : null,
     question: quiz.question,

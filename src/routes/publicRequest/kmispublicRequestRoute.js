@@ -116,4 +116,23 @@ router.post(
   publicRequestController.getMaterialbyIsPublic
 );
 
+// Quiz
+router.get(
+  "/get-all-quiz",
+  rateLimiter,
+  publicRequestController.getAllQuiz
+);
+
+router.get(
+  "/get-quiz/:id",
+  rateLimiter,
+  publicRequestController.getQuizbyId
+);
+
+router.post(
+  "/get-quiz-by-category-topic",
+  rateLimiter,
+  publicRequestController.getQuizbyTopicIdorCategoryId
+);
+
 module.exports = router;
