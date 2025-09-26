@@ -14,6 +14,7 @@ const RoleResource = require("../../resources/auth/RoleResource");
 const categoryResource = require("../../resources/kmis/categoryResource");
 const topicResource = require("../../resources/kmis/topicResource");
 const materialResource = require("../../resources/kmis/materialResource");
+const quizCategoryResource = require("../../resources/kmis/quizCategoryResource");
 const quizResource = require("../../resources/kmis/quizResource");
 const newsCategoryResource = require("../../resources/masterData/newsCategoryResource");
 const newsResource = require("../../resources/cms/newsResource");
@@ -1259,6 +1260,269 @@ exports.getMaterialbyIsPublic = async (req, res) => {
   }
 };
 
+// Quiz Category
+exports.getAllQuizCategory = async (req, res) => {
+  const { search } = req.query;
+
+  try {
+    let query = knex("kmis_quiz_categories as quiz_categories")
+      .leftJoin(
+        "kmis_categories as category",
+        "category.id",
+        "quiz_categories.kmis_categories_id"
+      )
+      .leftJoin("kmis_topics as topic", "topic.id", "quiz_categories.kmis_topics_id")
+      .select(
+        "quiz_categories.kmis_categories_id",
+        "quiz_categories.kmis_topics_id",
+        "quiz_categories.name",
+        "quiz_categories.description",
+        "quiz_categories.total_question",
+      )
+      .whereNull("quiz_categories.deleted_at")
+      .orderBy("quiz_categories.created_at", "desc");
+
+    applySearch(query, search, [
+      "quiz_categories.name",
+      "category.title",
+      "topic.title",
+    ]);
+
+    const paginationInfo = applyPagination(query, req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((quizCategory) => quizCategoryResource(quizCategory))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data kategori soal pertanyaan berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAllQuizCategory : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getQuizCategorybyId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const quiz = await knex("kmis_quiz_categories")
+      .select(
+        "kmis_categories_id",
+        "kmis_topics_id",
+        "name",
+        "description",
+        "total_question"
+      )
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!quiz) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data kategori soal dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const data = await quizCategoryResource(quiz);
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Detail data kategori soal berhasil didapatkan.",
+      data
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getQuizCategorybyId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getQuizCategorybyTopicIdorCategoryId = async (req, res) => {
+  const { search } = req.query;
+  const categoryIds = [
+    ...new Set(
+      normIdArray(
+        req.body?.categoryIds ??
+          req.body?.categoryId ??
+          req.query?.categoryIds ??
+          req.query?.categoryId,
+        { as: "number" }
+      )
+    ),
+  ];
+  const topicIds = [
+    ...new Set(
+      normIdArray(
+        req.body?.topicIds ??
+          req.body?.topicId ??
+          req.query?.topicIds ??
+          req.query?.topicId,
+        { as: "number" }
+      )
+    ),
+  ];
+
+  try {
+    if (categoryIds.length === 0 && topicIds.length === 0) {
+      const response = new WithoutDataResource(
+        400,
+        "FAILED_VALIDATION",
+        "Format Data Tidak Sesuai Ketentuan",
+        "Payload harus diisi minimal salah satu: categoryId[] atau topicId[]."
+      );
+      return res.status(400).json(response.toResponse());
+    }
+
+    if (categoryIds.length > 0) {
+      const existCatTxt = await knex("kmis_categories")
+        .whereIn("id", categoryIds)
+        .pluck("id");
+
+      const missCat = categoryIds
+        .map(String)
+        .filter((id) => !existCatTxt.includes(id));
+
+      if (missCat.length > 0) {
+        const response = new WithoutDataResource(
+          400,
+          "FAILED_VALIDATION",
+          "Validasi Gagal",
+          `Beberapa categoryId tidak ditemukan: [${missCat.join(", ")}].`
+        );
+        return res.status(400).json(response.toResponse());
+      }
+    }
+
+    if (topicIds.length > 0) {
+      const existTopTxt = await knex("kmis_topics")
+        .whereIn("id", topicIds)
+        .pluck("id");
+
+      const missTop = topicIds
+        .map(String)
+        .filter((id) => !existTopTxt.includes(id));
+
+      if (missTop.length > 0) {
+        const response = new WithoutDataResource(
+          400,
+          "FAILED_VALIDATION",
+          "Validasi Gagal",
+          `Beberapa topicId tidak ditemukan: [${missTop.join(", ")}].`
+        );
+        return res.status(400).json(response.toResponse());
+      }
+    }
+
+    let query = knex("kmis_quiz_categories as quiz")
+      .leftJoin(
+        "kmis_categories as category",
+        "category.id",
+        "quiz.kmis_categories_id"
+      )
+      .leftJoin("kmis_topics as topic", "topic.id", "quiz.kmis_topics_id")
+      .select(
+        "quiz.kmis_categories_id",
+        "quiz.kmis_topics_id",
+        "quiz.name",
+        "quiz.description",
+        "quiz.total_question"
+      )
+      .whereNull("quiz.deleted_at")
+      .orderBy("quiz.created_at", "desc");
+
+    if (categoryIds.length > 0)
+      query.whereIn("quiz.kmis_categories_id", categoryIds);
+    if (topicIds.length > 0) query.whereIn("quiz.kmis_topics_id", topicIds);
+
+    applySearch(query, search, [
+      "quiz.question",
+      "category.title",
+      "topic.title",
+    ]);
+
+    const paginationInfo = applyPagination(query, req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((quizCategory) => quizCategoryResource(quizCategory))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data kategori soal pertanyaan berdasarkan kategori atau topik berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getQuizbyTopicIdorCategoryId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
 // Quiz
 exports.getAllQuiz = async (req, res) => {
   const { search } = req.query;
@@ -1386,7 +1650,7 @@ exports.getQuizbyId = async (req, res) => {
   }
 };
 
-exports.getQuizbyTopicIdorCategoryId = async (req, res) => {
+exports.getQuizbyquizCategoryId = async (req, res) => {
   const { search } = req.query;
   const categoryIds = [
     ...new Set(
