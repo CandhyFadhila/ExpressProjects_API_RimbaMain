@@ -148,10 +148,10 @@ router.get(
   publicRequestController.getQuizbyId
 );
 
-// router.post(
-//   "/get-quiz-by-category-topic",
-//   rateLimiter,
-//   publicRequestController.getQuizbyTopicIdorCategoryId
-// );
+router.post(
+  "/get-quiz-by-category-topic",
+  rateLimiter,
+  publicRequestController.getQuizbyquizCategoryId
+);
 
 module.exports = router;

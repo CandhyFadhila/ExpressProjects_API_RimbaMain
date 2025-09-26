@@ -11,7 +11,6 @@ const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const quizCategoryResource = require("../../resources/kmis/quizCategoryResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
-const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 
 exports.index = async (req, res) => {
   const { search } = req.query;

@@ -19,19 +19,19 @@ router.use(rateLimiter, authMiddleware, requireAbility("educator"));
 
 router.get(
   "/educator/index",
-  requirePermission(["view.kmis_educator"]),
+  requirePermission(["view.kmis_quiz"]),
   quizController.index
 );
 
 router.get(
   "/educator/show/:id",
-  requirePermission(["view.kmis_educator"]),
+  requirePermission(["view.kmis_quiz"]),
   quizController.show
 );
 
 router.post(
   "/educator/create",
-  requirePermission(["create.kmis_educator"]),
+  requirePermission(["create.kmis_quiz"]),
   upload.none(),
   storeQuizValidator,
   validate,
@@ -40,7 +40,7 @@ router.post(
 
 router.patch(
   "/educator/update/:id",
-  requirePermission(["edit.kmis_educator"]),
+  requirePermission(["edit.kmis_quiz"]),
   upload.none(),
   updateQuizValidator,
   validate,
@@ -49,25 +49,25 @@ router.patch(
 
 router.delete(
   "/educator/delete",
-  requirePermission(["delete.kmis_educator"]),
+  requirePermission(["delete.kmis_quiz"]),
   quizController.destroy
 );
 
 router.patch(
   "/educator/restore",
-  requirePermission(["restore.kmis_educator"]),
+  requirePermission(["restore.kmis_quiz"]),
   quizController.restore
 );
 
 router.get(
   "/educator/download-template",
-  requirePermission(["create.kmis_educator"]),
+  requirePermission(["create.kmis_quiz"]),
   quizController.downloadTemplate
 );
 
 router.post(
   "/educator/import",
-  requirePermission(["create.kmis_educator"]),
+  requirePermission(["create.kmis_quiz"]),
   upload.array("files", 1),
   validate,
   quizController.importTemplate

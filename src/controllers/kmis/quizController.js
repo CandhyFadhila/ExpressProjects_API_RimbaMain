@@ -15,7 +15,6 @@ const {
 } = require("../../validators/kmis/storeQuizValidator");
 const quizResource = require("../../resources/kmis/quizResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
-const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 
 exports.index = async (req, res) => {
   const { search } = req.query;
@@ -37,8 +36,6 @@ exports.index = async (req, res) => {
         "quiz.updated_at"
       )
       .orderBy("quiz.created_at", "desc");
-
-    applyTrashedScope(query, req, "quiz.deleted_at");
 
     applySearch(query, search, ["quiz.question"]);
 
@@ -125,6 +122,17 @@ exports.store = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
+    await validateTotalQuestionQuota([{ quizCategoryId }], trx);
+
+    const normalizedExplanation =
+      explanation === undefined ||
+      explanation === null ||
+      (typeof explanation === "string" && explanation.trim() === "")
+        ? null
+        : typeof explanation === "string"
+        ? explanation.trim()
+        : explanation;
+
     await trx("kmis_quiz")
       .insert({
         kmis_quiz_categories_id: quizCategoryId,
@@ -134,7 +142,7 @@ exports.store = async (req, res) => {
         answer_c: answerC,
         answer_d: answerD,
         correct_option: correctOption,
-        explanation: explanation ?? null,
+        explanation: normalizedExplanation,
       })
       .returning("*");
 
@@ -158,6 +166,16 @@ exports.store = async (req, res) => {
     return res.status(201).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
+
+    if (error.code === "OVER_QUOTA") {
+      const response = new WithoutDataResource(
+        400,
+        "OVER_QUOTA",
+        "Melebihi Batas Kuota Soal",
+        error.message
+      );
+      return res.status(400).json(response.toResponse());
+    }
     logger.error(`| Quiz KMIS | - Error function store: ${error.message}`);
     const response = new WithoutDataResource(
       500,
@@ -538,17 +556,7 @@ exports.restore = async (req, res) => {
 exports.downloadTemplate = async (req, res) => {
   try {
     // 1) Ambil data referensi terbaru (hanya id & name)
-    const [categories, topics, quizCategories] = await Promise.all([
-      knex("kmis_categories")
-        .select({ id: "id", name: "title", description: "description" })
-        .whereNull("deleted_at")
-        .orderBy("id", "asc"),
-
-      knex("kmis_topics")
-        .select({ id: "id", name: "title", description: "description" })
-        .whereNull("deleted_at")
-        .orderBy("id", "asc"),
-
+    const [quizCategories] = await Promise.all([
       knex("kmis_quiz_categories as qc")
         .join("kmis_categories as c", "c.id", "qc.kmis_categories_id")
         .join("kmis_topics as t", "t.id", "qc.kmis_topics_id")
@@ -557,10 +565,10 @@ exports.downloadTemplate = async (req, res) => {
         .whereNull("t.deleted_at")
         .select({
           id: "qc.id",
-          categoryId: "qc.kmis_categories_id",
           categoryName: "c.title",
-          topicId: "qc.kmis_topics_id",
           topicName: "t.title",
+          name: "qc.name",
+          description: "qc.description",
           totalQuestion: "qc.total_question",
         })
         .orderBy([{ column: "qc.id", order: "asc" }]),
@@ -569,7 +577,6 @@ exports.downloadTemplate = async (req, res) => {
     // 2) Sheet 1: Template input quiz
     const header = [
       "quizCategoryId",
-      "topicId",
       "question",
       "answerA",
       "answerB",
@@ -609,58 +616,36 @@ exports.downloadTemplate = async (req, res) => {
     ];
 
     // 3) Sheet 2: Referensi
-    // 3.1 Quiz Categories (pair Kategori–Topik yang dipakai di Template)
     const qcTable = [
-      ["Quiz Categories (pakai kolom 'id' untuk diisi ke quizCategoryId)"],
+      [
+        "Kategori soal (pakai kolom 'id' untuk diisi ke quizCategoryId pada sheet template)",
+      ],
       [
         "id",
-        "categoryId",
-        "categoryName",
-        "topicId",
-        "topicName",
-        "totalQuestion",
+        "kategori",
+        "topik",
+        "nama kategori soal",
+        "deskripsi kategori soal",
+        "jumlah soal yang bisa dibuat",
       ],
       ...quizCategories.map((q) => [
         q.id,
-        q.categoryId,
         q.categoryName,
-        q.topicId,
         q.topicName,
+        q.name,
+        q.description,
         q.totalQuestion,
       ]),
     ];
 
-    // 3.2 Categories
-    const catTable = [
-      [""],
-      ["Kategori"],
-      ["id", "name", "description"],
-      ...categories.map((c) => [c.id, c.name, c.description]),
-    ];
-
-    // 3.3 Topics
-    const topicTable = [
-      [""],
-      ["Topik"],
-      ["id", "name", "description"],
-      ...topics.map((t) => [t.id, t.name, t.description]),
-    ];
-
     const wsRef = XLSX.utils.aoa_to_sheet(qcTable);
-    // Tempel tabel kategori & topik di bawahnya, dipisah baris kosong
-    XLSX.utils.sheet_add_aoa(wsRef, catTable, {
-      origin: { r: qcTable.length + 1, c: 0 },
-    });
-    XLSX.utils.sheet_add_aoa(wsRef, topicTable, {
-      origin: { r: qcTable.length + catTable.length + 2, c: 0 },
-    });
 
     wsRef["!cols"] = [
       { wch: 10 }, // id
-      { wch: 12 }, // categoryId
       { wch: 40 }, // categoryName
-      { wch: 10 }, // topicId
       { wch: 40 }, // topicName
+      { wch: 40 }, // name
+      { wch: 40 }, // description
       { wch: 16 }, // totalQuestion
       // sisa kolom untuk tabel berikutnya tetap muat
     ];
@@ -810,27 +795,39 @@ exports.importTemplate = async (req, res) => {
       return Number.isInteger(n) ? n : NaN;
     };
 
-    // Skip baris 1 (header), mulai baris index 2
-    const dataRows = rows.slice(1);
+    const HINT_MARKERS = new Set([
+      "(number)",
+      "(text)",
+      "A/B/C/D",
+      "(optional)",
+    ]);
+    const isHintRow = (row) =>
+      Array.isArray(row) &&
+      row.some((c) => typeof c === "string" && HINT_MARKERS.has(c.trim()));
+
+    // Jika baris ke-2 berisi petunjuk, startIndex = 2; kalau tidak, startIndex = 1
+    const startIndex = isHintRow(rows[1]) ? 2 : 1;
+    const excelStartRow = startIndex + 1;
+
+    const dataRows = rows.slice(startIndex);
     const items = [];
     const perRowErrors = [];
 
     for (let i = 0; i < dataRows.length; i++) {
       const r = dataRows[i] || [];
-      // lewati baris yang benar2 kosong
       const isEmpty = r.every((c) => c === null || c === "");
       if (isEmpty) continue;
 
-      const excelRowNum = i + 3; // baris excel (1-based)
+      const excelRowNum = excelStartRow + i; // baris excel (1-based)
 
       const obj = {
         quizCategoryId: toIntOrNaN(r[0]),
-        question: toStr(r[2]),
-        answerA: toStr(r[3]),
-        answerB: toStr(r[4]),
-        answerC: toStr(r[5]),
-        answerD: toStr(r[6]),
-        correctOption: toStr(r[7]).toUpperCase(),
+        question: toStr(r[1]),
+        answerA: toStr(r[2]),
+        answerB: toStr(r[3]),
+        answerC: toStr(r[4]),
+        answerD: toStr(r[5]),
+        correctOption: toStr(r[6]).toUpperCase(),
         explanation: (() => {
           const s = toStr(r[7]);
           return s === "" ? null : s;
@@ -942,8 +939,21 @@ exports.importTemplate = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    // --- 8) Insert batch dalam transaksi
-    const trx = await knex.transaction();
+    // --- 8) VALIDASI KUOTA total_question
+    try {
+      await validateTotalQuestionQuota(items, trx);
+    } catch (e) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        e.statusCode || 400,
+        e.code || "OVER_QUOTA",
+        "Melebihi Batas Kuota Soal",
+        e.message || "Jumlah soal pada file melebihi kuota yang diperbolehkan."
+      );
+      return res.status(400).json(response.toResponse());
+    }
+
+    // --- 9) Insert batch dalam transaksi
     try {
       const toInsert = items.map((it) => ({
         kmis_quiz_categories_id: it.quizCategoryId,
@@ -1002,3 +1012,65 @@ exports.importTemplate = async (req, res) => {
     return res.status(500).json(response.toResponse());
   }
 };
+
+async function validateTotalQuestionQuota(items, trx) {
+  const group = new Map(); // qcId -> { countInFile, rows[] }
+  for (const it of items) {
+    const qcId = Number(it.quizCategoryId);
+    if (!group.has(qcId)) group.set(qcId, { countInFile: 0, rows: [] });
+    const g = group.get(qcId);
+    g.countInFile += 1;
+    if (it.excelRowNum) g.rows.push(it.excelRowNum);
+  }
+  const qcIds = [...group.keys()];
+
+  const qcRows = await trx("kmis_quiz_categories")
+    .whereIn("id", qcIds)
+    .whereNull("deleted_at")
+    .select("id", "total_question")
+    .forUpdate(); // kunci parent untuk cegah race
+
+  const totalMap = new Map(
+    qcRows.map((r) => [Number(r.id), Number(r.total_question)])
+  );
+
+  const existingRows = await trx("kmis_quiz")
+    .whereIn("kmis_quiz_categories_id", qcIds)
+    .whereNull("deleted_at")
+    .select("kmis_quiz_categories_id")
+    .count({ n: "*" })
+    .groupBy("kmis_quiz_categories_id");
+
+  const existMap = new Map(
+    existingRows.map((r) => [Number(r.kmis_quiz_categories_id), Number(r.n)])
+  );
+
+  const errors = [];
+  for (const [qcId, { countInFile }] of group.entries()) {
+    const total = totalMap.get(qcId);
+    if (typeof total !== "number") {
+      errors.push(`quizCategoryId ${qcId} tidak ditemukan / nonaktif.`);
+      continue;
+    }
+    const existing = existMap.get(qcId) ?? 0;
+    const remaining = total - existing;
+    if (remaining < 0) {
+      errors.push(
+        `Kuota kategori ${qcId} sudah melebihi batas (existing ${existing} > total ${total}).`
+      );
+      continue;
+    }
+    if (countInFile > remaining) {
+      errors.push(
+        `Kategori kuis ${qcId}: sisa kuota ${remaining}, tetapi mencoba menambah ${countInFile} item.`
+      );
+    }
+  }
+
+  if (errors.length) {
+    const err = new Error(errors.join(" "));
+    err.statusCode = 400;
+    err.code = "OVER_QUOTA";
+    throw err;
+  }
+}

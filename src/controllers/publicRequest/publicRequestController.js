@@ -1271,13 +1271,17 @@ exports.getAllQuizCategory = async (req, res) => {
         "category.id",
         "quiz_categories.kmis_categories_id"
       )
-      .leftJoin("kmis_topics as topic", "topic.id", "quiz_categories.kmis_topics_id")
+      .leftJoin(
+        "kmis_topics as topic",
+        "topic.id",
+        "quiz_categories.kmis_topics_id"
+      )
       .select(
         "quiz_categories.kmis_categories_id",
         "quiz_categories.kmis_topics_id",
         "quiz_categories.name",
         "quiz_categories.description",
-        "quiz_categories.total_question",
+        "quiz_categories.total_question"
       )
       .whereNull("quiz_categories.deleted_at")
       .orderBy("quiz_categories.created_at", "desc");
@@ -1652,46 +1656,35 @@ exports.getQuizbyId = async (req, res) => {
 
 exports.getQuizbyquizCategoryId = async (req, res) => {
   const { search } = req.query;
-  const categoryIds = [
+  const quizCategoryIds = [
     ...new Set(
       normIdArray(
-        req.body?.categoryIds ??
-          req.body?.categoryId ??
-          req.query?.categoryIds ??
-          req.query?.categoryId,
-        { as: "number" }
-      )
-    ),
-  ];
-  const topicIds = [
-    ...new Set(
-      normIdArray(
-        req.body?.topicIds ??
-          req.body?.topicId ??
-          req.query?.topicIds ??
-          req.query?.topicId,
+        req.body?.quizCategoryIds ??
+          req.body?.quizCategoryId ??
+          req.query?.quizCategoryIds ??
+          req.query?.quizCategoryId,
         { as: "number" }
       )
     ),
   ];
 
   try {
-    if (categoryIds.length === 0 && topicIds.length === 0) {
+    if (quizCategoryIds.length === 0) {
       const response = new WithoutDataResource(
         400,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
-        "Payload harus diisi minimal salah satu: categoryId[] atau topicId[]."
+        "Payload harus diisi quizCategoryId[]."
       );
       return res.status(400).json(response.toResponse());
     }
 
-    if (categoryIds.length > 0) {
-      const existCatTxt = await knex("kmis_categories")
-        .whereIn("id", categoryIds)
+    if (quizCategoryIds.length > 0) {
+      const existCatTxt = await knex("kmis_quiz_categories")
+        .whereIn("id", quizCategoryIds)
         .pluck("id");
 
-      const missCat = categoryIds
+      const missCat = quizCategoryIds
         .map(String)
         .filter((id) => !existCatTxt.includes(id));
 
@@ -1700,27 +1693,7 @@ exports.getQuizbyquizCategoryId = async (req, res) => {
           400,
           "FAILED_VALIDATION",
           "Validasi Gagal",
-          `Beberapa categoryId tidak ditemukan: [${missCat.join(", ")}].`
-        );
-        return res.status(400).json(response.toResponse());
-      }
-    }
-
-    if (topicIds.length > 0) {
-      const existTopTxt = await knex("kmis_topics")
-        .whereIn("id", topicIds)
-        .pluck("id");
-
-      const missTop = topicIds
-        .map(String)
-        .filter((id) => !existTopTxt.includes(id));
-
-      if (missTop.length > 0) {
-        const response = new WithoutDataResource(
-          400,
-          "FAILED_VALIDATION",
-          "Validasi Gagal",
-          `Beberapa topicId tidak ditemukan: [${missTop.join(", ")}].`
+          `Beberapa quizCategoryId tidak ditemukan: [${missCat.join(", ")}].`
         );
         return res.status(400).json(response.toResponse());
       }
@@ -1728,15 +1701,12 @@ exports.getQuizbyquizCategoryId = async (req, res) => {
 
     let query = knex("kmis_quiz as quiz")
       .leftJoin(
-        "kmis_categories as category",
+        "kmis_quiz_categories as category",
         "category.id",
-        "quiz.kmis_categories_id"
+        "quiz.kmis_quiz_categories_id"
       )
-      .leftJoin("kmis_topics as topic", "topic.id", "quiz.kmis_topics_id")
       .select(
-        "quiz.id",
-        "quiz.kmis_categories_id",
-        "quiz.kmis_topics_id",
+        "quiz.kmis_quiz_categories_id",
         "quiz.question",
         "quiz.answer_a",
         "quiz.answer_b",
@@ -1751,14 +1721,12 @@ exports.getQuizbyquizCategoryId = async (req, res) => {
       .whereNull("quiz.deleted_at")
       .orderBy("quiz.created_at", "desc");
 
-    if (categoryIds.length > 0)
-      query.whereIn("quiz.kmis_categories_id", categoryIds);
-    if (topicIds.length > 0) query.whereIn("quiz.kmis_topics_id", topicIds);
+    if (quizCategoryIds.length > 0)
+      query.whereIn("quiz.kmis_quiz_categories_id", quizCategoryIds);
 
     applySearch(query, search, [
       "quiz.question",
-      "category.title",
-      "topic.title",
+      "category.name"
     ]);
 
     const paginationInfo = applyPagination(query, req.query);
