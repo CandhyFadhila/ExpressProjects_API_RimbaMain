@@ -3,38 +3,20 @@ const knex = require("../../config/database");
 const QUIZ_ALLOWED_ANSWER_TYPES = Object.freeze(["A", "B", "C", "D"]);
 
 exports.updateQuizValidator = [
-  body("categoryId")
+  body("quizCategoryId")
     .notEmpty()
-    .withMessage("Kategori wajib dipilih.")
+    .withMessage("Kategori kuis wajib dipilih.")
     .bail()
     .isInt()
-    .withMessage("Kategori harus berupa angka.")
+    .withMessage("Kategori kuis harus berupa angka.")
     .bail()
     .custom(async (value) => {
-      const category = await knex("kmis_categories")
+      const category = await knex("kmis_quiz_categories")
         .where("id", value)
         .whereNull("deleted_at")
         .first();
       if (!category) {
-        throw new Error("Kategori yang Anda pilih tidak ditemukan.");
-      }
-      return true;
-    }),
-
-  body("topicId")
-    .notEmpty()
-    .withMessage("Topik wajib dipilih.")
-    .bail()
-    .isInt()
-    .withMessage("Topik harus berupa angka.")
-    .bail()
-    .custom(async (value) => {
-      const topic = await knex("kmis_topics")
-        .where("id", value)
-        .whereNull("deleted_at")
-        .first();
-      if (!topic) {
-        throw new Error("Topik yang Anda pilih tidak ditemukan.");
+        throw new Error("Kategori kuis yang Anda pilih tidak ditemukan.");
       }
       return true;
     }),

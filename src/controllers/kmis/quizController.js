@@ -22,16 +22,9 @@ exports.index = async (req, res) => {
 
   try {
     let query = knex("kmis_quiz as quiz")
-      .leftJoin(
-        "kmis_categories as category",
-        "category.id",
-        "quiz.kmis_categories_id"
-      )
-      .leftJoin("kmis_topics as topic", "topic.id", "quiz.kmis_topics_id")
       .select(
         "quiz.id",
-        "quiz.kmis_categories_id",
-        "quiz.kmis_topics_id",
+        "quiz.kmis_quiz_categories_id",
         "quiz.question",
         "quiz.answer_a",
         "quiz.answer_b",
@@ -47,11 +40,7 @@ exports.index = async (req, res) => {
 
     applyTrashedScope(query, req, "quiz.deleted_at");
 
-    applySearch(query, search, [
-      "quiz.question",
-      "category.title",
-      "topic.title",
-    ]);
+    applySearch(query, search, ["quiz.question"]);
 
     const paginationInfo = applyPagination(query, req.query);
 
@@ -96,8 +85,7 @@ exports.index = async (req, res) => {
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
   const {
-    categoryId,
-    topicId,
+    quizCategoryId,
     question,
     answerA,
     answerB,
@@ -139,8 +127,7 @@ exports.store = async (req, res) => {
 
     await trx("kmis_quiz")
       .insert({
-        kmis_categories_id: categoryId,
-        kmis_topics_id: topicId,
+        kmis_quiz_categories_id: quizCategoryId,
         question,
         answer_a: answerA,
         answer_b: answerB,
@@ -221,8 +208,7 @@ exports.show = async (req, res) => {
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
   const {
-    categoryId,
-    topicId,
+    quizCategoryId,
     question,
     answerA,
     answerB,
@@ -278,8 +264,8 @@ exports.update = async (req, res) => {
     await trx("kmis_quiz")
       .where("id", id)
       .update({
-        kmis_categories_id: categoryId ?? existing.kmis_categories_id,
-        kmis_topics_id: topicId ?? existing.kmis_topics_id,
+        kmis_quiz_categories_id:
+          quizCategoryId ?? existing.kmis_quiz_categories_id,
         question: question ?? existing.question,
         answer_a: answerA ?? existing.answer_a,
         answer_b: answerB ?? existing.answer_b,
@@ -552,7 +538,7 @@ exports.restore = async (req, res) => {
 exports.downloadTemplate = async (req, res) => {
   try {
     // 1) Ambil data referensi terbaru (hanya id & name)
-    const [categories, topics] = await Promise.all([
+    const [categories, topics, quizCategories] = await Promise.all([
       knex("kmis_categories")
         .select({ id: "id", name: "title", description: "description" })
         .whereNull("deleted_at")
@@ -562,11 +548,27 @@ exports.downloadTemplate = async (req, res) => {
         .select({ id: "id", name: "title", description: "description" })
         .whereNull("deleted_at")
         .orderBy("id", "asc"),
+
+      knex("kmis_quiz_categories as qc")
+        .join("kmis_categories as c", "c.id", "qc.kmis_categories_id")
+        .join("kmis_topics as t", "t.id", "qc.kmis_topics_id")
+        .whereNull("qc.deleted_at")
+        .whereNull("c.deleted_at")
+        .whereNull("t.deleted_at")
+        .select({
+          id: "qc.id",
+          categoryId: "qc.kmis_categories_id",
+          categoryName: "c.title",
+          topicId: "qc.kmis_topics_id",
+          topicName: "t.title",
+          totalQuestion: "qc.total_question",
+        })
+        .orderBy([{ column: "qc.id", order: "asc" }]),
     ]);
 
     // 2) Sheet 1: Template input quiz
     const header = [
-      "categoryId",
+      "quizCategoryId",
       "topicId",
       "question",
       "answerA",
@@ -582,7 +584,6 @@ exports.downloadTemplate = async (req, res) => {
       header,
       [
         "(number)",
-        "(number)",
         "(text)",
         "(text)",
         "(text)",
@@ -597,8 +598,7 @@ exports.downloadTemplate = async (req, res) => {
 
     // Lebar kolom biar nyaman dilihat
     wsTemplate["!cols"] = [
-      { wch: 12 }, // categoryId
-      { wch: 10 }, // topicId
+      { wch: 15 }, // quizCategoryId
       { wch: 120 }, // question
       { wch: 25 }, // answerA
       { wch: 25 }, // answerB
@@ -608,35 +608,69 @@ exports.downloadTemplate = async (req, res) => {
       { wch: 120 }, // explanation
     ];
 
-    // 3) Sheet 2: Referensi Category & Topic (masing-masing tabel id, name)
+    // 3) Sheet 2: Referensi
+    // 3.1 Quiz Categories (pair Kategori–Topik yang dipakai di Template)
+    const qcTable = [
+      ["Quiz Categories (pakai kolom 'id' untuk diisi ke quizCategoryId)"],
+      [
+        "id",
+        "categoryId",
+        "categoryName",
+        "topicId",
+        "topicName",
+        "totalQuestion",
+      ],
+      ...quizCategories.map((q) => [
+        q.id,
+        q.categoryId,
+        q.categoryName,
+        q.topicId,
+        q.topicName,
+        q.totalQuestion,
+      ]),
+    ];
+
+    // 3.2 Categories
     const catTable = [
+      [""],
       ["Kategori"],
       ["id", "name", "description"],
       ...categories.map((c) => [c.id, c.name, c.description]),
     ];
 
+    // 3.3 Topics
     const topicTable = [
+      [""],
       ["Topik"],
       ["id", "name", "description"],
       ...topics.map((t) => [t.id, t.name, t.description]),
     ];
 
-    const wsRef = XLSX.utils.aoa_to_sheet(catTable);
-    // sisipkan 1 baris kosong lalu tabel TOPICS di bawahnya
-    XLSX.utils.sheet_add_aoa(wsRef, [[""]], {
-      origin: { r: catTable.length + 1, c: 0 },
+    const wsRef = XLSX.utils.aoa_to_sheet(qcTable);
+    // Tempel tabel kategori & topik di bawahnya, dipisah baris kosong
+    XLSX.utils.sheet_add_aoa(wsRef, catTable, {
+      origin: { r: qcTable.length + 1, c: 0 },
     });
     XLSX.utils.sheet_add_aoa(wsRef, topicTable, {
-      origin: { r: catTable.length + 2, c: 0 },
+      origin: { r: qcTable.length + catTable.length + 2, c: 0 },
     });
-    wsRef["!cols"] = [{ wch: 10 }, { wch: 50 }];
+
+    wsRef["!cols"] = [
+      { wch: 10 }, // id
+      { wch: 12 }, // categoryId
+      { wch: 40 }, // categoryName
+      { wch: 10 }, // topicId
+      { wch: 40 }, // topicName
+      { wch: 16 }, // totalQuestion
+      // sisa kolom untuk tabel berikutnya tetap muat
+    ];
 
     // 4) Buat workbook & kirim sebagai .xls
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, wsTemplate, "Template");
     XLSX.utils.book_append_sheet(wb, wsRef, "Referensi");
 
-    const buffer = XLSX.write(wb, { bookType: "biff8", type: "buffer" }); // => .xls
+    const buffer = XLSX.write(wb, { bookType: "biff8", type: "buffer" });
 
     res.setHeader(
       "Content-Disposition",
@@ -748,8 +782,7 @@ exports.importTemplate = async (req, res) => {
         .toLowerCase()
     );
     const expected = [
-      "categoryid",
-      "topicid",
+      "quizcategoryid",
       "question",
       "answera",
       "answerb",
@@ -791,15 +824,17 @@ exports.importTemplate = async (req, res) => {
       const excelRowNum = i + 3; // baris excel (1-based)
 
       const obj = {
-        categoryId: toIntOrNaN(r[0]),
-        topicId: toIntOrNaN(r[1]),
+        quizCategoryId: toIntOrNaN(r[0]),
         question: toStr(r[2]),
         answerA: toStr(r[3]),
         answerB: toStr(r[4]),
         answerC: toStr(r[5]),
         answerD: toStr(r[6]),
         correctOption: toStr(r[7]).toUpperCase(),
-        explanation: toStr(r[8]) || null,
+        explanation: (() => {
+          const s = toStr(r[7]);
+          return s === "" ? null : s;
+        })(),
       };
 
       // --- 4) Jalankan validator route secara programatik per baris
@@ -854,23 +889,22 @@ exports.importTemplate = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    // --- 6) Cek relasi: topic harus milik category yang sama
-    const topicIds = [...new Set(items.map((x) => x.topicId))];
-    const topics = await knex("kmis_topics")
-      .select("id", "kmis_categories_id")
-      .whereIn("id", topicIds)
-      .whereNull("deleted_at");
+    // --- 6) Validasi keberadaan quizCategoryId
+    const qcIds = [...new Set(items.map((x) => x.quizCategoryId))];
+    const qcRows = await knex("kmis_quiz_categories as qc")
+      .leftJoin("kmis_categories as c", "c.id", "qc.kmis_categories_id")
+      .leftJoin("kmis_topics as t", "t.id", "qc.kmis_topics_id")
+      .whereIn("qc.id", qcIds)
+      .whereNull("qc.deleted_at")
+      .whereNull("c.deleted_at")
+      .whereNull("t.deleted_at")
+      .select("qc.id");
 
-    const topicMap = new Map(
-      topics.map((t) => [Number(t.id), Number(t.kmis_categories_id)])
-    );
+    const qcIdSet = new Set(qcRows.map((r) => Number(r.id)));
     for (const it of items) {
-      const belongsTo = topicMap.get(it.topicId);
-      if (belongsTo === undefined) {
-        perRowErrors.push(`Baris ${it.excelRowNum}: Topik tidak ditemukan.`);
-      } else if (belongsTo !== it.categoryId) {
+      if (!qcIdSet.has(it.quizCategoryId)) {
         perRowErrors.push(
-          `Baris ${it.excelRowNum}: Topik (${it.topicId}) tidak berada pada kategori (${it.categoryId}).`
+          `Baris ${it.excelRowNum}: quizCategoryId (${it.quizCategoryId}) tidak valid / tidak ditemukan.`
         );
       }
     }
@@ -878,7 +912,7 @@ exports.importTemplate = async (req, res) => {
       const response = new WithoutDataResource(
         400,
         "INVALID_RELATION",
-        "Relasi Category–Topic Tidak Sesuai",
+        "Relasi Tidak Valid",
         perRowErrors.join(" ")
       );
       return res.status(400).json(response.toResponse());
@@ -912,8 +946,7 @@ exports.importTemplate = async (req, res) => {
     const trx = await knex.transaction();
     try {
       const toInsert = items.map((it) => ({
-        kmis_categories_id: it.categoryId,
-        kmis_topics_id: it.topicId,
+        kmis_quiz_categories_id: it.quizCategoryId,
         question: it.question,
         answer_a: it.answerA,
         answer_b: it.answerB,

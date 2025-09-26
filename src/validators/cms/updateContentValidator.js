@@ -7,7 +7,7 @@ const CMS_ALLOWED_TYPES = Object.freeze([
   "Audio",
   "File",
   "Link",
-  "StringArray",
+  "TextArray",
   "ImageArray",
 ]);
 

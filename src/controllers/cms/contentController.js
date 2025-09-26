@@ -192,7 +192,7 @@ function validateFilesForType(type, files) {
     return null;
   }
 
-  // Tipe non-file (Link, Text, StringArray) -> tidak mewajibkan file
+  // Tipe non-file (Link, Text, TextArray) -> tidak mewajibkan file
   return null;
 }
 
@@ -290,7 +290,7 @@ function handleText(rawContent) {
       400,
       "INVALID_CONTENT_FORMAT",
       "Format Konten Salah",
-      "Untuk tipe Text/StringArray, content harus objek dengan properti id dan en bertipe string."
+      "Untuk tipe Text/TextArray, content harus objek dengan properti id dan en bertipe string."
     );
     return { error: err };
   }
@@ -300,7 +300,7 @@ function handleText(rawContent) {
   };
 }
 
-function handleStringArray(rawContent) {
+function handleTextArray(rawContent) {
   let arr = rawContent;
   if (typeof arr === "string") arr = parseJsonSafe(arr) ?? arr;
 
@@ -309,7 +309,7 @@ function handleStringArray(rawContent) {
       400,
       "INVALID_CONTENT_FORMAT",
       "Format Konten Salah",
-      "Untuk tipe StringArray, content harus array of object dengan properti id dan en bertipe string."
+      "Untuk tipe TextArray, content harus array of object dengan properti id dan en bertipe string."
     );
     return { error: err };
   }
@@ -390,8 +390,8 @@ exports.store = async (req, res) => {
       if (result.error) return res.status(400).json(result.error.toResponse());
       content_file_ids = result.contentFileIds;
       content_value = result.contentValue;
-    } else if (type === "StringArray") {
-      const result = handleStringArray(content);
+    } else if (type === "TextArray") {
+      const result = handleTextArray(content);
       if (result.error) return res.status(400).json(result.error.toResponse());
       content_file_ids = result.contentFileIds;
       content_value = result.contentValue;
@@ -607,8 +607,8 @@ exports.update = async (req, res) => {
       if (built.error) return res.status(400).json(built.error.toResponse());
       content_value = built.contentValue;
       content_file_ids = built.contentFileIds; // null
-    } else if (effType === "StringArray") {
-      const built = handleStringArray(content);
+    } else if (effType === "TextArray") {
+      const built = handleTextArray(content);
       if (built.error) return res.status(400).json(built.error.toResponse());
       content_value = built.contentValue;
       content_file_ids = built.contentFileIds; // null

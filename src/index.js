@@ -12,6 +12,7 @@ const topicRoutes = require("./routes/kmis/topicRoutes");
 const educatorRoutes = require("./routes/kmis/educatorRoutes");
 const studentRoutes = require("./routes/kmis/studentRoutes");
 const materialRoutes = require("./routes/kmis/materialRoutes");
+const quizCategoryRoutes = require("./routes/kmis/quizCategoryRoutes");
 const quizRoutes = require("./routes/kmis/quizRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const newsCategoryRoutes = require("./routes/masterData/newsCategoryRoutes");
@@ -70,7 +71,8 @@ app.get("/check-db", async (req, res) => {
     logger.error("DB Connection Error:", error.message);
     res.status(500).json({
       status: "error",
-      message: "Gagal terhubung ke database. Pastikan environment sudah benar dan database sudah dijalankan.",
+      message:
+        "Gagal terhubung ke database. Pastikan environment sudah benar dan database sudah dijalankan.",
       error: error.message,
     });
   }
@@ -111,6 +113,9 @@ app.use("/api/kmis/student", studentRoutes);
 
 // Material
 app.use("/api/kmis/material", materialRoutes);
+
+// Quiz Category
+app.use("/api/kmis/quiz-category", quizCategoryRoutes);
 
 // Quiz
 app.use("/api/kmis/quiz", quizRoutes);
