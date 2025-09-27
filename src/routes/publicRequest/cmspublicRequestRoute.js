@@ -3,6 +3,7 @@ const router = express.Router();
 const rateLimiter = require("../../middlewares/rateLimitMiddleware");
 const publicRequestController = require("../../controllers/publicRequest/publicRequestController");
 
+// News
 router.get(
   "/get-all-news-category",
   rateLimiter,
@@ -15,6 +16,31 @@ router.get(
   publicRequestController.getNewsCategorybyId
 );
 
+router.get(
+  "/get-all-news",
+  rateLimiter,
+  publicRequestController.getAllNews
+);
+
+router.get(
+  "/get-news/:id",
+  rateLimiter,
+  publicRequestController.getNewsbyId
+);
+
+router.get(
+  "/get-news-by-category/:id",
+  rateLimiter,
+  publicRequestController.getNewsbyNewsCategoryId
+);
+
+router.get(
+  "/get-news-by-slug/:slug",
+  rateLimiter,
+  publicRequestController.getNewsbySlug
+);
+
+// Event
 router.get(
   "/get-all-event-category",
   rateLimiter,
@@ -45,30 +71,20 @@ router.get(
   publicRequestController.getEventbyEventCategoryId
 );
 
+// Animal
 router.get(
-  "/get-all-news",
+  "/get-all-animal-category",
   rateLimiter,
-  publicRequestController.getAllNews
+  publicRequestController.getAllAnimalCategory
 );
 
 router.get(
-  "/get-news/:id",
+  "/get-animal-category/:id",
   rateLimiter,
-  publicRequestController.getNewsbyId
+  publicRequestController.getAnimalCategorybyId
 );
 
-router.get(
-  "/get-news-by-category/:id",
-  rateLimiter,
-  publicRequestController.getNewsbyNewsCategoryId
-);
-
-router.get(
-  "/get-news-by-slug/:slug",
-  rateLimiter,
-  publicRequestController.getNewsbySlug
-);
-
+// Content
 router.get(
   "/get-all-content",
   rateLimiter,

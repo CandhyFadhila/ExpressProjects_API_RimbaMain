@@ -6,7 +6,7 @@ const {
   applyPagination,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
-const { normIdArray } = require("../../helpers/inputNorm");
+const { normIdArray, isPlainObject } = require("../../helpers/inputNorm");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const UserResource = require("../../resources/auth/UserResource");
@@ -20,6 +20,7 @@ const newsCategoryResource = require("../../resources/masterData/newsCategoryRes
 const newsResource = require("../../resources/cms/newsResource");
 const eventCategoryResource = require("../../resources/masterData/eventCategoryResource");
 const eventResource = require("../../resources/cms/eventResource");
+const animalCategoryResource = require("../../resources/masterData/animalCategoryResource");
 const contentResource = require("../../resources/cms/contentResource");
 
 // Role
@@ -1724,10 +1725,7 @@ exports.getQuizbyquizCategoryId = async (req, res) => {
     if (quizCategoryIds.length > 0)
       query.whereIn("quiz.kmis_quiz_categories_id", quizCategoryIds);
 
-    applySearch(query, search, [
-      "quiz.question",
-      "category.name"
-    ]);
+    applySearch(query, search, ["quiz.question", "category.name"]);
 
     const paginationInfo = applyPagination(query, req.query);
 
@@ -1857,6 +1855,11 @@ exports.getNewsCategorybyId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
+    const nameObj = isPlainObject(category.name)
+      ? category.name
+      : parseJsonSafe(category.name) || {};
+    const displayName = nameObj.id || nameObj.en || "Tanpa Nama";
+
     const data = await newsCategoryResource(category);
     const response = new WithDataResource(
       200,
@@ -1966,6 +1969,11 @@ exports.getEventCategorybyId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
+    const nameObj = isPlainObject(category.name)
+      ? category.name
+      : parseJsonSafe(category.name) || {};
+    const displayName = nameObj.id || nameObj.en || "Tanpa Nama";
+
     const data = await newsCategoryResource(category);
     const response = new WithDataResource(
       200,
@@ -1978,6 +1986,120 @@ exports.getEventCategorybyId = async (req, res) => {
   } catch (error) {
     logger.error(
       `| Public Request | - Error function getEventCategorybyId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
+// Animal Category
+exports.getAllAnimalCategory = async (req, res) => {
+  const { search } = req.query;
+
+  try {
+    let query = knex("cms_animal_categories as category")
+      .select(["category.name", "category.description"])
+      .whereNull("category.deleted_at")
+      .orderBy("category.created_at", "desc");
+
+    applyJsonbSearch(
+      query,
+      search,
+      [
+        "category.name->>'id'",
+        "category.name->>'en'",
+        "category.description->>'id'",
+        "category.description->>'en'",
+      ],
+      {
+        mode: "or",
+        split: true,
+      }
+    );
+
+    const paginationInfo = applyPagination(query, req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((animal) => animalCategoryResource(animal))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data kategori satwa berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAllAnimalCategory : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getAnimalCategorybyId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const category = await knex("cms_animal_categories")
+      .select(["name", "description"])
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!category) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data kategori satwa dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const nameObj = isPlainObject(category.name)
+      ? category.name
+      : parseJsonSafe(category.name) || {};
+    const displayName = nameObj.id || nameObj.en || "Tanpa Nama";
+
+    const data = await newsCategoryResource(category);
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      `Detail data kategori satwa '${displayName}' berhasil didapatkan.`,
+      data
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAnimalCategorybyId: ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -2427,10 +2549,10 @@ exports.getAllContent = async (req, res) => {
       .whereNull("content.deleted_at")
       .orderBy(knex.raw(`"content"."order"`), "asc");
 
-    const contents = {};
+    const staticContents = {};
     for (const row of contentRows) {
       const key = `${row.ord}`;
-      contents[key] = await contentResource(row);
+      staticContents[key] = await contentResource(row);
     }
 
     // Event
@@ -2446,7 +2568,7 @@ exports.getAllContent = async (req, res) => {
       .orderBy("event.created_at", "desc")
       .limit(3);
 
-    const events = await Promise.all(eventRows.map(eventResource));
+    const homeActivities = await Promise.all(eventRows.map(eventResource));
 
     // News
     const newsRows = await knex("cms_news as news")
@@ -2459,14 +2581,37 @@ exports.getAllContent = async (req, res) => {
         "news.news_content",
       ])
       .whereNull("news.deleted_at")
-      .orderBy("news.created_at", "desc");
+      .orderBy("news.created_at", "desc")
+      .limit(3);
 
-    const news = await Promise.all(newsRows.map(newsResource));
+    const homeNews = await Promise.all(newsRows.map(newsResource));
+
+    // TODO: Animal Compositions
+    const homeAnimalComposition = await knex("animal_compositions")
+      .select([
+        "cms_animal_category_id",
+        "species_image_ids",
+        "title",
+        "description",
+        "total",
+      ])
+      .whereNull("deleted_at")
+      .orderBy("created_at", "desc")
+      .limit(3);
+
+    // TODO: Legal Docs
+    const homeLegalDocuments = await knex("legal_docs")
+      .select(["title", "description", "document_ids"])
+      .whereNull("deleted_at")
+      .orderBy("created_at", "desc")
+      .limit(3);
 
     if (
-      Object.keys(contents).length === 0 &&
-      events.length === 0 &&
-      news.length === 0
+      Object.keys(staticContents).length === 0 &&
+      homeActivities.length === 0 &&
+      homeNews.length === 0 &&
+      homeAnimalComposition.length === 0 &&
+      homeLegalDocuments.length === 0
     ) {
       const response = new WithoutDataResource(
         200,
@@ -2483,9 +2628,11 @@ exports.getAllContent = async (req, res) => {
       "Berhasil Mengambil Data",
       "Data konten CMS berhasil diambil.",
       {
-        contents,
-        events,
-        news,
+        staticContents,
+        homeActivities,
+        homeNews,
+        homeAnimalComposition,
+        homeLegalDocuments,
       }
     );
     return res.status(200).json(response.toResponse());

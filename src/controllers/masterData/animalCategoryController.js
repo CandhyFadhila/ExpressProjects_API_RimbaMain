@@ -13,7 +13,7 @@ const {
 } = require("../../helpers/queryHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
-const newsCategoryResource = require("../../resources/masterData/newsCategoryResource");
+const animalCategoryResource = require("../../resources/masterData/animalCategoryResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 
@@ -21,7 +21,7 @@ exports.index = async (req, res) => {
   const { search } = req.query;
 
   try {
-    let query = knex("cms_news_categories as category")
+    let query = knex("cms_animal_categories as category")
       .select(
         "category.id",
         "category.name",
@@ -63,14 +63,14 @@ exports.index = async (req, res) => {
     }
 
     const serializedData = await Promise.all(
-      result.data.map((category) => newsCategoryResource(category))
+      result.data.map((category) => animalCategoryResource(category))
     );
 
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      "Data kategori berita berhasil diambil.",
+      "Data kategori satwa berhasil diambil.",
       {
         data: serializedData,
         pagination: result.pagination,
@@ -79,7 +79,7 @@ exports.index = async (req, res) => {
     return res.status(200).json(response.toResponse());
   } catch (error) {
     logger.error(
-      `| News Category Master | - Error function index : ${error.message}`
+      `| Animal Category Master | - Error function index : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -141,7 +141,7 @@ exports.store = async (req, res) => {
       return res.status(400).json(r.toResponse());
     }
 
-    const exists = await trx("cms_news_categories")
+    const exists = await trx("cms_animal_categories")
       .whereNull("deleted_at")
       .andWhere(function () {
         this.whereRaw("lower(name->>'id') = lower(?)", [
@@ -154,12 +154,12 @@ exports.store = async (req, res) => {
         400,
         "DUPLICATE_TITLE",
         "Duplikat Data",
-        "Nama kategori berita ini sudah digunakan pada kategori lain."
+        "Nama kategori satwa ini sudah digunakan pada kategori lain."
       );
       return res.status(400).json(response.toResponse());
     }
 
-    await trx("cms_news_categories").insert({
+    await trx("cms_animal_categories").insert({
       name: { id: nameNorm.value.id, en: nameNorm.value.en },
       description: { id: descNorm.value.id, en: descNorm.value.en },
     });
@@ -168,7 +168,7 @@ exports.store = async (req, res) => {
       {
         userId: activityLogHelper.fromReq(req),
         module: "master_data",
-        subject: "List Kategori Berita",
+        subject: "List Kategori Satwa",
       },
       trx
     );
@@ -179,13 +179,13 @@ exports.store = async (req, res) => {
       201,
       "SUCCESS_CREATE_DATA",
       "Berhasil Menyimpan Data",
-      `Data kategori berita '${nameNorm.value.id}' berhasil ditambahkan.`
+      `Data kategori satwa '${nameNorm.value.id}' berhasil ditambahkan.`
     );
     return res.status(201).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
     logger.error(
-      `| News Category Master | - Error function store: ${error.message}`
+      `| Animal Category Master | - Error function store: ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -201,7 +201,7 @@ exports.show = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const category = await knex("cms_news_categories")
+    const category = await knex("cms_animal_categories")
       .select("*")
       .where("id", id)
       .first();
@@ -210,23 +210,23 @@ exports.show = async (req, res) => {
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Data kategori berita dengan ID '${id}' tidak ditemukan.`
+        `Data kategori satwa dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
 
-    const data = await newsCategoryResource(category);
+    const data = await animalCategoryResource(category);
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      `Detail data kategori berita '${category.name}' berhasil didapatkan.`,
+      `Detail data kategori satwa '${category.name}' berhasil didapatkan.`,
       data
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     logger.error(
-      `| News Category Master | - Error function show: ${error.message}`
+      `| Animal Category Master | - Error function show: ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -259,13 +259,13 @@ exports.update = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    const existing = await trx("cms_news_categories").where("id", id).first();
+    const existing = await trx("cms_animal_categories").where("id", id).first();
     if (!existing) {
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Data kategori berita dengan ID '${id}' tidak ditemukan.`
+        `Data kategori satwa dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
@@ -365,7 +365,7 @@ exports.update = async (req, res) => {
       (nextName.en ?? "").toLowerCase() !== (exName.en ?? "").toLowerCase();
 
     if (nameChanged) {
-      const duplicate = await trx("cms_news_categories")
+      const duplicate = await trx("cms_animal_categories")
         .whereNull("deleted_at")
         .whereNot("id", id)
         .andWhere(function () {
@@ -379,13 +379,13 @@ exports.update = async (req, res) => {
           400,
           "DUPLICATE_TITLE",
           "Duplikat Data",
-          "Nama kategori berita (ID/EN) sudah digunakan pada kategori lain."
+          "Nama kategori satwa (ID/EN) sudah digunakan pada kategori lain."
         );
         return res.status(400).json(response.toResponse());
       }
     }
 
-    await trx("cms_news_categories").where("id", id).update({
+    await trx("cms_animal_categories").where("id", id).update({
       name: nextName,
       description: nextDescription,
       updated_at: trx.fn.now(),
@@ -395,7 +395,7 @@ exports.update = async (req, res) => {
       {
         userId: activityLogHelper.fromReq(req),
         module: "master_data",
-        subject: "List Kategori Berita",
+        subject: "List Kategori Satwa",
       },
       trx
     );
@@ -406,13 +406,13 @@ exports.update = async (req, res) => {
       200,
       "SUCCESS_UPDATE_DATA",
       "Berhasil Memperbarui",
-      `Data kategori berita '${nextName.id}' berhasil diperbarui.`
+      `Data kategori satwa '${nextName.id}' berhasil diperbarui.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
     logger.error(
-      `| News Category Master | - Error function update : ${error.message}`
+      `| Animal Category Master | - Error function update : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -454,7 +454,7 @@ exports.destroy = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    const existing = await trx("cms_news_categories")
+    const existing = await trx("cms_animal_categories")
       .select("id", "name")
       .whereIn("id", ids)
       .whereNull("deleted_at");
@@ -464,14 +464,14 @@ exports.destroy = async (req, res) => {
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Tidak ada data kategori berita yang cocok atau sudah terhapus.`
+        `Tidak ada data kategori satwa yang cocok atau sudah terhapus.`
       );
       return res.status(200).json(response.toResponse());
     }
 
     const existingIds = existing.map((r) => r.id);
 
-    await trx("cms_news_categories").whereIn("id", existingIds).update({
+    await trx("cms_animal_categories").whereIn("id", existingIds).update({
       deleted_at: trx.fn.now(),
     });
 
@@ -479,7 +479,7 @@ exports.destroy = async (req, res) => {
       {
         userId: activityLogHelper.fromReq(req),
         module: "master_data",
-        subject: "List Kategori Berita",
+        subject: "List Kategori Satwa",
       },
       trx
     );
@@ -490,13 +490,13 @@ exports.destroy = async (req, res) => {
       200,
       "SUCCESS_DELETE_DATA",
       "Berhasil Menghapus Data",
-      `Berhasil menghapus (soft delete) ${existingIds.length} data kategori berita.`
+      `Berhasil menghapus (soft delete) ${existingIds.length} data kategori satwa.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
     logger.error(
-      `| News Category Master | - Error function destroy : ${error.message}`
+      `| Animal Category Master | - Error function destroy : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -538,8 +538,8 @@ exports.restore = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    const softDeleted = await trx("cms_news_categories")
-      .select("id", "name")
+    const softDeleted = await trx("cms_animal_categories")
+      .select("id", "name") // name: JSONB {id,en}
       .whereIn("id", ids)
       .whereNotNull("deleted_at");
     if (softDeleted.length === 0) {
@@ -571,7 +571,7 @@ exports.restore = async (req, res) => {
     // --- Cek bentrok judul dengan entri aktif (dua bahasa)
     let activeWithSameTitle = [];
     if (namesIdLower.length || namesEnLower.length) {
-      activeWithSameTitle = await trx("cms_news_categories")
+      activeWithSameTitle = await trx("cms_animal_categories")
         .select("id", "name")
         .whereNull("deleted_at")
         .andWhere(function () {
@@ -660,7 +660,7 @@ exports.restore = async (req, res) => {
     let restoredCount = 0;
     if (restorable.length > 0) {
       const idsToRestore = restorable.map((r) => r.rowId);
-      await trx("cms_news_categories")
+      await trx("cms_animal_categories")
         .whereIn("id", idsToRestore)
         .update({ deleted_at: null, updated_at: trx.fn.now() });
       restoredCount = idsToRestore.length;
@@ -670,7 +670,7 @@ exports.restore = async (req, res) => {
       {
         userId: activityLogHelper.fromReq(req),
         module: "master_data",
-        subject: "List Kategori Berita",
+        subject: "List Kategori Satwa",
       },
       trx
     );
@@ -705,7 +705,7 @@ exports.restore = async (req, res) => {
     return res.status(200).json(response.toResponse());
   } catch (error) {
     logger.error(
-      `| News Category Master | - Error function restore: ${error.message}`
+      `| Animal Category Master | - Error function restore: ${error.message}`
     );
     const response = new WithoutDataResource(
       500,

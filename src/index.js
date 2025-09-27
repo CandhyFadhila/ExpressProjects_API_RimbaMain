@@ -17,6 +17,7 @@ const quizRoutes = require("./routes/kmis/quizRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const newsCategoryRoutes = require("./routes/masterData/newsCategoryRoutes");
 const eventCategoryRoutes = require("./routes/masterData/eventCategoryRoutes");
+const animalCategoryRoutes = require("./routes/masterData/animalCategoryRoutes");
 const contentRoutes = require("./routes/cms/contentRoutes");
 const newsRoutes = require("./routes/cms/newsRoutes");
 const eventRoutes = require("./routes/cms/eventRoutes");
@@ -127,6 +128,9 @@ app.use("/api/master-data/news-category", newsCategoryRoutes);
 
 // Event Category
 app.use("/api/master-data/event-category", eventCategoryRoutes);
+
+// Animal Category
+app.use("/api/master-data/animal-category", animalCategoryRoutes);
 //! ======== MASTER DATA MODULE ========
 
 // Jalankan server
