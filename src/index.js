@@ -21,6 +21,7 @@ const animalCategoryRoutes = require("./routes/masterData/animalCategoryRoutes")
 const contentRoutes = require("./routes/cms/contentRoutes");
 const newsRoutes = require("./routes/cms/newsRoutes");
 const eventRoutes = require("./routes/cms/eventRoutes");
+const animalCompositionRoutes = require("./routes/cms/animalCompositionRoutes");
 
 const app = express();
 
@@ -58,10 +59,10 @@ app.get("/check-db", async (req, res) => {
   try {
     // Cek koneksi berdasarkan environment (Linux/Windows)
     const env = process.env.PG_ENV || "windows";
-    const dbConnection = require("./config/database"); // ini file database.js
+    const database = require("./config/database"); // ini file database.js
 
     // Panggil query untuk cek waktu server database
-    const result = await dbConnection.raw("SELECT NOW()");
+    const result = await database.raw("SELECT NOW()");
 
     res.json({
       status: "success",
@@ -97,6 +98,9 @@ app.use("/api/cms/news", newsRoutes);
 
 // Event
 app.use("/api/cms/event", eventRoutes);
+
+// Animal Composition
+app.use("/api/cms/animal-composition", animalCompositionRoutes);
 //! ======== CMS MODULE ========
 
 //! ======== KMIS MODULE ========

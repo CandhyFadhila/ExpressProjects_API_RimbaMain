@@ -17,7 +17,7 @@ const {
 const documentHelper = require("../../helpers/documentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
-const newsResource = require("../../resources/cms/newsResource");
+const animalCompositionResource = require("../../resources/cms/animalCompositionResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 
@@ -25,27 +25,26 @@ exports.index = async (req, res) => {
   const { search } = req.query;
 
   try {
-    let query = knex("cms_news as news")
+    let query = knex("cms_animal_composition as animal")
       .select(
-        "news.id",
-        "news.cms_news_category_id",
-        "news.thumbnail_ids",
-        "news.title",
-        "news.slug",
-        "news.description",
-        "news.news_content",
-        "news.deleted_at",
-        "news.created_at",
-        "news.updated_at"
+        "animal.id",
+        "animal.cms_animal_category_id",
+        "animal.species_image_ids",
+        "animal.name",
+        "animal.description",
+        "animal.total",
+        "animal.deleted_at",
+        "animal.created_at",
+        "animal.updated_at"
       )
-      .orderBy("news.created_at", "desc");
+      .orderBy("animal.created_at", "desc");
 
-    applyTrashedScope(query, req, "news.deleted_at");
+    applyTrashedScope(query, req, "animal.deleted_at");
 
     applyJsonbSearch(
       query,
       search,
-      ["news.title->>'id'", "news.title->>'en'"],
+      ["animal.name->>'id'", "animal.name->>'en'"],
       {
         mode: "or",
         split: true,
@@ -66,14 +65,14 @@ exports.index = async (req, res) => {
     }
 
     const serializedData = await Promise.all(
-      result.data.map((category) => newsResource(category))
+      result.data.map((animal) => animalCompositionResource(animal))
     );
 
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      "Data berita berhasil diambil.",
+      "Data komposisi satwa berhasil diambil.",
       {
         data: serializedData,
         pagination: result.pagination,
@@ -81,7 +80,9 @@ exports.index = async (req, res) => {
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
-    logger.error(`| News CMS | - Error function index : ${error.message}`);
+    logger.error(
+      `| Animal Composition CMS | - Error function index : ${error.message}`
+    );
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -94,7 +95,7 @@ exports.index = async (req, res) => {
 
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
-  const { categoryId, title, slug, description, newsContent } = req.body;
+  const { categoryId, name, description, total } = req.body;
 
   try {
     const errors = validationResult(req);
@@ -112,32 +113,17 @@ exports.store = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    const titleNorm = handleLocalizedText(title, {
+    const nameNorm = handleLocalizedText(name, {
       allowPartial: false,
       maxLen: 255,
-      fieldLabel: "title",
+      fieldLabel: "name",
     });
-    if (titleNorm.error) {
+    if (nameNorm.error) {
       const r = new WithoutDataResource(
         400,
         "INVALID_CONTENT_FORMAT",
         "Format Konten Salah",
-        titleNorm.error.message
-      );
-      return res.status(400).json(r.toResponse());
-    }
-
-    const slugNorm = handleLocalizedText(slug, {
-      allowPartial: false,
-      maxLen: 255,
-      fieldLabel: "slug",
-    });
-    if (slugNorm.error) {
-      const r = new WithoutDataResource(
-        400,
-        "INVALID_CONTENT_FORMAT",
-        "Format Konten Salah",
-        slugNorm.error.message
+        nameNorm.error.message
       );
       return res.status(400).json(r.toResponse());
     }
@@ -153,21 +139,6 @@ exports.store = async (req, res) => {
         "INVALID_CONTENT_FORMAT",
         "Format Konten Salah",
         descNorm.error.message
-      );
-      return res.status(400).json(r.toResponse());
-    }
-
-    const contentNorm = handleLocalizedText(newsContent, {
-      allowPartial: false,
-      maxLen: undefined,
-      fieldLabel: "newsContent",
-    });
-    if (contentNorm.error) {
-      const r = new WithoutDataResource(
-        400,
-        "INVALID_CONTENT_FORMAT",
-        "Format Konten Salah",
-        contentNorm.error.message
       );
       return res.status(400).json(r.toResponse());
     }
@@ -213,12 +184,12 @@ exports.store = async (req, res) => {
       }
     }
 
-    const exists = await trx("cms_news")
+    const exists = await trx("cms_animal_composition")
       .whereNull("deleted_at")
       .andWhere(function () {
-        this.whereRaw("lower(title->>'id') = lower(?)", [
-          titleNorm.value.id,
-        ]).orWhereRaw("lower(title->>'en') = lower(?)", [titleNorm.value.en]);
+        this.whereRaw("lower(name->>'id') = lower(?)", [
+          nameNorm.value.id,
+        ]).orWhereRaw("lower(name->>'en') = lower(?)", [nameNorm.value.en]);
       })
       .first();
     if (exists) {
@@ -226,7 +197,7 @@ exports.store = async (req, res) => {
         400,
         "DUPLICATE_TITLE",
         "Duplikat Data",
-        "Judul berita (ID/EN) sudah digunakan. Silakan gunakan judul lain."
+        "Nama komposisi satwa (ID/EN) sudah digunakan. Silakan gunakan nama lain."
       );
       return res.status(400).json(response.toResponse());
     }
@@ -236,16 +207,15 @@ exports.store = async (req, res) => {
       req
     );
     const firstId = uploadedDocuments?.[0];
-    const thumbnailId = Number(firstId);
+    const imageId = Number(firstId);
 
-    await trx("cms_news")
+    await trx("cms_animal_composition")
       .insert({
-        cms_news_category_id: categoryId,
-        thumbnail_ids: asJsonb([thumbnailId]),
-        title: { id: titleNorm.value.id, en: titleNorm.value.en },
-        slug: { id: slugNorm.value.id, en: slugNorm.value.en },
+        cms_animal_category_id: categoryId,
+        species_image_ids: asJsonb([imageId]),
+        name: { id: nameNorm.value.id, en: nameNorm.value.en },
         description: { id: descNorm.value.id, en: descNorm.value.en },
-        news_content: { id: contentNorm.value.id, en: contentNorm.value.en },
+        total,
       })
       .returning("*");
 
@@ -253,7 +223,7 @@ exports.store = async (req, res) => {
       {
         userId: activityLogHelper.fromReq(req),
         module: "cms",
-        subject: "List Berita",
+        subject: "List Komposisi Satwa",
       },
       trx
     );
@@ -264,12 +234,14 @@ exports.store = async (req, res) => {
       201,
       "SUCCESS_CREATE_DATA",
       "Berhasil Menyimpan Data",
-      `Data berita '${titleNorm.value.id}' berhasil ditambahkan.`
+      `Data komposisi satwa '${nameNorm.value.id}' berhasil ditambahkan.`
     );
     return res.status(201).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
-    logger.error(`| News CMS | - Error function store: ${error.message}`);
+    logger.error(
+      `| Animal Composition CMS | - Error function store: ${error.message}`
+    );
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -284,33 +256,38 @@ exports.show = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const news = await knex("cms_news").select("*").where("id", id).first();
-    if (!news) {
+    const animal = await knex("cms_animal_composition")
+      .select("*")
+      .where("id", id)
+      .first();
+    if (!animal) {
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Data berita dengan ID '${id}' tidak ditemukan.`
+        `Data komposisi satwa dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
 
-    const titleObj = isPlainObject(news.title)
-      ? news.title
-      : parseJsonSafe(news.title) || {};
-    const displayName = titleObj.id || titleObj.en || "Tanpa Nama";
+    const nameObj = isPlainObject(animal.name)
+      ? animal.name
+      : parseJsonSafe(animal.name) || {};
+    const displayName = nameObj.id || nameObj.en || "Tanpa Nama";
 
-    const data = await newsResource(news);
+    const data = await animalCompositionResource(animal);
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      `Detail data berita '${displayName}' berhasil didapatkan.`,
+      `Detail data komposisi satwa '${displayName}' berhasil didapatkan.`,
       data
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
-    logger.error(`| News CMS | - Error function show: ${error.message}`);
+    logger.error(
+      `| Animal Composition CMS | - Error function show: ${error.message}`
+    );
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -323,14 +300,7 @@ exports.show = async (req, res) => {
 
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
-  const {
-    categoryId,
-    title,
-    slug,
-    description,
-    newsContent,
-    deleteDocumentIds,
-  } = req.body;
+  const { categoryId, name, description, total, deleteDocumentIds } = req.body;
   const id = req.params.id;
 
   try {
@@ -349,36 +319,32 @@ exports.update = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    const existing = await trx("cms_news").where("id", id).first();
+    const existing = await trx("cms_animal_composition")
+      .where("id", id)
+      .first();
     if (!existing) {
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Data berita dengan ID '${id}' tidak ditemukan.`
+        `Data komposisi satwa dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
 
-    const exTitle = isPlainObject(existing.title)
-      ? existing.title
-      : parseJsonSafe(existing.title) ?? { id: "", en: "" };
-    const exSlug = isPlainObject(existing.slug)
-      ? existing.slug
-      : parseJsonSafe(existing.slug) ?? { id: "", en: "" };
+    const exName = isPlainObject(existing.name)
+      ? existing.name
+      : parseJsonSafe(existing.name) ?? { id: "", en: "" };
     const exDesc = isPlainObject(existing.description)
       ? existing.description
       : parseJsonSafe(existing.description) ?? { id: "", en: "" };
-    const exContent = isPlainObject(existing.news_content)
-      ? existing.news_content
-      : parseJsonSafe(existing.news_content) ?? { id: "", en: "" };
 
-    let nextTitle = exTitle;
-    if (typeof title !== "undefined") {
-      const t = handleLocalizedText(title, {
+    let nextName = exName;
+    if (typeof name !== "undefined") {
+      const t = handleLocalizedText(name, {
         allowPartial: true,
         maxLen: 255,
-        fieldLabel: "title",
+        fieldLabel: "name",
       });
       if (t.error) {
         const r = new WithoutDataResource(
@@ -389,69 +355,27 @@ exports.update = async (req, res) => {
         );
         return res.status(400).json(r.toResponse());
       }
-      const merged = { ...exTitle, ...t.value };
+      const merged = { ...exName, ...t.value };
       if (
         Object.prototype.hasOwnProperty.call(t.value, "id") &&
         String(t.value.id).trim() === ""
       )
-        merged.id = exTitle.id;
+        merged.id = exName.id;
       if (
         Object.prototype.hasOwnProperty.call(t.value, "en") &&
         String(t.value.en).trim() === ""
       )
-        merged.en = exTitle.en;
+        merged.en = exName.en;
       if (!merged.id || !merged.en) {
         const r = new WithoutDataResource(
           400,
           "INVALID_CONTENT_FORMAT",
           "Format Konten Salah",
-          "Judul harus memiliki id dan en yang tidak kosong."
+          "Nama harus memiliki id dan en yang tidak kosong."
         );
         return res.status(400).json(r.toResponse());
       }
-      nextTitle = {
-        id: String(merged.id).trim(),
-        en: String(merged.en).trim(),
-      };
-    }
-
-    let nextSlug = exSlug;
-    if (typeof slug !== "undefined") {
-      const t = handleLocalizedText(slug, {
-        allowPartial: true,
-        maxLen: 255,
-        fieldLabel: "slug",
-      });
-      if (t.error) {
-        const r = new WithoutDataResource(
-          400,
-          "INVALID_CONTENT_FORMAT",
-          "Format Konten Salah",
-          t.error.message
-        );
-        return res.status(400).json(r.toResponse());
-      }
-      const merged = { ...exSlug, ...t.value };
-      if (
-        Object.prototype.hasOwnProperty.call(t.value, "id") &&
-        String(t.value.id).trim() === ""
-      )
-        merged.id = exSlug.id;
-      if (
-        Object.prototype.hasOwnProperty.call(t.value, "en") &&
-        String(t.value.en).trim() === ""
-      )
-        merged.en = exSlug.en;
-      if (!merged.id || !merged.en) {
-        const r = new WithoutDataResource(
-          400,
-          "INVALID_CONTENT_FORMAT",
-          "Format Konten Salah",
-          "Slug harus memiliki id dan en yang tidak kosong."
-        );
-        return res.status(400).json(r.toResponse());
-      }
-      nextSlug = {
+      nextName = {
         id: String(merged.id).trim(),
         en: String(merged.en).trim(),
       };
@@ -499,59 +423,17 @@ exports.update = async (req, res) => {
       };
     }
 
-    let nextContent = exContent;
-    if (typeof newsContent !== "undefined") {
-      const c = handleLocalizedText(newsContent, {
-        allowPartial: true,
-        maxLen: undefined,
-        fieldLabel: "newsContent",
-      });
-      if (c.error) {
-        const r = new WithoutDataResource(
-          400,
-          "INVALID_CONTENT_FORMAT",
-          "Format Konten Salah",
-          c.error.message
-        );
-        return res.status(400).json(r.toResponse());
-      }
-      const merged = { ...exContent, ...c.value };
-      if (
-        Object.prototype.hasOwnProperty.call(c.value, "id") &&
-        String(c.value.id).trim() === ""
-      )
-        merged.id = exContent.id;
-      if (
-        Object.prototype.hasOwnProperty.call(c.value, "en") &&
-        String(c.value.en).trim() === ""
-      )
-        merged.en = exContent.en;
-      if (!merged.id || !merged.en) {
-        const r = new WithoutDataResource(
-          400,
-          "INVALID_CONTENT_FORMAT",
-          "Format Konten Salah",
-          "Konten acara harus memiliki id dan en yang tidak kosong."
-        );
-        return res.status(400).json(r.toResponse());
-      }
-      nextContent = {
-        id: String(merged.id).trim(),
-        en: String(merged.en).trim(),
-      };
-    }
-
-    const titleChanged =
-      (nextTitle.id ?? "").toLowerCase() !== (exTitle.id ?? "").toLowerCase() ||
-      (nextTitle.en ?? "").toLowerCase() !== (exTitle.en ?? "").toLowerCase();
-    if (titleChanged) {
-      const duplicate = await trx("cms_news")
+    const nameChanged =
+      (nextName.id ?? "").toLowerCase() !== (exName.id ?? "").toLowerCase() ||
+      (nextName.en ?? "").toLowerCase() !== (exName.en ?? "").toLowerCase();
+    if (nameChanged) {
+      const duplicate = await trx("cms_animal_composition")
         .whereNull("deleted_at")
         .whereNot("id", id)
         .andWhere(function () {
-          this.whereRaw("lower(title->>'id') = lower(?)", [
-            nextTitle.id,
-          ]).orWhereRaw("lower(title->>'en') = lower(?)", [nextTitle.en]);
+          this.whereRaw("lower(name->>'id') = lower(?)", [
+            nextName.id,
+          ]).orWhereRaw("lower(name->>'en') = lower(?)", [nextName.en]);
         })
         .first();
       if (duplicate) {
@@ -559,13 +441,13 @@ exports.update = async (req, res) => {
           400,
           "DUPLICATE_TITLE",
           "Duplikat Data",
-          "Judul berita (ID/EN) sudah digunakan pada berita lain."
+          "Nama komposisi satwa (ID/EN) sudah digunakan pada komposisi satwa lain."
         );
         return res.status(400).json(response.toResponse());
       }
     }
 
-    const oldCoverIds = normJsonbArray(existing.thumbnail_ids);
+    const oldCoverIds = normJsonbArray(existing.species_image_ids);
     const oldDocId = normIdArray(oldCoverIds, { as: "number" })[0] ?? null;
 
     const deletedIds = toArray(deleteDocumentIds).map(String);
@@ -582,17 +464,16 @@ exports.update = async (req, res) => {
     }
 
     const coverId = uploadIds?.[0] ?? finalDocId ?? null;
-    const coverArr = coverId != null ? [Number(coverId)] : [];
+    const imageeArr = coverId != null ? [Number(coverId)] : [];
 
-    await trx("cms_news")
+    await trx("cms_animal_composition")
       .where("id", id)
       .update({
-        cms_news_category_id: categoryId,
-        thumbnail_ids: asJsonb(coverArr),
-        title: nextTitle,
-        slug: nextSlug,
+        cms_animal_category_id: categoryId ?? existing.cms_animal_category_id,
+        species_image_ids: asJsonb(imageeArr),
+        name: nextName,
         description: nextDescription,
-        news_content: nextContent,
+        total: total ?? existing.total,
         updated_at: trx.fn.now(),
       });
 
@@ -600,7 +481,7 @@ exports.update = async (req, res) => {
       {
         userId: activityLogHelper.fromReq(req),
         module: "cms",
-        subject: "List Berita",
+        subject: "List Komposisi Satwa",
       },
       trx
     );
@@ -611,12 +492,14 @@ exports.update = async (req, res) => {
       200,
       "SUCCESS_UPDATE_DATA",
       "Berhasil Memperbarui",
-      `Data berita '${nextTitle.id}' berhasil diperbarui.`
+      `Data komposisi satwa '${nextName.id}' berhasil diperbarui.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
-    logger.error(`| News CMS | - Error function update : ${error.message}`);
+    logger.error(
+      `| Animal Composition CMS | - Error function update : ${error.message}`
+    );
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -657,8 +540,8 @@ exports.destroy = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    const existing = await trx("cms_news")
-      .select("id", "title")
+    const existing = await trx("cms_animal_composition")
+      .select("id", "name")
       .whereIn("id", ids)
       .whereNull("deleted_at");
     if (existing.length === 0) {
@@ -667,14 +550,14 @@ exports.destroy = async (req, res) => {
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Tidak ada data berita yang cocok atau sudah terhapus.`
+        `Tidak ada data komposisi satwa yang cocok atau sudah terhapus.`
       );
       return res.status(200).json(response.toResponse());
     }
 
     const existingIds = existing.map((r) => r.id);
 
-    await trx("cms_news").whereIn("id", existingIds).update({
+    await trx("cms_animal_composition").whereIn("id", existingIds).update({
       deleted_at: trx.fn.now(),
     });
 
@@ -682,7 +565,7 @@ exports.destroy = async (req, res) => {
       {
         userId: activityLogHelper.fromReq(req),
         module: "cms",
-        subject: "List Berita",
+        subject: "List Komposisi Satwa",
       },
       trx
     );
@@ -693,12 +576,14 @@ exports.destroy = async (req, res) => {
       200,
       "SUCCESS_DELETE_DATA",
       "Berhasil Menghapus Data",
-      `Berhasil menghapus (soft delete) ${existingIds.length} data berita.`
+      `Berhasil menghapus (soft delete) ${existingIds.length} data komposisi satwa.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
-    logger.error(`| News CMS | - Error function destroy : ${error.message}`);
+    logger.error(
+      `| Animal Composition CMS | - Error function destroy : ${error.message}`
+    );
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -739,8 +624,8 @@ exports.restore = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    const softDeleted = await trx("cms_news")
-      .select("id", "title")
+    const softDeleted = await trx("cms_animal_composition")
+      .select("id", "name")
       .whereIn("id", ids)
       .whereNotNull("deleted_at");
     if (softDeleted.length === 0) {
@@ -749,12 +634,12 @@ exports.restore = async (req, res) => {
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        "Tidak ada data berita terhapus yang cocok untuk direstore."
+        "Tidak ada data kategori satwa terhapus yang cocok untuk direstore."
       );
       return res.status(200).json(response.toResponse());
     }
 
-    // --- Ambil pasangan title.id / title.en dari record terhapus
+    // --- Ambil pasangan name.id / name.en dari record terhapus
     const parseName = (v) => {
       const obj = isPlainObject(v) ? v : parseJsonSafe(v) || {};
       const id = typeof obj.id === "string" ? obj.id.trim() : "";
@@ -763,28 +648,28 @@ exports.restore = async (req, res) => {
     };
 
     const deletedNames = softDeleted.map((r) => {
-      const n = parseName(r.title);
+      const n = parseName(r.name);
       return { rowId: r.id, ...n };
     });
-    const titlesIdLower = deletedNames.map((x) => x.idLower).filter(Boolean);
-    const titlesEnLower = deletedNames.map((x) => x.enLower).filter(Boolean);
+    const namesIdLower = deletedNames.map((x) => x.idLower).filter(Boolean);
+    const namesEnLower = deletedNames.map((x) => x.enLower).filter(Boolean);
 
     // --- Cek bentrok judul dengan entri aktif (dua bahasa)
     let activeWithSameTitle = [];
-    if (titlesIdLower.length || titlesEnLower.length) {
-      activeWithSameTitle = await trx("cms_news")
-        .select("id", "title")
+    if (namesIdLower.length || namesEnLower.length) {
+      activeWithSameTitle = await trx("cms_animal_composition")
+        .select("id", "name")
         .whereNull("deleted_at")
         .andWhere(function () {
           let hasCond = false;
-          if (titlesIdLower.length) {
+          if (namesIdLower.length) {
             hasCond = true;
-            this.whereIn(knex.raw("lower(title->>'id')"), titlesIdLower);
+            this.whereIn(knex.raw("lower(name->>'id')"), namesIdLower);
           }
-          if (titlesEnLower.length) {
+          if (namesEnLower.length) {
             if (hasCond)
-              this.orWhereIn(knex.raw("lower(title->>'en')"), titlesEnLower);
-            else this.whereIn(knex.raw("lower(title->>'en')"), titlesEnLower);
+              this.orWhereIn(knex.raw("lower(name->>'en')"), namesEnLower);
+            else this.whereIn(knex.raw("lower(name->>'en')"), namesEnLower);
           }
         });
     }
@@ -792,7 +677,7 @@ exports.restore = async (req, res) => {
     // Kumpulkan semua "label bentrok" aktif (id/en)
     const conflictActive = new Set();
     for (const row of activeWithSameTitle) {
-      const n = parseName(row.title);
+      const n = parseName(row.name);
       if (n.idLower) conflictActive.add(`id:${n.idLower}`);
       if (n.enLower) conflictActive.add(`en:${n.enLower}`);
     }
@@ -835,7 +720,7 @@ exports.restore = async (req, res) => {
       if (hasActiveConflict || hasBatchDup || emptyBoth) {
         skippedConflicts.push({
           id: r.id,
-          title: { id: r.idLower, en: r.enLower },
+          name: { id: r.idLower, en: r.enLower },
         });
         continue;
       }
@@ -847,7 +732,7 @@ exports.restore = async (req, res) => {
       ) {
         skippedConflicts.push({
           id: r.id,
-          title: { id: r.idLower, en: r.enLower },
+          name: { id: r.idLower, en: r.enLower },
         });
         continue;
       }
@@ -861,7 +746,7 @@ exports.restore = async (req, res) => {
     let restoredCount = 0;
     if (restorable.length > 0) {
       const idsToRestore = restorable.map((r) => r.rowId);
-      await trx("cms_news")
+      await trx("cms_animal_composition")
         .whereIn("id", idsToRestore)
         .update({ deleted_at: null, updated_at: trx.fn.now() });
       restoredCount = idsToRestore.length;
@@ -871,7 +756,7 @@ exports.restore = async (req, res) => {
       {
         userId: activityLogHelper.fromReq(req),
         module: "cms",
-        subject: "List Kegiatan",
+        subject: "List Komposisi Satwa",
       },
       trx
     );
@@ -905,7 +790,9 @@ exports.restore = async (req, res) => {
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
-    logger.error(`| News CMS | - Error function restore: ${error.message}`);
+    logger.error(
+      `| Animal Category CMS | - Error function restore: ${error.message}`
+    );
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",

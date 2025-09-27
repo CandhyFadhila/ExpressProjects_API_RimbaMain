@@ -278,12 +278,17 @@ exports.show = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
+    const titleObj = isPlainObject(event.title)
+      ? event.title
+      : parseJsonSafe(event.title) || {};
+    const displayName = titleObj.id || titleObj.en || "Tanpa Nama";
+
     const data = await eventResource(event);
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      `Detail data kegiatan '${event.title}' berhasil didapatkan.`,
+      `Detail data kegiatan '${displayName}' berhasil didapatkan.`,
       data
     );
     return res.status(200).json(response.toResponse());
@@ -675,55 +680,118 @@ exports.restore = async (req, res) => {
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Tidak ada data kegiatan terhapus yang cocok untuk direstore.`
+        "Tidak ada data kegiatan terhapus yang cocok untuk direstore."
       );
       return res.status(200).json(response.toResponse());
     }
 
-    // 1) Cek bentrok judul dengan entri aktif
-    const titlesLower = softDeleted.map((r) => r.title?.toLowerCase?.() ?? "");
-    const activeWithSameTitle = await trx("cms_events")
-      .select(knex.raw("lower(title) AS ltitle"))
-      .whereNull("deleted_at")
-      .whereIn(knex.raw("lower(title)"), titlesLower);
+    // --- Ambil pasangan title.id / title.en dari record terhapus
+    const parseName = (v) => {
+      const obj = isPlainObject(v) ? v : parseJsonSafe(v) || {};
+      const id = typeof obj.id === "string" ? obj.id.trim() : "";
+      const en = typeof obj.en === "string" ? obj.en.trim() : "";
+      return { id, en, idLower: id.toLowerCase(), enLower: en.toLowerCase() };
+    };
 
-    const conflictActive = new Set(activeWithSameTitle.map((r) => r.ltitle));
+    const deletedNames = softDeleted.map((r) => {
+      const n = parseName(r.title);
+      return { rowId: r.id, ...n };
+    });
+    const titlesIdLower = deletedNames.map((x) => x.idLower).filter(Boolean);
+    const titlesEnLower = deletedNames.map((x) => x.enLower).filter(Boolean);
 
-    // 2) Cek duplikat judul di dalam batch restore sendiri
-    const seenBatch = new Set();
-    const duplicateInBatch = new Set();
-    for (const r of softDeleted) {
-      const lt = (r.title || "").toLowerCase();
-      if (seenBatch.has(lt)) duplicateInBatch.add(lt);
-      else seenBatch.add(lt);
+    // --- Cek bentrok judul dengan entri aktif (dua bahasa)
+    let activeWithSameTitle = [];
+    if (titlesIdLower.length || titlesEnLower.length) {
+      activeWithSameTitle = await trx("cms_events")
+        .select("id", "title")
+        .whereNull("deleted_at")
+        .andWhere(function () {
+          let hasCond = false;
+          if (titlesIdLower.length) {
+            hasCond = true;
+            this.whereIn(knex.raw("lower(title->>'id')"), titlesIdLower);
+          }
+          if (titlesEnLower.length) {
+            if (hasCond)
+              this.orWhereIn(knex.raw("lower(title->>'en')"), titlesEnLower);
+            else this.whereIn(knex.raw("lower(title->>'en')"), titlesEnLower);
+          }
+        });
     }
 
-    // 3) Tentukan mana yang boleh direstore (tidak bentrok & bukan duplikat batch)
+    // Kumpulkan semua "label bentrok" aktif (id/en)
+    const conflictActive = new Set();
+    for (const row of activeWithSameTitle) {
+      const n = parseName(row.title);
+      if (n.idLower) conflictActive.add(`id:${n.idLower}`);
+      if (n.enLower) conflictActive.add(`en:${n.enLower}`);
+    }
+
+    // --- Cek duplikat di dalam batch restore sendiri (dua bahasa)
+    const seenId = new Set(),
+      seenEn = new Set();
+    const duplicateInBatch = new Set();
+    for (const n of deletedNames) {
+      if (n.idLower) {
+        if (seenId.has(n.idLower)) duplicateInBatch.add(`id:${n.idLower}`);
+        else seenId.add(n.idLower);
+      }
+      if (n.enLower) {
+        if (seenEn.has(n.enLower)) duplicateInBatch.add(`en:${n.enLower}`);
+        else seenEn.add(n.enLower);
+      }
+    }
+
+    // --- Tentukan mana yang boleh direstore
     const restorable = [];
     const skippedConflicts = [];
-    const takenInBatch = new Set(); // untuk hanya ambil satu per title di batch
+    const takenId = new Set(); // untuk mencegah duplikat di batch yang sama saat restore
+    const takenEn = new Set();
 
-    for (const r of softDeleted) {
-      const lt = (r.title || "").toLowerCase();
-      const hasActiveConflict = conflictActive.has(lt);
-      const hasBatchDup = duplicateInBatch.has(lt);
-      if (hasActiveConflict || hasBatchDup) {
-        skippedConflicts.push({ id: r.id, title: r.title });
+    for (const r of deletedNames) {
+      const idKey = r.idLower ? `id:${r.idLower}` : null;
+      const enKey = r.enLower ? `en:${r.enLower}` : null;
+
+      const hasActiveConflict =
+        (idKey && conflictActive.has(idKey)) ||
+        (enKey && conflictActive.has(enKey));
+      const hasBatchDup =
+        (idKey && duplicateInBatch.has(idKey)) ||
+        (enKey && duplicateInBatch.has(enKey));
+
+      // Jika kedua bahasa kosong, kita skip karena tidak bisa verifikasi uniqueness
+      const emptyBoth = !r.idLower && !r.enLower;
+
+      if (hasActiveConflict || hasBatchDup || emptyBoth) {
+        skippedConflicts.push({
+          id: r.id,
+          title: { id: r.idLower, en: r.enLower },
+        });
         continue;
       }
-      if (takenInBatch.has(lt)) {
-        // safety: kalau ada urutan ganda, skip
-        skippedConflicts.push({ id: r.id, title: r.title });
+
+      // Hindari duplikat antar restorable dalam satu batch
+      if (
+        (r.idLower && takenId.has(r.idLower)) ||
+        (r.enLower && takenEn.has(r.enLower))
+      ) {
+        skippedConflicts.push({
+          id: r.id,
+          title: { id: r.idLower, en: r.enLower },
+        });
         continue;
       }
-      takenInBatch.add(lt);
+
+      if (r.idLower) takenId.add(r.idLower);
+      if (r.enLower) takenEn.add(r.enLower);
       restorable.push(r);
     }
 
-    // 4) Eksekusi restore
+    // --- Eksekusi restore
     let restoredCount = 0;
     if (restorable.length > 0) {
-      const idsToRestore = restorable.map((r) => r.id);
+      const idsToRestore = restorable.map((r) => r.rowId);
       await trx("cms_events")
         .whereIn("id", idsToRestore)
         .update({ deleted_at: null, updated_at: trx.fn.now() });
@@ -768,7 +836,9 @@ exports.restore = async (req, res) => {
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
-    logger.error(`| Event CMS | - Error function restore: ${error.message}`);
+    logger.error(
+      `| Event CMS | - Error function restore: ${error.message}`
+    );
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
