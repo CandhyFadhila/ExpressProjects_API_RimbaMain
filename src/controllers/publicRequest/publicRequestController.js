@@ -22,6 +22,7 @@ const eventCategoryResource = require("../../resources/masterData/eventCategoryR
 const eventResource = require("../../resources/cms/eventResource");
 const animalCategoryResource = require("../../resources/masterData/animalCategoryResource");
 const contentResource = require("../../resources/cms/contentResource");
+const animalCompositionResource = require("../../resources/cms/animalCompositionResource");
 
 // Role
 exports.getAllRole = async (req, res) => {
@@ -1769,7 +1770,7 @@ exports.getQuizbyquizCategoryId = async (req, res) => {
   }
 };
 
-// News Category
+// News Category (TextArray)
 exports.getAllNewsCategory = async (req, res) => {
   const { search } = req.query;
 
@@ -1883,7 +1884,7 @@ exports.getNewsCategorybyId = async (req, res) => {
   }
 };
 
-// Event Category
+// Event Category (TextArray)
 exports.getAllEventCategory = async (req, res) => {
   const { search } = req.query;
 
@@ -1997,7 +1998,7 @@ exports.getEventCategorybyId = async (req, res) => {
   }
 };
 
-// Animal Category
+// Animal Category (TextArray)
 exports.getAllAnimalCategory = async (req, res) => {
   const { search } = req.query;
 
@@ -2111,7 +2112,7 @@ exports.getAnimalCategorybyId = async (req, res) => {
   }
 };
 
-// Event
+// Event (TextArray)
 exports.getAllEvent = async (req, res) => {
   const { search } = req.query;
 
@@ -2204,12 +2205,17 @@ exports.getEventbyId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
+    const titleObj = isPlainObject(event.title)
+      ? event.title
+      : parseJsonSafe(event.title) || {};
+    const displayName = titleObj.id || titleObj.en || "Tanpa Nama";
+
     const data = await eventResource(event);
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      `Detail data kegiatan '${event.title}' berhasil didapatkan.`,
+      `Detail data kegiatan '${displayName}' berhasil didapatkan.`,
       data
     );
     return res.status(200).json(response.toResponse());
@@ -2293,7 +2299,7 @@ exports.getEventbyEventCategoryId = async (req, res) => {
   }
 };
 
-// News
+// News (TextArray)
 exports.getAllNews = async (req, res) => {
   const { search } = req.query;
 
@@ -2388,12 +2394,17 @@ exports.getNewsbyId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
+    const titleObj = isPlainObject(news.title)
+      ? news.title
+      : parseJsonSafe(news.title) || {};
+    const displayName = titleObj.id || titleObj.en || "Tanpa Nama";
+
     const data = await newsResource(news);
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      `Detail data berita '${news.title}' berhasil didapatkan.`,
+      `Detail data berita '${displayName}' berhasil didapatkan.`,
       data
     );
     return res.status(200).json(response.toResponse());
@@ -2535,7 +2546,194 @@ exports.getNewsbySlug = async (req, res) => {
   }
 };
 
-// Content
+// Animal Composition (TextArray)
+exports.getAllAnimalComposition = async (req, res) => {
+  const { search } = req.query;
+
+  try {
+    let query = knex("cms_animal_composition as animal")
+      .select([
+        "animal.cms_animal_category_id",
+        "animal.species_image_ids",
+        "animal.name",
+        "animal.description",
+        "animal.total",
+      ])
+      .whereNull("animal.deleted_at")
+      .orderBy("animal.created_at", "desc");
+
+    applyJsonbSearch(
+      query,
+      search,
+      ["animal.name->>'id'", "animal.name->>'en'"],
+      {
+        mode: "or",
+        split: true,
+      }
+    );
+
+    const paginationInfo = applyPagination(query, req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((animal) => animalCompositionResource(animal))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data komposisi satwa berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAllAnimalComposition : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getAnimalCompositionbyId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const animal = await knex("cms_animal_composition")
+      .select([
+        "cms_animal_category_id",
+        "species_image_ids",
+        "name",
+        "description",
+        "total",
+      ])
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!animal) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data komposisi satwa dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const nameObj = isPlainObject(animal.name)
+      ? animal.name
+      : parseJsonSafe(animal.name) || {};
+    const displayName = nameObj.id || nameObj.en || "Tanpa Nama";
+
+    const data = await animalCompositionResource(animal);
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      `Detail data komposisi satwa '${displayName}' berhasil didapatkan.`,
+      data
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAnimalCompositionbyId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getAnimalCompositionbyAnimalCategoryId = async (req, res) => {
+  const { search } = req.query;
+  const { id } = req.params;
+
+  try {
+    let query = knex("cms_animal_composition as animal")
+      .leftJoin(
+        "cms_animal_categories as category",
+        "category.id",
+        "animal.cms_animal_category_id"
+      )
+      .select([
+        "animal.cms_animal_category_id",
+        "animal.name",
+        "animal.description",
+        "animal.total",
+        "animal.species_image_ids",
+      ])
+      .whereNull("animal.deleted_at")
+      .where("animal.cms_animal_category_id", id)
+      .orderBy("animal.created_at", "desc");
+
+    applySearch(query, search, ["animal.name", "category.name"]);
+
+    const paginationInfo = applyPagination(query, req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((event) => animalCompositionResource(event))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data komposisi satwa berdasarkan kategori berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAnimalCompositionbyAnimalCategoryId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
+//TODO:benahi Content
 exports.getAllContent = async (req, res) => {
   try {
     // Content

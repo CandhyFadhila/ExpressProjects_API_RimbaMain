@@ -84,6 +84,24 @@ router.get(
   publicRequestController.getAnimalCategorybyId
 );
 
+router.get(
+  "/get-all-animal",
+  rateLimiter,
+  publicRequestController.getAllAnimalComposition
+);
+
+router.get(
+  "/get-animal/:id",
+  rateLimiter,
+  publicRequestController.getAnimalCompositionbyId
+);
+
+router.get(
+  "/get-animal-by-category/:id",
+  rateLimiter,
+  publicRequestController.getAnimalCompositionbyAnimalCategoryId
+);
+
 // Content
 router.get(
   "/get-all-content",
