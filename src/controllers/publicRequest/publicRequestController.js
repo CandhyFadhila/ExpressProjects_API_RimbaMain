@@ -23,6 +23,7 @@ const eventResource = require("../../resources/cms/eventResource");
 const animalCategoryResource = require("../../resources/masterData/animalCategoryResource");
 const contentResource = require("../../resources/cms/contentResource");
 const animalCompositionResource = require("../../resources/cms/animalCompositionResource");
+const legalDocumentResource = require("../../resources/cms/legalDocumentResource");
 
 // Role
 exports.getAllRole = async (req, res) => {
@@ -2124,6 +2125,7 @@ exports.getAllEvent = async (req, res) => {
         "event.description",
         "event.event_content",
         "event.thumbnail_ids",
+        "event.created_at",
       ])
       .whereNull("event.deleted_at")
       .orderBy("event.created_at", "desc");
@@ -2191,6 +2193,7 @@ exports.getEventbyId = async (req, res) => {
         "description",
         "event_content",
         "thumbnail_ids",
+        "created_at",
       ])
       .where("id", id)
       .whereNull("deleted_at")
@@ -2250,6 +2253,7 @@ exports.getEventbyEventCategoryId = async (req, res) => {
         "event.description",
         "event.event_content",
         "event.thumbnail_ids",
+        "event.created_at",
       ])
       .whereNull("event.deleted_at")
       .where("event.cms_event_category_id", id)
@@ -2312,6 +2316,7 @@ exports.getAllNews = async (req, res) => {
         "news.slug",
         "news.description",
         "news.news_content",
+        "news.created_at",
       ])
       .whereNull("news.deleted_at")
       .orderBy("news.created_at", "desc");
@@ -2380,6 +2385,7 @@ exports.getNewsbyId = async (req, res) => {
         "slug",
         "description",
         "news_content",
+        "created_at",
       ])
       .where("id", id)
       .whereNull("deleted_at")
@@ -2440,6 +2446,7 @@ exports.getNewsbyNewsCategoryId = async (req, res) => {
         "news.description",
         "news.news_content",
         "news.thumbnail_ids",
+        "news.created_at",
       ])
       .whereNull("news.deleted_at")
       .where("news.cms_news_category_id", id)
@@ -2501,6 +2508,7 @@ exports.getNewsbySlug = async (req, res) => {
         "slug",
         "description",
         "news_content",
+        "created_at",
       ])
       .whereNull("deleted_at")
       .andWhere(function () {
@@ -2733,7 +2741,122 @@ exports.getAnimalCompositionbyAnimalCategoryId = async (req, res) => {
   }
 };
 
-//TODO:benahi Content
+// Legal Document (TextArray)
+exports.getAllLegalDocument = async (req, res) => {
+  const { search } = req.query;
+
+  try {
+    let query = knex("cms_legal_documents as document")
+      .select([
+        "document.id",
+        "document.document_ids",
+        "document.title",
+        "document.description",
+        "document.created_at",
+      ])
+      .whereNull("document.deleted_at")
+      .orderBy("document.created_at", "desc");
+
+    applyJsonbSearch(
+      query,
+      search,
+      ["document.title->>'id'", "document.title->>'en'"],
+      {
+        mode: "or",
+        split: true,
+      }
+    );
+
+    const paginationInfo = applyPagination(query, req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((document) => legalDocumentResource(document))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data dokumen hukum berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAllLegalDocument : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getLegalDocumentbyId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const document = await knex("cms_legal_documents")
+      .select(["id", "document_ids", "title", "description", "created_at"])
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!document) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data dokumen hukum dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const titleObj = isPlainObject(document.title)
+      ? document.title
+      : parseJsonSafe(document.title) || {};
+    const displayName = titleObj.id || titleObj.en || "Tanpa Nama";
+
+    const data = await legalDocumentResource(document);
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      `Detail data dokumen hukum '${displayName}' berhasil didapatkan.`,
+      data
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getLegalDocumentbyId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
+// Content
 exports.getAllContent = async (req, res) => {
   try {
     // Content
@@ -2761,6 +2884,7 @@ exports.getAllContent = async (req, res) => {
         "event.description",
         "event.event_content",
         "event.thumbnail_ids",
+        "event.created_at",
       ])
       .whereNull("event.deleted_at")
       .orderBy("event.created_at", "desc")
@@ -2777,6 +2901,7 @@ exports.getAllContent = async (req, res) => {
         "news.slug",
         "news.description",
         "news.news_content",
+        "news.created_at",
       ])
       .whereNull("news.deleted_at")
       .orderBy("news.created_at", "desc")
@@ -2784,12 +2909,12 @@ exports.getAllContent = async (req, res) => {
 
     const homeNews = await Promise.all(newsRows.map(newsResource));
 
-    // TODO: Animal Compositions
+    // Animal Compositions
     const homeAnimalComposition = await knex("animal_compositions")
       .select([
         "cms_animal_category_id",
         "species_image_ids",
-        "title",
+        "name",
         "description",
         "total",
       ])
@@ -2797,12 +2922,12 @@ exports.getAllContent = async (req, res) => {
       .orderBy("created_at", "desc")
       .limit(3);
 
-    // TODO: Legal Docs
+    // Legal Docs
     const homeLegalDocuments = await knex("legal_docs")
       .select(["title", "description", "document_ids"])
       .whereNull("deleted_at")
       .orderBy("created_at", "desc")
-      .limit(3);
+      .limit(4);
 
     if (
       Object.keys(staticContents).length === 0 &&
@@ -2815,7 +2940,7 @@ exports.getAllContent = async (req, res) => {
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        "Belum ada konten, event, atau berita yang tersedia."
+        "Belum ada konten, event, berita, komposisi satwa, atau dokumen hukum yang tersedia."
       );
       return res.status(200).json(response.toResponse());
     }

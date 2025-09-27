@@ -16,17 +16,9 @@ router.get(
   publicRequestController.getNewsCategorybyId
 );
 
-router.get(
-  "/get-all-news",
-  rateLimiter,
-  publicRequestController.getAllNews
-);
+router.get("/get-all-news", rateLimiter, publicRequestController.getAllNews);
 
-router.get(
-  "/get-news/:id",
-  rateLimiter,
-  publicRequestController.getNewsbyId
-);
+router.get("/get-news/:id", rateLimiter, publicRequestController.getNewsbyId);
 
 router.get(
   "/get-news-by-category/:id",
@@ -53,17 +45,9 @@ router.get(
   publicRequestController.getEventCategorybyId
 );
 
-router.get(
-  "/get-all-event",
-  rateLimiter,
-  publicRequestController.getAllEvent
-);
+router.get("/get-all-event", rateLimiter, publicRequestController.getAllEvent);
 
-router.get(
-  "/get-event/:id",
-  rateLimiter,
-  publicRequestController.getEventbyId
-);
+router.get("/get-event/:id", rateLimiter, publicRequestController.getEventbyId);
 
 router.get(
   "/get-event-by-category/:id",
@@ -100,6 +84,19 @@ router.get(
   "/get-animal-by-category/:id",
   rateLimiter,
   publicRequestController.getAnimalCompositionbyAnimalCategoryId
+);
+
+// Legal Document
+router.get(
+  "/get-all-legal-dcoument",
+  rateLimiter,
+  publicRequestController.getAllLegalDocument
+);
+
+router.get(
+  "/get-legal-dcoument/:id",
+  rateLimiter,
+  publicRequestController.getLegalDocumentbyId
 );
 
 // Content

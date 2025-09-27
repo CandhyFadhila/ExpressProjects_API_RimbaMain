@@ -22,6 +22,7 @@ const contentRoutes = require("./routes/cms/contentRoutes");
 const newsRoutes = require("./routes/cms/newsRoutes");
 const eventRoutes = require("./routes/cms/eventRoutes");
 const animalCompositionRoutes = require("./routes/cms/animalCompositionRoutes");
+const legalDocumentRoutes = require("./routes/cms/legalDocumentRoutes");
 
 const app = express();
 
@@ -101,6 +102,9 @@ app.use("/api/cms/event", eventRoutes);
 
 // Animal Composition
 app.use("/api/cms/animal-composition", animalCompositionRoutes);
+
+// Legal Document
+app.use("/api/cms/legal-document", legalDocumentRoutes);
 //! ======== CMS MODULE ========
 
 //! ======== KMIS MODULE ========
