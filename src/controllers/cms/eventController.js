@@ -176,13 +176,13 @@ exports.store = async (req, res) => {
     }
 
     for (const file of req.files) {
-      const allowedTypes = ["image/jpeg", "image/png", "image/jpg"];
+      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
       if (!allowedTypes.includes(file.mimetype)) {
         const response = new WithoutDataResource(
           400,
           "INVALID_FILE_TYPE",
           "Tipe File Salah",
-          "File File hanya boleh JPG, JPEG, atau PNG."
+          "File File hanya boleh JPG, JPEG, PNG, dan WebP."
         );
         return res.status(400).json(response.toResponse());
       }
@@ -497,10 +497,29 @@ exports.update = async (req, res) => {
       }
     }
 
+    const deletedIds = toArray(deleteDocumentIds).map(String);
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    const validation = await validateFilesQuotaAndTypesOnUpdate({
+      existingRow: existing,
+      deleteDocumentIds: deletedIds,
+      files: Array.isArray(req.files) ? req.files : [],
+      dbColumn: "thumbnail_ids",
+      maxFilesAllowed: 1,
+      allowedTypes,
+      sizeLimitBytes: 10 * 1024 * 1024, // 10MB
+    });
+    if (!validation.ok) {
+      const response = new WithoutDataResource(
+        validation.http,
+        validation.code,
+        validation.title,
+        validation.desc
+      );
+      return res.status(validation.http).json(response.toResponse());
+    }
+
     const oldCoverIds = normJsonbArray(existing.thumbnail_ids);
     const oldDocId = normIdArray(oldCoverIds, { as: "number" })[0] ?? null;
-
-    const deletedIds = toArray(deleteDocumentIds).map(String);
 
     let finalDocId = oldDocId;
     if (finalDocId != null && deletedIds.includes(String(finalDocId))) {
@@ -836,9 +855,7 @@ exports.restore = async (req, res) => {
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
-    logger.error(
-      `| Event CMS | - Error function restore: ${error.message}`
-    );
+    logger.error(`| Event CMS | - Error function restore: ${error.message}`);
     const response = new WithoutDataResource(
       500,
       "SERVER_ERROR",
@@ -848,3 +865,84 @@ exports.restore = async (req, res) => {
     res.status(500).json(response.toResponse());
   }
 };
+
+async function validateFilesQuotaAndTypesOnUpdate({
+  existingRow,
+  deleteDocumentIds,
+  files,
+  dbColumn = "thumbnail_ids",
+  maxFilesAllowed = 1,
+  allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
+  sizeLimitBytes = 10 * 1024 * 1024,
+}) {
+  // Normalisasi array dokumen yang saat ini tersimpan
+  const currentIds = normIdArray(normJsonbArray(existingRow?.[dbColumn]), {
+    as: "string",
+  });
+
+  // Normalisasi daftar yang minta dihapus (kalau ada), lalu "simulasikan" state setelah dihapus
+  const toDelete = toArray(deleteDocumentIds).map(String);
+  const currentAfterDelete = currentIds.filter(
+    (id) => !toDelete.includes(String(id))
+  );
+
+  // Hitung sisa slot setelah penghapusan
+  const currentCount = currentAfterDelete.length;
+  const remaining = Math.max(maxFilesAllowed - currentCount, 0);
+
+  const incomingCount = Array.isArray(files) ? files.length : 0;
+
+  // Tidak upload file → boleh lanjut (validator hanya mengembalikan info remaining)
+  if (incomingCount === 0) {
+    return { ok: true, remaining };
+  }
+
+  // Sudah penuh tapi masih ada file yang dikirim
+  if (remaining === 0) {
+    return {
+      ok: false,
+      http: 400,
+      code: "MAX_CAPACITY",
+      title: "Kapasitas Sudah Penuh",
+      desc: "Kapasitas file untuk data ini sudah terpenuhi. Tidak ada slot tersisa.",
+    };
+  }
+
+  // Jika payload melebihi sisa slot → kembalikan info berapa yang boleh
+  if (incomingCount > remaining) {
+    const s = remaining;
+    return {
+      ok: false,
+      http: 400,
+      code: "UPLOAD_LIMIT_EXCEEDED",
+      title: "Terlalu Banyak File",
+      desc: `File yang diperbolehkan di upload adalah ${s} file.`,
+    };
+  }
+
+  // Validasi tipe & ukuran per file
+  for (const f of files) {
+    if (!allowedTypes.includes(f.mimetype)) {
+      return {
+        ok: false,
+        http: 400,
+        code: "INVALID_FILE_TYPE",
+        title: "Tipe File Salah",
+        desc: `File hanya boleh bertipe: JPG, JPEG, PNG, dan WebP.`,
+      };
+    }
+    if (f.size > sizeLimitBytes) {
+      return {
+        ok: false,
+        http: 400,
+        code: "FILE_TOO_LARGE",
+        title: "Ukuran File Terlalu Besar",
+        desc: `Ukuran maksimal tiap file adalah ${Math.floor(
+          sizeLimitBytes / (1024 * 1024)
+        )}MB.`,
+      };
+    }
+  }
+
+  return { ok: true, remaining };
+}

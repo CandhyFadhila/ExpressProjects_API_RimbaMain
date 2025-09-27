@@ -32,7 +32,7 @@ router.get(
 router.post(
   "/sso/create",
   requirePermission(["create.kmis_category"]),
-  upload.array("files", 1),
+  upload.array("files", 20),
   storeCategoryValidator,
   validate,
   categoryController.store
@@ -41,7 +41,7 @@ router.post(
 router.patch(
   "/sso/update/:id",
   requirePermission(["edit.kmis_category"]),
-  upload.array("files", 1),
+  upload.array("files", 20),
   updateCategoryValidator,
   validate,
   categoryController.update

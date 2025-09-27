@@ -32,7 +32,7 @@ router.get(
 router.post(
   "/sso/create",
   requirePermission(["create.cms_management"]),
-  upload.array("files", 1),
+  upload.array("files", 20),
   storeEventValidator,
   validate,
   eventController.store
@@ -41,7 +41,7 @@ router.post(
 router.patch(
   "/sso/update/:id",
   requirePermission(["edit.cms_management"]),
-  upload.array("files", 1),
+  upload.array("files", 20),
   updateEventValidator,
   validate,
   eventController.update

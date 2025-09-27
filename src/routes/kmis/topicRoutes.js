@@ -32,7 +32,7 @@ router.get(
 router.post(
   "/sso/create",
   requirePermission(["create.kmis_topic"]),
-  upload.array("files", 1),
+  upload.array("files", 20),
   storeTopicValidator,
   validate,
   topicController.store
@@ -41,7 +41,7 @@ router.post(
 router.patch(
   "/sso/update/:id",
   requirePermission(["edit.kmis_topic"]),
-  upload.array("files", 1),
+  upload.array("files", 20),
   updateTopicValidator,
   validate,
   topicController.update

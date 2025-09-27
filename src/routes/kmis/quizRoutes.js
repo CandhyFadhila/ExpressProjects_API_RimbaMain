@@ -68,7 +68,7 @@ router.get(
 router.post(
   "/educator/import",
   requirePermission(["create.kmis_quiz"]),
-  upload.array("files", 1),
+  upload.array("files", 20),
   validate,
   quizController.importTemplate
 );
