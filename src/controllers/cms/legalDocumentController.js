@@ -10,6 +10,8 @@ const {
 } = require("../../helpers/inputNorm");
 const { asJsonb } = require("../../helpers/dbJson");
 const {
+  applyStartEndDateFilter,
+  validateDateRangeRequiredBoth,
   applyJsonbSearch,
   applyPagination,
   formatPaginationResult,
@@ -22,9 +24,15 @@ const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 
 exports.index = async (req, res) => {
-  const { search } = req.query;
+  const { search, start_date, end_date } = req.query;
 
   try {
+    const dr = validateDateRangeRequiredBoth(start_date, end_date);
+    if (!dr.ok) {
+      const response = new WithoutDataResource(400, dr.code, dr.title, dr.desc);
+      return res.status(400).json(response.toResponse());
+    }
+
     let query = knex("cms_legal_documents as document")
       .select(
         "document.id",
@@ -38,6 +46,16 @@ exports.index = async (req, res) => {
       .orderBy("document.created_at", "desc");
 
     applyTrashedScope(query, req, "document.deleted_at");
+
+    applyStartEndDateFilter(
+      query,
+      "document.created_at",
+      start_date,
+      end_date,
+      {
+        inclusiveEnd: true,
+      }
+    );
 
     applyJsonbSearch(
       query,

@@ -8,6 +8,7 @@ const {
 } = require("../../helpers/inputNorm");
 const { asJsonb } = require("../../helpers/dbJson");
 const {
+  applyRelationIn,
   applySearch,
   applyPagination,
   formatPaginationResult,
@@ -20,10 +21,15 @@ const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 
 exports.index = async (req, res) => {
-  const { search } = req.query;
+  const { search, categoryId } = req.query;
 
   try {
     let query = knex("kmis_topics as topic")
+      .leftJoin(
+        "kmis_categories as category",
+        "topic.kmis_categories_id",
+        "category.id"
+      )
       .select(
         "topic.id",
         "topic.kmis_categories_id",
@@ -34,14 +40,13 @@ exports.index = async (req, res) => {
         "topic.created_at",
         "topic.updated_at"
       )
-      .leftJoin(
-        "kmis_categories as category",
-        "topic.kmis_categories_id",
-        "category.id"
-      )
       .orderBy("topic.created_at", "desc");
 
     applyTrashedScope(query, req, "topic.deleted_at");
+
+    applyRelationIn(query, "topic.kmis_categories_id", categoryId, {
+      as: "number",
+    });
 
     applySearch(query, search, ["topic.title", "category.title"]);
 

@@ -3,6 +3,9 @@ const logger = require("../../utils/logger");
 const {
   applySearch,
   applyJsonbSearch,
+  applyRelationIn,
+  applyStartEndDateFilter,
+  validateDateRangeRequiredBoth,
   applyPagination,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
@@ -182,7 +185,7 @@ exports.getCategorybyId = async (req, res) => {
 
 // Topic
 exports.getAllTopic = async (req, res) => {
-  const { search } = req.query;
+  const { search, categoryId } = req.query;
 
   try {
     let query = knex("kmis_topics as topic")
@@ -199,6 +202,10 @@ exports.getAllTopic = async (req, res) => {
       )
       .whereNull("topic.deleted_at")
       .orderBy("topic.created_at", "desc");
+
+    applyRelationIn(query, "topic.kmis_categories_id", categoryId, {
+      as: "number",
+    });
 
     applySearch(query, search, ["topic.title", "category.title"]);
 
@@ -644,7 +651,7 @@ exports.getUserbyId = async (req, res) => {
 
 // Material
 exports.getAllMaterial = async (req, res) => {
-  const { search } = req.query;
+  const { search, categoryId, topicId } = req.query;
 
   try {
     let query = knex("kmis_materials as material")
@@ -665,6 +672,13 @@ exports.getAllMaterial = async (req, res) => {
       ])
       .whereNull("material.deleted_at")
       .orderBy("material.created_at", "desc");
+
+    applyRelationIn(query, "material.kmis_categories_id", categoryId, {
+      as: "number",
+    });
+    applyRelationIn(query, "material.kmis_topics_id", topicId, {
+      as: "number",
+    });
 
     applySearch(query, search, [
       "material.title",
@@ -1265,7 +1279,7 @@ exports.getMaterialbyIsPublic = async (req, res) => {
 
 // Quiz Category
 exports.getAllQuizCategory = async (req, res) => {
-  const { search } = req.query;
+  const { search, topicId, categoryId } = req.query;
 
   try {
     let query = knex("kmis_quiz_categories as quiz_categories")
@@ -1288,6 +1302,13 @@ exports.getAllQuizCategory = async (req, res) => {
       )
       .whereNull("quiz_categories.deleted_at")
       .orderBy("quiz_categories.created_at", "desc");
+
+    applyRelationIn(query, "quiz_categories.kmis_categories_id", categoryId, {
+      as: "number",
+    });
+    applyRelationIn(query, "quiz_categories.kmis_topics_id", topicId, {
+      as: "number",
+    });
 
     applySearch(query, search, [
       "quiz_categories.name",
@@ -1532,20 +1553,18 @@ exports.getQuizCategorybyTopicIdorCategoryId = async (req, res) => {
 
 // Quiz
 exports.getAllQuiz = async (req, res) => {
-  const { search } = req.query;
+  const { search, quizCategoryId } = req.query;
 
   try {
     let query = knex("kmis_quiz as quiz")
       .leftJoin(
-        "kmis_categories as category",
+        "kmis_quiz_categories as category",
         "category.id",
-        "quiz.kmis_categories_id"
+        "quiz.kmis_quiz_categories_id"
       )
-      .leftJoin("kmis_topics as topic", "topic.id", "quiz.kmis_topics_id")
       .select(
         "quiz.id",
-        "quiz.kmis_categories_id",
-        "quiz.kmis_topics_id",
+        "quiz.kmis_quiz_categories_id",
         "quiz.question",
         "quiz.answer_a",
         "quiz.answer_b",
@@ -1557,11 +1576,11 @@ exports.getAllQuiz = async (req, res) => {
       .whereNull("quiz.deleted_at")
       .orderBy("quiz.created_at", "desc");
 
-    applySearch(query, search, [
-      "quiz.question",
-      "category.title",
-      "topic.title",
-    ]);
+    applyRelationIn(query, "quiz.kmis_quiz_categories_id", quizCategoryId, {
+      as: "number",
+    });
+
+    applySearch(query, search, ["quiz.question", "category.name"]);
 
     const paginationInfo = applyPagination(query, req.query);
 
@@ -2115,7 +2134,7 @@ exports.getAnimalCategorybyId = async (req, res) => {
 
 // Event (TextArray)
 exports.getAllEvent = async (req, res) => {
-  const { search } = req.query;
+  const { search, eventCategory } = req.query;
 
   try {
     let query = knex("cms_events as event")
@@ -2129,6 +2148,10 @@ exports.getAllEvent = async (req, res) => {
       ])
       .whereNull("event.deleted_at")
       .orderBy("event.created_at", "desc");
+
+    applyRelationIn(query, "event.cms_event_category_id", eventCategory, {
+      as: "number",
+    });
 
     applyJsonbSearch(
       query,
@@ -2305,7 +2328,7 @@ exports.getEventbyEventCategoryId = async (req, res) => {
 
 // News (TextArray)
 exports.getAllNews = async (req, res) => {
-  const { search } = req.query;
+  const { search, newsCategory } = req.query;
 
   try {
     let query = knex("cms_news as news")
@@ -2320,6 +2343,10 @@ exports.getAllNews = async (req, res) => {
       ])
       .whereNull("news.deleted_at")
       .orderBy("news.created_at", "desc");
+
+    applyRelationIn(query, "news.cms_news_category_id", newsCategory, {
+      as: "number",
+    });
 
     applyJsonbSearch(
       query,
@@ -2556,7 +2583,7 @@ exports.getNewsbySlug = async (req, res) => {
 
 // Animal Composition (TextArray)
 exports.getAllAnimalComposition = async (req, res) => {
-  const { search } = req.query;
+  const { search, animalCategory } = req.query;
 
   try {
     let query = knex("cms_animal_composition as animal")
@@ -2569,6 +2596,10 @@ exports.getAllAnimalComposition = async (req, res) => {
       ])
       .whereNull("animal.deleted_at")
       .orderBy("animal.created_at", "desc");
+
+    applyRelationIn(query, "animal.cms_animal_category_id", animalCategory, {
+      as: "number",
+    });
 
     applyJsonbSearch(
       query,
@@ -2743,9 +2774,15 @@ exports.getAnimalCompositionbyAnimalCategoryId = async (req, res) => {
 
 // Legal Document (TextArray)
 exports.getAllLegalDocument = async (req, res) => {
-  const { search } = req.query;
+  const { search, start_date, end_date } = req.query;
 
   try {
+    const dr = validateDateRangeRequiredBoth(start_date, end_date);
+    if (!dr.ok) {
+      const response = new WithoutDataResource(400, dr.code, dr.title, dr.desc);
+      return res.status(400).json(response.toResponse());
+    }
+
     let query = knex("cms_legal_documents as document")
       .select([
         "document.id",
@@ -2756,6 +2793,16 @@ exports.getAllLegalDocument = async (req, res) => {
       ])
       .whereNull("document.deleted_at")
       .orderBy("document.created_at", "desc");
+
+    applyStartEndDateFilter(
+      query,
+      "document.created_at",
+      start_date,
+      end_date,
+      {
+        inclusiveEnd: true,
+      }
+    );
 
     applyJsonbSearch(
       query,
@@ -2910,30 +2957,24 @@ exports.getAllContent = async (req, res) => {
     const homeNews = await Promise.all(newsRows.map(newsResource));
 
     // Animal Compositions
-    const homeAnimalComposition = await knex("animal_compositions")
-      .select([
-        "cms_animal_category_id",
-        "species_image_ids",
-        "name",
-        "description",
-        "total",
-      ])
-      .whereNull("deleted_at")
-      .orderBy("created_at", "desc")
-      .limit(3);
+    const homeAnimalCompositions = await buildHomeAnimalCompositions(knex);
 
     // Legal Docs
-    const homeLegalDocuments = await knex("legal_docs")
-      .select(["title", "description", "document_ids"])
+    const legalDocumentRows = await knex("cms_legal_documents")
+      .select(["title", "description", "document_ids", "created_at"])
       .whereNull("deleted_at")
       .orderBy("created_at", "desc")
       .limit(4);
+
+    const homeLegalDocuments = await Promise.all(
+      legalDocumentRows.map(legalDocumentResource)
+    );
 
     if (
       Object.keys(staticContents).length === 0 &&
       homeActivities.length === 0 &&
       homeNews.length === 0 &&
-      homeAnimalComposition.length === 0 &&
+      homeAnimalCompositions.dataCategory.length === 0 &&
       homeLegalDocuments.length === 0
     ) {
       const response = new WithoutDataResource(
@@ -2954,7 +2995,7 @@ exports.getAllContent = async (req, res) => {
         staticContents,
         homeActivities,
         homeNews,
-        homeAnimalComposition,
+        homeAnimalCompositions,
         homeLegalDocuments,
       }
     );
@@ -3094,3 +3135,70 @@ exports.getContentHero = async (req, res) => {
     return res.status(500).json(response.toResponse());
   }
 };
+
+async function buildHomeAnimalCompositions(knex, { yearsBack = 2 } = {}) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const years = Array.from(
+    { length: yearsBack + 1 },
+    (_, i) => currentYear - yearsBack + i
+  );
+
+  // 1) Agregasi bulanan 3 tahun terakhir
+  const monthlyRows = await knex("cms_animal_composition as cac")
+    .select([
+      knex.raw("EXTRACT(YEAR  FROM cac.created_at)::int AS yr"),
+      knex.raw("EXTRACT(MONTH FROM cac.created_at)::int AS mo"),
+      knex.raw("SUM(cac.total)::bigint AS total"),
+    ])
+    .whereNull("cac.deleted_at")
+    .whereIn(knex.raw("EXTRACT(YEAR FROM cac.created_at)::int"), years)
+    .groupByRaw("1,2")
+    .orderBy([
+      { column: knex.raw("yr"), order: "asc" },
+      { column: knex.raw("mo"), order: "asc" },
+    ]);
+
+  const makeYearTemplate = () =>
+    Array.from({ length: 12 }, (_, i) => ({ month: i + 1, total: 0 }));
+
+  const dataPercentage = {};
+  for (const y of years) dataPercentage[String(y)] = makeYearTemplate();
+
+  for (const r of monthlyRows) {
+    const y = String(r.yr);
+    const m = Number(r.mo);
+    const t = Number(r.total); // SUM(bigint) dari pg dikembalikan string → cast ke number
+    if (dataPercentage[y] && dataPercentage[y][m - 1]) {
+      dataPercentage[y][m - 1].total = t;
+    }
+  }
+
+  // 2) Agregasi kategori
+  const categoryRows = await knex("cms_animal_composition as cac")
+    .leftJoin(
+      "cms_animal_categories as cat",
+      "cat.id",
+      "cac.cms_animal_category_id"
+    )
+    .whereNull("cac.deleted_at")
+    .whereNull("cat.deleted_at")
+    .groupBy("cat.id", "cat.name")
+    .select([
+      "cat.name", // JSONB { id, en } (atau string yang berisi JSON)
+      knex.raw("SUM(cac.total)::bigint AS total"),
+    ])
+    .orderBy("cat.id", "asc");
+
+  const dataCategory = categoryRows.map((r) => {
+    const nm = isPlainObject(r.name)
+      ? r.name
+      : (typeof r.name === "string" ? parseJsonSafe(r.name) : null) || {};
+    return {
+      name: nm, // { id: "...", en: "..." }
+      total: Number(r.total), // cast dari string
+    };
+  });
+
+  return { dataPercentage, dataCategory };
+}

@@ -10,6 +10,7 @@ const {
 } = require("../../helpers/inputNorm");
 const { asJsonb } = require("../../helpers/dbJson");
 const {
+  applyRelationIn,
   applyJsonbSearch,
   applyPagination,
   formatPaginationResult,
@@ -22,7 +23,7 @@ const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 
 exports.index = async (req, res) => {
-  const { search } = req.query;
+  const { search, animalCategory } = req.query;
 
   try {
     let query = knex("cms_animal_composition as animal")
@@ -40,6 +41,10 @@ exports.index = async (req, res) => {
       .orderBy("animal.created_at", "desc");
 
     applyTrashedScope(query, req, "animal.deleted_at");
+
+    applyRelationIn(query, "animal.cms_animal_category_id", animalCategory, {
+      as: "number",
+    });
 
     applyJsonbSearch(
       query,
@@ -163,7 +168,12 @@ exports.store = async (req, res) => {
     }
 
     for (const file of req.files) {
-      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+      const allowedTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+      ];
       if (!allowedTypes.includes(file.mimetype)) {
         const response = new WithoutDataResource(
           400,

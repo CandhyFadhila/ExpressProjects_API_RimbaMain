@@ -3,6 +3,7 @@ const knex = require("../../config/database");
 const logger = require("../../utils/logger");
 const { normIdArray } = require("../../helpers/inputNorm");
 const {
+  applyRelationIn,
   applySearch,
   applyPagination,
   formatPaginationResult,
@@ -13,7 +14,7 @@ const quizCategoryResource = require("../../resources/kmis/quizCategoryResource"
 const activityLogHelper = require("../../helpers/activityLogHelper");
 
 exports.index = async (req, res) => {
-  const { search } = req.query;
+  const { search, topicId, categoryId } = req.query;
 
   try {
     let query = knex("kmis_quiz_categories as quiz")
@@ -37,6 +38,9 @@ exports.index = async (req, res) => {
       .orderBy("quiz.created_at", "desc");
 
     // applyTrashedScope(query, req, "quiz.deleted_at");
+
+    applyRelationIn(query, "quiz.kmis_categories_id", categoryId, { as: "number" });
+    applyRelationIn(query, "quiz.kmis_topics_id",     topicId,    { as: "number" });
 
     applySearch(query, search, ["category.title", "topic.title"]);
 

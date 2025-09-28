@@ -7,6 +7,7 @@ const {
 } = require("../../helpers/inputNorm");
 const { asJsonb } = require("../../helpers/dbJson");
 const {
+  applyRelationIn,
   applySearch,
   applyPagination,
   formatPaginationResult,
@@ -16,11 +17,11 @@ const documentHelper = require("../../helpers/documentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
-const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
+// const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 const materialResource = require("../../resources/kmis/materialResource");
 
 exports.index = async (req, res) => {
-  const { search } = req.query;
+  const { search, categoryId, topicId } = req.query;
 
   try {
     let query = knex("kmis_materials as material")
@@ -58,7 +59,10 @@ exports.index = async (req, res) => {
       ])
       .orderBy("material.created_at", "desc");
 
-    applyTrashedScope(query, req, "material.deleted_at");
+    // applyTrashedScope(query, req, "material.deleted_at");
+
+    applyRelationIn(query, "material.kmis_categories_id", categoryId, { as: "number" });
+    applyRelationIn(query, "material.kmis_topics_id",     topicId,    { as: "number" });
 
     applySearch(query, search, [
       "material.title",
