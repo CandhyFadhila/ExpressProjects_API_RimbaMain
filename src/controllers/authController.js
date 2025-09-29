@@ -1,5 +1,5 @@
 const { OAuth2Client } = require("google-auth-library");
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const googleClient = new OAuth2Client(process.env.CLIENT_ID);
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const validator = require("validator");
@@ -146,7 +146,7 @@ exports.createOrLoginWithOauth = async (req, res) => {
 
     const ticket = await googleClient.verifyIdToken({
       idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: process.env.CLIENT_ID,
     });
 
     const payload = ticket.getPayload();
