@@ -2956,8 +2956,12 @@ exports.getAllContent = async (req, res) => {
 
     const homeNews = await Promise.all(newsRows.map(newsResource));
 
-    // Animal Compositions
-    const homeAnimalCompositions = await buildHomeAnimalCompositions(knex);
+    // --- Animal widgets (baru) ---
+    const homeAnimalComposition = await buildHomeAnimalCompositionLocal(knex);
+    const homeCompletionProgress = await buildHomeCompletionProgressLocal(
+      knex,
+      { yearsBack: 2 }
+    );
 
     // Legal Docs
     const legalDocumentRows = await knex("cms_legal_documents")
@@ -2974,7 +2978,10 @@ exports.getAllContent = async (req, res) => {
       Object.keys(staticContents).length === 0 &&
       homeActivities.length === 0 &&
       homeNews.length === 0 &&
-      homeAnimalCompositions.dataCategory.length === 0 &&
+      homeAnimalComposition.length === 0 &&
+      homeCompletionProgress.every((m) =>
+        Object.values(m).every((v) => v === 0 || v === null)
+      ) &&
       homeLegalDocuments.length === 0
     ) {
       const response = new WithoutDataResource(
@@ -2994,9 +3001,10 @@ exports.getAllContent = async (req, res) => {
       {
         staticContents,
         homeActivities,
-        homeNews,
-        homeAnimalCompositions,
+        homeAnimalComposition,
+        homeCompletionProgress,
         homeLegalDocuments,
+        homeNews,
       }
     );
     return res.status(200).json(response.toResponse());
@@ -3136,16 +3144,61 @@ exports.getContentHero = async (req, res) => {
   }
 };
 
-async function buildHomeAnimalCompositions(knex, { yearsBack = 2 } = {}) {
+async function buildHomeAnimalCompositionLocal(knex) {
+  const rows = await knex("cms_animal_composition as cac")
+    .leftJoin(
+      "cms_animal_categories as cat",
+      "cat.id",
+      "cac.cms_animal_category_id"
+    )
+    .whereNull("cac.deleted_at")
+    .whereNull("cat.deleted_at")
+    .groupBy("cat.id", "cat.name")
+    .select([
+      "cat.name", // JSONB
+      knex.raw("SUM(cac.total)::bigint AS total"), // SUM -> string
+    ])
+    .orderBy("cat.id", "asc");
+
+  const totalAll = rows.reduce((s, r) => s + Number(r.total || 0), 0);
+
+  const out = rows.map((r) => {
+    let nmObj = {};
+    if (isPlainObject(r.name)) {
+      nmObj = r.name;
+    } else if (typeof r.name === "string") {
+      nmObj = parseJsonSafe(r.name) || {};
+    }
+    const nmId =
+      nmObj && typeof nmObj.id === "string" && nmObj.id.trim() !== ""
+        ? nmObj.id
+        : typeof r.name === "string"
+        ? r.name
+        : "Unknown";
+
+    const value = Number(r.total || 0);
+    const percentage = totalAll > 0 ? Math.round((value / totalAll) * 100) : 0;
+
+    return { name: nmId, value, percentage };
+  });
+
+  // urutkan dari value terbesar
+  out.sort((a, b) => b.value - a.value);
+
+  return out;
+}
+
+async function buildHomeCompletionProgressLocal(knex, { yearsBack = 2 } = {}) {
   const now = new Date();
-  const currentYear = now.getFullYear();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth() + 1; // 1..12
+
   const years = Array.from(
     { length: yearsBack + 1 },
-    (_, i) => currentYear - yearsBack + i
+    (_, i) => curYear - yearsBack + i
   );
 
-  // 1) Agregasi bulanan 3 tahun terakhir
-  const monthlyRows = await knex("cms_animal_composition as cac")
+  const monthly = await knex("cms_animal_composition as cac")
     .select([
       knex.raw("EXTRACT(YEAR  FROM cac.created_at)::int AS yr"),
       knex.raw("EXTRACT(MONTH FROM cac.created_at)::int AS mo"),
@@ -3159,46 +3212,39 @@ async function buildHomeAnimalCompositions(knex, { yearsBack = 2 } = {}) {
       { column: knex.raw("mo"), order: "asc" },
     ]);
 
-  const makeYearTemplate = () =>
-    Array.from({ length: 12 }, (_, i) => ({ month: i + 1, total: 0 }));
+  // tabel total bulanan
+  const totals = {};
+  for (const y of years) totals[y] = Array.from({ length: 12 }, () => 0);
 
-  const dataPercentage = {};
-  for (const y of years) dataPercentage[String(y)] = makeYearTemplate();
+  for (const r of monthly) {
+    const y = r.yr,
+      m = r.mo;
+    totals[y][m - 1] = Number(r.total || 0);
+  }
 
-  for (const r of monthlyRows) {
-    const y = String(r.yr);
-    const m = Number(r.mo);
-    const t = Number(r.total); // SUM(bigint) dari pg dikembalikan string → cast ke number
-    if (dataPercentage[y] && dataPercentage[y][m - 1]) {
-      dataPercentage[y][m - 1].total = t;
+  // akumulasi per bulan
+  const cumulative = {};
+  for (const y of years) {
+    cumulative[y] = [];
+    let run = 0;
+    for (let m = 1; m <= 12; m++) {
+      run += totals[y][m - 1];
+      cumulative[y][m - 1] = run;
     }
   }
 
-  // 2) Agregasi kategori
-  const categoryRows = await knex("cms_animal_composition as cac")
-    .leftJoin(
-      "cms_animal_categories as cat",
-      "cat.id",
-      "cac.cms_animal_category_id"
-    )
-    .whereNull("cac.deleted_at")
-    .whereNull("cat.deleted_at")
-    .groupBy("cat.id", "cat.name")
-    .select([
-      "cat.name", // JSONB { id, en } (atau string yang berisi JSON)
-      knex.raw("SUM(cac.total)::bigint AS total"),
-    ])
-    .orderBy("cat.id", "asc");
-
-  const dataCategory = categoryRows.map((r) => {
-    const nm = isPlainObject(r.name)
-      ? r.name
-      : (typeof r.name === "string" ? parseJsonSafe(r.name) : null) || {};
-    return {
-      name: nm, // { id: "...", en: "..." }
-      total: Number(r.total), // cast dari string
-    };
+  // bentuk array 12 objek (Jan..Des)
+  const result = Array.from({ length: 12 }, (_, i) => {
+    const obj = {};
+    for (const y of years) {
+      if (y === curYear && i + 1 > curMonth) {
+        obj[String(y)] = null; // bulan mendatang → null
+      } else {
+        obj[String(y)] = cumulative[y][i];
+      }
+    }
+    return obj;
   });
 
-  return { dataPercentage, dataCategory };
+  return result;
 }
