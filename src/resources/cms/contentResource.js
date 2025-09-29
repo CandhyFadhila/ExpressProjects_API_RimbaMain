@@ -3,10 +3,6 @@ const {
   normJsonbArray,
   isPlainObject,
 } = require("../../helpers/inputNorm");
-const {
-  resolveArrayRelations,
-} = require("../../helpers/resolveArrayRelations");
-const documentResource = require("../../resources/doc/documentResource");
 
 async function contentResource(row) {
   const type = String(row.type || "").toLowerCase();
@@ -20,7 +16,7 @@ async function contentResource(row) {
       const obj = parseJsonSafe(raw);
       if (isPlainObject(obj)) normalized = obj;
     }
-  } else if (type === "stringarray" || type === "imagearray") {
+  } else if (type === "textarray" || type === "imagearray") {
     if (Array.isArray(raw)) {
       normalized = raw;
     } else {
@@ -39,26 +35,10 @@ async function contentResource(row) {
     }
   }
 
-  const typesWithFiles = new Set([
-    "image",
-    "video",
-    "audio",
-    "file",
-    "imagearray",
-  ]);
-  const contentFiles =
-    typesWithFiles.has(type) && row.content_file_ids
-      ? await resolveArrayRelations(
-          row.content_file_ids,
-          "documents",
-          documentResource
-        )
-      : [];
-
   return {
-    contentType: row.type,
-    content: normalized,
-    contentFiles,
+    id: row.id,
+    type: row.type,
+    content: normalized
   };
 }
 

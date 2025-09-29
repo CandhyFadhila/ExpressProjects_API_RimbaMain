@@ -14,6 +14,7 @@ const studentRoutes = require("./routes/kmis/studentRoutes");
 const materialRoutes = require("./routes/kmis/materialRoutes");
 const quizCategoryRoutes = require("./routes/kmis/quizCategoryRoutes");
 const quizRoutes = require("./routes/kmis/quizRoutes");
+const quizParticipantRoutes = require("./routes/kmis/quizParticipantRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const newsCategoryRoutes = require("./routes/masterData/newsCategoryRoutes");
 const eventCategoryRoutes = require("./routes/masterData/eventCategoryRoutes");
@@ -128,6 +129,9 @@ app.use("/api/kmis/quiz-category", quizCategoryRoutes);
 
 // Quiz
 app.use("/api/kmis/quiz", quizRoutes);
+
+// Quiz Participant
+app.use("/api/kmis/quiz-participant", quizParticipantRoutes);
 //! ======== KMIS MODULE ========
 
 //! ======== MASTER DATA MODULE ========

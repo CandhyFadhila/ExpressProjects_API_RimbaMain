@@ -1,3 +1,5 @@
+const { OAuth2Client } = require("google-auth-library");
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const validator = require("validator");
@@ -16,6 +18,264 @@ const UserResource = require("../resources/auth/UserResource");
 const dateHelper = require("../helpers/dateHelper");
 const JWT_SECRET = process.env.JWT_SECRET_KEY || "secretkey";
 
+// ========== CREATE ACCOUNT ==========
+function getGoogleIdToken(req) {
+  const auth = req.get("authorization") || "";
+  const m = auth.match(/^Bearer\s+(.+)$/i);
+  if (m) return m[1];
+  if (req.cookies?.g_id_token) return req.cookies.g_id_token;
+  return req.get("x-id-token") || null;
+}
+
+exports.createAccount = async (req, res) => {
+  const trx = await knex.transaction();
+  const { name, email, password } = req.body;
+
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const message = errors
+        .array()
+        .map((err) => err.msg)
+        .join(" ");
+      const response = new WithoutDataResource(
+        400,
+        "FAILED_VALIDATION",
+        "Format Data Tidak Sesuai Ketentuan",
+        message
+      );
+      return res.status(400).json(response.toResponse());
+    }
+
+    const existed = await trx("users")
+      .whereNull("deleted_at")
+      .where("email", email)
+      .first();
+    if (existed) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        409,
+        "EMAIL_ALREADY_USED",
+        "Email Sudah Terpakai",
+        "Email yang anda gunakan sudah pernah terdaftar. Silahkan gunakan email yang lain."
+      );
+      return res.status(409).json(response.toResponse());
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const [user] = await trx("users")
+      .insert({
+        role_id: 3,
+        name: name.trim(),
+        email: email.trim(),
+        password: hashedPassword,
+        account_status: 2,
+        register_at: knex.fn.now(),
+        created_at: knex.fn.now(),
+        updated_at: knex.fn.now(),
+      })
+      .returning(["name"]);
+
+    await trx.commit();
+
+    const transporter = nodemailer.createTransport({
+      service: "Gmail",
+      auth: {
+        user: process.env.MAIL_USERNAME,
+        pass: process.env.MAIL_PASSWORD,
+      },
+    });
+
+    const displayName = stripTitlesOnly(user.name);
+    const htmlBody = renderEmailTemplate("welcome_message.html", {
+      name: displayName,
+      email: email,
+      from_email: process.env.MAIL_USERNAME,
+      year: new Date().getFullYear(),
+    });
+
+    await transporter.sendMail({
+      from: `"Rimba" <${process.env.MAIL_USERNAME}>`,
+      to: email,
+      subject: "Selamat Datang di aplikasi Rimba",
+      html: htmlBody,
+    });
+
+    logger.info(
+      `| Auth | - Welcome message sent to ${email} at ${new Date().toISOString()}`
+    );
+
+    const response = new WithoutDataResource(
+      201,
+      "ACCOUNT_CREATED",
+      "Akun Berhasil Dibuat",
+      `Akun untuk '${user.name}' berhasil dibuat.`
+    );
+    return res.status(201).json(response.toResponse());
+  } catch (error) {
+    logger.error(`| Auth | - Error function createAccount: ${error.message}`);
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.createOrLoginWithOauth = async (req, res) => {
+  const trx = await knex.transaction();
+
+  try {
+    const idToken = getGoogleIdToken(req);
+    if (!idToken) {
+      await trx.rollback();
+      return res
+        .status(401)
+        .json(
+          new WithoutDataResource(
+            401,
+            "GOOGLE_TOKEN_MISSING",
+            "Token Google Tidak Ditemukan",
+            "Harap sertakan Authorization: Bearer <id_token> dari Google."
+          ).toResponse()
+        );
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const email = String(payload?.email || "").trim();
+    const emailVerified = Boolean(payload?.email_verified);
+    const nameFromGoogle = String(payload?.name || "").trim();
+    if (!email || !emailVerified) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        401,
+        "GOOGLE_EMAIL_NOT_VERIFIED",
+        "Email Google Belum Terverifikasi",
+        "Akun Google belum terverifikasi email-nya atau email tidak tersedia."
+      );
+      return res.status(401).json(response.toResponse());
+    }
+
+    const studentRole = await trx("roles")
+      .select("id", "name")
+      .whereRaw("LOWER(name) = LOWER(?)", ["Student"])
+      .first();
+    if (!studentRole) {
+      await trx.rollback();
+      logger.error(
+        `| Auth | - Role 'Student' not found, when creating account with email: ${email} via Google`
+      );
+      const response = new WithoutDataResource(
+        500,
+        "SERVER_ERROR",
+        "Server Sedang Error",
+        "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+      );
+      return res.status(500).json(response.toResponse());
+    }
+
+    let userRow = await trx("users")
+      .whereNull("deleted_at")
+      .where("email", email)
+      .first();
+    if (!userRow) {
+      // create baru → kirim welcome email (best-effort)
+      const hashedPassword = await bcrypt.hash(
+        crypto.randomBytes(32).toString("hex"),
+        12
+      );
+      const safeName = nameFromGoogle || email.split("@")[0] || "Pengguna";
+
+      [userRow] = await trx("users")
+        .insert({
+          role_id: studentRole.id,
+          name: safeName,
+          email,
+          password: hashedPassword,
+          account_status: 2,
+          register_at: knex.fn.now(),
+          created_at: knex.fn.now(),
+          updated_at: knex.fn.now(),
+        })
+        .returning(["id", "email", "name", "account_status"]);
+
+      // kirim welcome email setelah commit
+      const sendWelcome = async (u) => {
+        try {
+          const transporter = nodemailer.createTransport({
+            service: "Gmail",
+            auth: {
+              user: process.env.MAIL_USERNAME,
+              pass: process.env.MAIL_PASSWORD,
+            },
+          });
+          const displayName =
+            typeof stripTitlesOnly === "function"
+              ? stripTitlesOnly(u.name)
+              : u.name;
+          const htmlBody = renderEmailTemplate("welcome_message.html", {
+            name: displayName,
+            email: u.email,
+            from_email: process.env.MAIL_USERNAME,
+            year: new Date().getFullYear(),
+          });
+          await transporter.sendMail({
+            from: `"Rimba" <${process.env.MAIL_USERNAME}>`,
+            to: u.email,
+            subject: "Selamat Datang di aplikasi Rimba",
+            html: htmlBody,
+          });
+          logger.info(`| Auth | - Welcome message sent to ${u.email}`);
+        } catch (e) {
+          logger.warn(`| Mail | - Gagal kirim welcome email: ${e.message}`);
+        }
+      };
+
+      // commit dulu baru kirim email
+      await trx.commit();
+      sendWelcome(userRow).catch(() => {}); // non-blocking
+    } else {
+      // sudah ada → pastikan aktif (reactivate kalau perlu)
+      if (Number(userRow.account_status) !== 2) {
+        [userRow] = await trx("users")
+          .where({ id: userRow.id })
+          .update({ account_status: 2, updated_at: knex.fn.now() }, [
+            "id",
+            "email",
+            "name",
+            "account_status",
+          ]);
+      }
+      await trx.commit();
+    }
+
+    // 4) Delegasi ke flow login student (bypass password)
+    req.authStrategy = "oauth";
+    req.oauthEmail = email;
+    return exports.signInStudent(req, res);
+  } catch (error) {
+    await trx.rollback();
+    logger.error(`| Auth | - Error createAccountOauth: ${error.message}`, {
+      stack: error.stack,
+    });
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
 // ========== LOGIN CONTROLLER ==========
 exports.signInAdminSSO = (req, res) =>
   signInWithContext(req, res, {
@@ -31,12 +291,28 @@ exports.signInEducator = (req, res) =>
     ability: "educator",
   });
 
-exports.signInStudent = (req, res) =>
-  signInWithContext(req, res, {
+exports.signInStudent = async (req, res) => {
+  const studentRole = await knex("roles")
+    .select("id", "name")
+    .whereRaw("LOWER(name) = LOWER(?)", ["Student"])
+    .first();
+  if (!studentRole) {
+    const response = new WithoutDataResource(
+      500,
+      "ROLE_NOT_FOUND",
+      "Server Sedang Error",
+      "Role 'Student' tidak ditemukan. Mohon cek tabel roles."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+
+  return signInWithContext(req, res, {
     context: "student",
-    requiredRole: "Student",
+    requiredRoleId: studentRole.id,
+    requiredRole: studentRole.name,
     ability: "student",
   });
+};
 
 // ========== GET USER INFO CONTROLLER ==========
 exports.getUserInfo = async (req, res) => {
@@ -153,7 +429,7 @@ exports.sendOTP = async (req, res) => {
     if (!user) {
       const response = new WithoutDataResource(
         200,
-        "DATA_NOT_FOUND",
+        "INVALID_EMAIL",
         "Akun Tidak Ditemukan",
         `Akun dengan email '${email}' tidak ditemukan.`
       );
@@ -412,20 +688,29 @@ async function findUserByEmailWithRole(email) {
     .first();
 }
 
-async function signInWithContext(req, res, { context, requiredRole, ability }) {
+async function signInWithContext(
+  req,
+  res,
+  { context, requiredRole, requiredRoleId, ability }
+) {
+  const isOauth = req.authStrategy === "oauth";
+
   // Validasi input
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const response = new WithoutDataResource(
-      400,
-      "VALIDATION_FAILED",
-      "Login Gagal.",
-      "Tolong periksa kembali input anda. Pastikan email dan password terisi dengan benar."
-    );
-    return res.status(400).json(response.toResponse());
+  if (!isOauth) {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const response = new WithoutDataResource(
+        400,
+        "VALIDATION_FAILED",
+        "Login Gagal.",
+        "Tolong periksa kembali input anda. Pastikan email dan password terisi dengan benar."
+      );
+      return res.status(400).json(response.toResponse());
+    }
   }
 
-  const { email, password } = req.body;
+  const email = isOauth ? req.oauthEmail : req.body.email;
+  const password = isOauth ? null : req.body.password;
 
   try {
     // Ambil user + role
@@ -472,10 +757,14 @@ async function signInWithContext(req, res, { context, requiredRole, ability }) {
     }
 
     // Role check (STRICT): harus persis dengan requiredRole
-    const roleName = user.role_name || null;
-    if (roleName !== requiredRole) {
+    const hasId = Number(user.role_id);
+    const hasName = (user.role_name || "").toLowerCase();
+    const needId = Number(requiredRoleId || 0);
+    const needName = (requiredRole || "").toLowerCase();
+    const okRole = needId ? hasId === needId : hasName === needName;
+    if (!okRole) {
       logger.info(
-        `| Login | - Forbidden role for email: ${email} on context: ${context} (has: ${roleName}, need: ${requiredRole})`
+        `| Login | - Forbidden role for email: ${email} on context: ${context} (has: ${hasName}, need: ${requiredRole})`
       );
       const response = new WithoutDataResource(
         403,
@@ -487,18 +776,20 @@ async function signInWithContext(req, res, { context, requiredRole, ability }) {
     }
 
     // Verifikasi password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      logger.info(
-        `| Login | - Invalid credentials for email: ${email}, at ${new Date().toISOString()}`
-      );
-      const response = new WithoutDataResource(
-        400,
-        "INVALID_CREDENTIALS",
-        "Login Gagal.",
-        "Password atau email yang anda masukkan tidak valid, silahkan periksa kembali dan pastikan akun anda sudah terdaftar."
-      );
-      return res.status(400).json(response.toResponse());
+    if (!isOauth) {
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        logger.info(
+          `| Login | - Invalid credentials for email: ${email}, at ${new Date().toISOString()}`
+        );
+        const response = new WithoutDataResource(
+          400,
+          "INVALID_CREDENTIALS",
+          "Login Gagal.",
+          "Password atau email yang anda masukkan tidak valid, silahkan periksa kembali dan pastikan akun anda sudah terdaftar."
+        );
+        return res.status(400).json(response.toResponse());
+      }
     }
 
     // Update last_login
@@ -506,7 +797,12 @@ async function signInWithContext(req, res, { context, requiredRole, ability }) {
     await knex("users").where({ id: user.id }).update({ last_login: now });
 
     // Buat token dengan ability spesifik
-    const token = signToken({ userId: user.id, roleName, ability, context });
+    const token = signToken({
+      userId: user.id,
+      roleName: user.role_name,
+      ability,
+      context,
+    });
 
     // Serialize & ambil field minimal
     const serialized = await UserResource({ ...user, last_login: now });
