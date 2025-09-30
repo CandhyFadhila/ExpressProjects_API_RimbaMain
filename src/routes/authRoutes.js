@@ -19,7 +19,6 @@ router.post(
   (req, res) => authController.signInAdminSSO(req, res)
 );
 router.get("/sso/user-info", rateLimiter, authMiddleware, requireAbility("super_admin"), authController.getUserInfo);
-router.get("/sso/signout", rateLimiter, authMiddleware, requireAbility("super_admin"), authController.logout);
 
 // 2) Educator
 router.post(
@@ -33,7 +32,6 @@ router.post("/admin/send-otp", rateLimiter, sendOTPValidator, validate, authCont
 router.post("/admin/verify-otp", rateLimiter, verifyOTPValidator, validate, authController.verifyOTP);
 router.post("/admin/reset-password", rateLimiter, resetPasswordValidator, validate, authController.resetPassword);
 router.get("/admin/user-info", rateLimiter, authMiddleware, requireAbility("educator"), authController.getUserInfo);
-router.get("/admin/signout", rateLimiter, authMiddleware, requireAbility("educator"), authController.logout);
 
 // 3) Student
 router.post(
@@ -59,6 +57,6 @@ router.post("/send-otp", rateLimiter, sendOTPValidator, validate, authController
 router.post("/verify-otp", rateLimiter, verifyOTPValidator, validate, authController.verifyOTP);
 router.post("/reset-password", rateLimiter, resetPasswordValidator, validate, authController.resetPassword);
 router.get("/user-info", rateLimiter, authMiddleware, requireAbility("student"), authController.getUserInfo);
-router.get("/signout", rateLimiter, authMiddleware, requireAbility("student"), authController.logout);
+router.get("/signout", rateLimiter, authMiddleware, authController.logout);
 
 module.exports = router;
