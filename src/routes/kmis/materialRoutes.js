@@ -10,7 +10,6 @@ const {
 const validate = require("../../middlewares/validate");
 const authMiddleware = require("../../middlewares/authMiddleware");
 const rateLimiter = require("../../middlewares/rateLimitMiddleware");
-const { requireAnyAbility } = require("../../middlewares/requireAbility");
 const requirePermission = require("../../middlewares/requirePermission");
 const multer = require("multer");
 const upload = multer();
@@ -21,8 +20,7 @@ const uploadMaterialFields = upload.fields([
 
 router.use(
   rateLimiter,
-  authMiddleware,
-  requireAnyAbility(["super_admin", "educator"])
+  authMiddleware
 );
 
 router.get(

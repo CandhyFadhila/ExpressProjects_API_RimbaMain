@@ -10,27 +10,26 @@ const {
 const validate = require("../../middlewares/validate");
 const authMiddleware = require("../../middlewares/authMiddleware");
 const rateLimiter = require("../../middlewares/rateLimitMiddleware");
-const requireAbility = require("../../middlewares/requireAbility");
 const requirePermission = require("../../middlewares/requirePermission");
 const multer = require("multer");
 const upload = multer();
 
-router.use(rateLimiter, authMiddleware, requireAbility("super_admin"));
+router.use(rateLimiter, authMiddleware);
 
 router.get(
-  "/sso/index",
+  "/index",
   requirePermission(["view.cms_management"]),
   animalCompositionController.index
 );
 
 router.get(
-  "/sso/show/:id",
+  "/show/:id",
   requirePermission(["view.cms_management"]),
   animalCompositionController.show
 );
 
 router.post(
-  "/sso/create",
+  "/create",
   requirePermission(["create.cms_management"]),
   upload.array("files", 20),
   storeAnimalCompositionValidator,
@@ -39,7 +38,7 @@ router.post(
 );
 
 router.patch(
-  "/sso/update/:id",
+  "/update/:id",
   requirePermission(["edit.cms_management"]),
   upload.array("files", 20),
   updateAnimalCompositionValidator,
@@ -48,13 +47,13 @@ router.patch(
 );
 
 router.delete(
-  "/sso/delete",
+  "/delete",
   requirePermission(["delete.cms_management"]),
   animalCompositionController.destroy
 );
 
 router.patch(
-  "/sso/restore",
+  "/restore",
   requirePermission(["restore.cms_management"]),
   animalCompositionController.restore
 );

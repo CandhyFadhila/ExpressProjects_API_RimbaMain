@@ -10,25 +10,24 @@ const {
 const validate = require("../../middlewares/validate");
 const authMiddleware = require("../../middlewares/authMiddleware");
 const rateLimiter = require("../../middlewares/rateLimitMiddleware");
-const requireAbility = require("../../middlewares/requireAbility");
 const requirePermission = require("../../middlewares/requirePermission");
 
-router.use(rateLimiter, authMiddleware, requireAbility("super_admin"));
+router.use(rateLimiter, authMiddleware);
 
 router.get(
-  "/sso/index",
+  "/index",
   requirePermission(["view.kmis_student"]),
   studentController.index
 );
 
 router.get(
-  "/sso/show/:id",
+  "/show/:id",
   requirePermission(["view.kmis_student"]),
   studentController.show
 );
 
 router.post(
-  "/sso/create",
+  "/create",
   requirePermission(["create.kmis_student"]),
   storeStudentValidator,
   validate,
@@ -36,7 +35,7 @@ router.post(
 );
 
 router.patch(
-  "/sso/update/:id",
+  "/update/:id",
   requirePermission(["edit.kmis_student"]),
   updateStudentValidator,
   validate,
@@ -44,25 +43,25 @@ router.patch(
 );
 
 router.delete(
-  "/sso/delete",
+  "/delete",
   requirePermission(["delete.kmis_student"]),
   studentController.destroy
 );
 
 router.patch(
-  "/sso/restore",
+  "/restore",
   requirePermission(["restore.kmis_student"]),
   studentController.restore
 );
 
 router.patch(
-  "/sso/deactivate",
+  "/deactivate",
   requirePermission(["edit.kmis_student"]),
   studentController.deactivateAccount
 );
 
 router.patch(
-  "/sso/activate",
+  "/activate",
   requirePermission(["edit.kmis_student"]),
   studentController.activateAccount
 );

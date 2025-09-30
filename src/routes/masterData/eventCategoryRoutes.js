@@ -15,7 +15,7 @@ const requirePermission = require("../../middlewares/requirePermission");
 const multer = require("multer");
 const upload = multer();
 
-router.use(rateLimiter, authMiddleware, requireAbility("super_admin"));
+router.use(rateLimiter, authMiddleware);
 
 router.get(
   "/index",

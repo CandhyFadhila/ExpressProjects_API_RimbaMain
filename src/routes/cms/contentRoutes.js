@@ -10,15 +10,14 @@ const {
 const validate = require("../../middlewares/validate");
 const authMiddleware = require("../../middlewares/authMiddleware");
 const rateLimiter = require("../../middlewares/rateLimitMiddleware");
-const requireAbility = require("../../middlewares/requireAbility");
 const requirePermission = require("../../middlewares/requirePermission");
 const multer = require("multer");
 const upload = multer({ limits: { fileSize: 400 * 1024 * 1024 } });
 
-router.use(rateLimiter, authMiddleware, requireAbility("super_admin"));
+router.use(rateLimiter, authMiddleware);
 
 router.post(
-  "/sso/create",
+  "/create",
   requirePermission(["create.cms_management"]),
   upload.array("files", 20),
   storeContentValidator,
@@ -27,7 +26,7 @@ router.post(
 );
 
 router.patch(
-  "/sso/update/:id",
+  "/update/:id",
   requirePermission(["edit.cms_management"]),
   upload.array("files", 20),
   updateContentValidator,

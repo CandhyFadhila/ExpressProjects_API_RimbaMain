@@ -10,7 +10,6 @@ const {
 const validate = require("../../middlewares/validate");
 const authMiddleware = require("../../middlewares/authMiddleware");
 const rateLimiter = require("../../middlewares/rateLimitMiddleware");
-const { requireAnyAbility } = require("../../middlewares/requireAbility");
 const requirePermission = require("../../middlewares/requirePermission");
 const multer = require("multer");
 const upload = multer();
@@ -18,22 +17,19 @@ const upload = multer();
 router.use(rateLimiter, authMiddleware);
 
 router.get(
-  "/educator/index",
-  requireAnyAbility(["super_admin", "educator"]),
+  "/index",
   requirePermission(["view.kmis_quiz"]),
   quizCategoryController.index
 );
 
 router.get(
-  "/educator/show/:id",
-  requireAnyAbility(["educator"]),
+  "/show/:id",
   requirePermission(["view.kmis_quiz"]),
   quizCategoryController.show
 );
 
 router.post(
-  "/educator/create",
-  requireAnyAbility(["educator"]),
+  "/create",
   requirePermission(["create.kmis_quiz"]),
   upload.none(),
   storeQuizCategoryValidator,
@@ -42,8 +38,7 @@ router.post(
 );
 
 router.patch(
-  "/educator/update/:id",
-  requireAnyAbility(["educator"]),
+  "/update/:id",
   requirePermission(["edit.kmis_quiz"]),
   upload.none(),
   updateQuizCategoryValidator,
@@ -52,15 +47,13 @@ router.patch(
 );
 
 router.delete(
-  "/educator/delete",
-  requireAnyAbility(["educator"]),
+  "/delete",
   requirePermission(["delete.kmis_quiz"]),
   quizCategoryController.destroy
 );
 
 router.patch(
-  "/educator/restore",
-  requireAnyAbility(["educator"]),
+  "/restore",
   requirePermission(["restore.kmis_quiz"]),
   quizCategoryController.restore
 );
