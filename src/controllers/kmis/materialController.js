@@ -18,20 +18,14 @@ const activityLogHelper = require("../../helpers/activityLogHelper");
 const materialResource = require("../../resources/kmis/materialResource");
 
 exports.index = async (req, res) => {
-  const { search, categoryId, topicId } = req.query;
+  const { search, topicId } = req.query;
 
   try {
     let query = knex("kmis_materials as material")
-      .leftJoin(
-        "kmis_categories as category",
-        "category.id",
-        "material.kmis_categories_id"
-      )
       .leftJoin("kmis_topics as topic", "topic.id", "material.kmis_topic_id")
       .select([
         // kolom material (eksplisit agar tidak bentrok)
         "material.id",
-        "material.kmis_categories_id",
         "material.kmis_topic_id",
         "material.created_by",
         "material.uploaded_by",
@@ -58,9 +52,6 @@ exports.index = async (req, res) => {
 
     // applyTrashedScope(query, req, "material.deleted_at");
 
-    applyRelationIn(query, "material.kmis_categories_id", categoryId, {
-      as: "number",
-    });
     applyRelationIn(query, "material.kmis_topic_id", topicId, { as: "number" });
 
     applySearch(query, search, [
@@ -115,7 +106,6 @@ exports.store = async (req, res) => {
     materialTypes,
     title,
     description,
-    categoryId,
     topicId,
     materialData,
     isPublic,
@@ -307,7 +297,6 @@ exports.store = async (req, res) => {
       .insert({
         created_by: userId,
         uploaded_by: uploadedBy,
-        kmis_categories_id: categoryId ?? null,
         kmis_topic_id: topicId ?? null,
         material_types: type,
         title,
@@ -406,7 +395,6 @@ exports.update = async (req, res) => {
     materialTypes,
     title,
     description,
-    categoryId,
     topicId,
     materialData,
     isPublic,
@@ -629,7 +617,6 @@ exports.update = async (req, res) => {
     await trx("kmis_materials")
       .where("id", id)
       .update({
-        kmis_categories_id: categoryId ?? existing.kmis_categories_id,
         kmis_topic_id: topicId ?? existing.kmis_topic_id,
         material_types: type || existing.material_types,
         title: title ?? existing.title,

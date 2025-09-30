@@ -2,18 +2,11 @@ const {
   resolveArrayRelations,
 } = require("../../helpers/resolveArrayRelations");
 const knex = require("../../config/database");
-const categoryResource = require("../../resources/kmis/categoryResource");
 const topicResource = require("../../resources/kmis/topicResource");
 const UserResource = require("../../resources/auth/UserResource");
 const documentResource = require("../../resources/doc/documentResource");
 
 async function materialResource(material) {
-  const category = material.kmis_categories_id
-    ? await knex("kmis_categories")
-        .where("id", material.kmis_categories_id)
-        .first()
-    : null;
-
   const createdUser = material.created_by
     ? await knex("users").where("id", material.created_by).first()
     : null;
@@ -42,7 +35,6 @@ async function materialResource(material) {
     id: material.id,
     createdUser: createdUser ? await UserResource(createdUser) : null,
     uploadedUser: uploadedUser ? await UserResource(uploadedUser) : null,
-    category: category ? await categoryResource(category) : null,
     topic: topic ? await topicResource(topic) : null,
     materialFile: file,
     materialCover: cover,

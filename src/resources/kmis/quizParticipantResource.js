@@ -1,12 +1,16 @@
 const knex = require("../../config/database");
 const UserResource = require("../auth/UserResource");
+const topicResource = require("./topicResource");
 const quizResponseResource = require("./quizResponseResource");
 
 async function quizParticipantResource(quizParticipant) {
   // Jalankan query hubungan utama secara paralel
-  const [user, responses] = await Promise.all([
+  const [user, topic, responses] = await Promise.all([
     quizParticipant.attempt_by
       ? knex("users").where("id", quizParticipant.attempt_by).first()
+      : null,
+    quizParticipant.kmis_topic_id
+      ? knex("kmis_topics").where("id", quizParticipant.kmis_topic_id).first()
       : null,
     knex("kmis_quiz_responses")
       .where("kmis_quiz_attempt_id", quizParticipant.id)
@@ -37,6 +41,7 @@ async function quizParticipantResource(quizParticipant) {
   return {
     id: quizParticipant.id,
     attemptUser: user ? await UserResource(user) : null,
+    topic: topic ? await topicResource(topic) : null,
     attemptStatus: quizParticipant.attempt_status,
     assessmentStatus: quizParticipant.assessment_status,
     startedAt: quizParticipant.started_at,

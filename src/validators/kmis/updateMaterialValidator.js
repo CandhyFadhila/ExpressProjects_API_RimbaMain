@@ -37,31 +37,8 @@ exports.updateMaterialValidator = [
     .isString()
     .withMessage("Deskripsi materi harus berupa teks."),
 
-  // === categoryId (wajib jika gambar/dokumen) ===
-  body("categoryId")
-    .if(body("materialTypes").isIn(["gambar", "dokumen"]))
-    .notEmpty()
-    .withMessage("Kategori materi wajib dipilih untuk tipe gambar/dokumen.")
-    .bail()
-    .isInt({ gt: 0 })
-    .withMessage("Kategori materi harus berupa angka.")
-    .bail()
-    .custom(async (value) => {
-      const category = await knex("kmis_categories")
-        .where("id", value)
-        .whereNull("deleted_at")
-        .first();
-      if (!category) {
-        throw new Error(
-          "Kategori materi yang Anda pilih tidak ditemukan atau sudah dihapus."
-        );
-      }
-      return true;
-    }),
-
-  // === topicId (wajib jika gambar/dokumen) + konsistensi ke categoryId ===
+  // === topicId (wajib jika gambar/dokumen) ===
   body("topicId")
-    .if(body("materialTypes").isIn(["gambar", "dokumen"]))
     .notEmpty()
     .withMessage("Topik materi wajib dipilih untuk tipe gambar/dokumen.")
     .bail()
@@ -78,14 +55,6 @@ exports.updateMaterialValidator = [
           "Topik materi yang Anda pilih tidak ditemukan atau sudah dihapus."
         );
       }
-      // Cek kesesuaian topic vs category bila categoryId dikirim
-      if (
-        req.body.categoryId != null &&
-        Number(req.body.categoryId) !== Number(topic.kmis_categories_id)
-      ) {
-        throw new Error("Topik tidak sesuai dengan kategori yang dipilih.");
-      }
-      return true;
     }),
 
   // === materialData (wajib untuk video; opsional untuk lainnya) ===

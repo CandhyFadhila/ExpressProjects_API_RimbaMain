@@ -87,6 +87,7 @@ exports.index = async (req, res) => {
 };
 
 // TODO Refactor ini, karena quizcategory sudah tidak ada
+// tidak langsung di download, melainkan simpan di tabel kmis_certificates
 exports.generateCertificate = async (req, res) => {
   const { id } = req.params;
 
