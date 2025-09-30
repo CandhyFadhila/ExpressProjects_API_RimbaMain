@@ -22,8 +22,8 @@ async function materialResource(material) {
     ? await knex("users").where("id", material.uploaded_by).first()
     : null;
 
-  const topic = material.kmis_topics_id
-    ? await knex("kmis_topics").where("id", material.kmis_topics_id).first()
+  const topic = material.kmis_topic_id
+    ? await knex("kmis_topics").where("id", material.kmis_topic_id).first()
     : null;
 
   const file = await resolveArrayRelations(

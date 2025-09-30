@@ -18,13 +18,13 @@ const quizResource = require("../../resources/kmis/quizResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 
 exports.index = async (req, res) => {
-  const { search, quizCategoryId } = req.query;
+  const { search, topicId } = req.query;
 
   try {
     let query = knex("kmis_quiz as quiz")
       .select(
         "quiz.id",
-        "quiz.kmis_quiz_categories_id",
+        "quiz.kmis_topic_id",
         "quiz.question",
         "quiz.answer_a",
         "quiz.answer_b",
@@ -38,7 +38,7 @@ exports.index = async (req, res) => {
       )
       .orderBy("quiz.created_at", "desc");
 
-    applyRelationIn(query, "quiz.kmis_quiz_categories_id", quizCategoryId, {
+    applyRelationIn(query, "quiz.kmis_topic_id", topicId, {
       as: "number",
     });
 
@@ -87,7 +87,7 @@ exports.index = async (req, res) => {
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
   const {
-    quizCategoryId,
+    topicId,
     question,
     answerA,
     answerB,
@@ -127,7 +127,7 @@ exports.store = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    await validateTotalQuestionQuota([{ quizCategoryId }], trx);
+    await validateTopicTotalQuizQuota([{ topicId }], trx);
 
     const normalizedExplanation =
       explanation === undefined ||
@@ -140,7 +140,7 @@ exports.store = async (req, res) => {
 
     await trx("kmis_quiz")
       .insert({
-        kmis_quiz_categories_id: quizCategoryId,
+        kmis_topic_id: topicId,
         question,
         answer_a: answerA,
         answer_b: answerB,
@@ -231,7 +231,7 @@ exports.show = async (req, res) => {
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
   const {
-    quizCategoryId,
+    topicId,
     question,
     answerA,
     answerB,
@@ -287,8 +287,7 @@ exports.update = async (req, res) => {
     await trx("kmis_quiz")
       .where("id", id)
       .update({
-        kmis_quiz_categories_id:
-          quizCategoryId ?? existing.kmis_quiz_categories_id,
+        kmis_topic_id: topicId ?? existing.kmis_topic_id,
         question: question ?? existing.question,
         answer_a: answerA ?? existing.answer_a,
         answer_b: answerB ?? existing.answer_b,
@@ -561,27 +560,33 @@ exports.restore = async (req, res) => {
 exports.downloadTemplate = async (req, res) => {
   try {
     // 1) Ambil data referensi terbaru (hanya id & name)
-    const [quizCategories] = await Promise.all([
-      knex("kmis_quiz_categories as qc")
-        .join("kmis_categories as c", "c.id", "qc.kmis_categories_id")
-        .join("kmis_topics as t", "t.id", "qc.kmis_topics_id")
-        .whereNull("qc.deleted_at")
-        .whereNull("c.deleted_at")
+    const [topics, categories] = await Promise.all([
+      knex("kmis_topics as t")
+        .join("kmis_categories as c", "c.id", "t.kmis_categories_id")
         .whereNull("t.deleted_at")
+        .whereNull("c.deleted_at")
         .select({
-          id: "qc.id",
-          categoryName: "c.title",
+          id: "t.id",
           topicName: "t.title",
-          name: "qc.name",
-          description: "qc.description",
-          totalQuestion: "qc.total_question",
+          topicDescription: "t.description",
+          totalQuiz: "t.total_quiz",
+          categoryId: "c.id",
+          categoryName: "c.title",
         })
-        .orderBy([{ column: "qc.id", order: "asc" }]),
+        .orderBy("t.id", "asc"),
+      knex("kmis_categories as c")
+        .whereNull("c.deleted_at")
+        .select({
+          id: "c.id",
+          name: "c.title",
+          description: "c.description",
+        })
+        .orderBy("c.id", "asc"),
     ]);
 
     // 2) Sheet 1: Template input quiz
     const header = [
-      "quizCategoryId",
+      "topicId",
       "question",
       "answerA",
       "answerB",
@@ -607,10 +612,8 @@ exports.downloadTemplate = async (req, res) => {
     ];
 
     const wsTemplate = XLSX.utils.aoa_to_sheet(sheet1Data);
-
-    // Lebar kolom biar nyaman dilihat
     wsTemplate["!cols"] = [
-      { wch: 15 }, // quizCategoryId
+      { wch: 15 }, // topicId
       { wch: 120 }, // question
       { wch: 25 }, // answerA
       { wch: 25 }, // answerB
@@ -621,38 +624,34 @@ exports.downloadTemplate = async (req, res) => {
     ];
 
     // 3) Sheet 2: Referensi
-    const qcTable = [
+    const topicsTable = [
       [
-        "Kategori soal (pakai kolom 'id' untuk diisi ke quizCategoryId pada sheet template)",
+        "TOPICS (pakai kolom 'id' untuk diisi ke 'topicId' pada sheet Template)",
       ],
       [
         "id",
-        "kategori",
-        "topik",
-        "nama kategori soal",
-        "deskripsi kategori soal",
-        "jumlah soal yang bisa dibuat",
+        "categoryName",
+        "topicName",
+        "description",
+        "totalQuiz",
       ],
-      ...quizCategories.map((q) => [
-        q.id,
-        q.categoryName,
-        q.topicName,
-        q.name,
-        q.description,
-        q.totalQuestion,
+      ...topics.map((t) => [
+        t.id,
+        t.categoryName,
+        t.topicName,
+        t.topicDescription,
+        t.totalQuiz ?? "", // bisa null -> kosong
       ]),
     ];
 
-    const wsRef = XLSX.utils.aoa_to_sheet(qcTable);
+    const wsRef = XLSX.utils.aoa_to_sheet(topicsTable);
 
     wsRef["!cols"] = [
-      { wch: 10 }, // id
+      { wch: 8 }, // id
       { wch: 40 }, // categoryName
       { wch: 40 }, // topicName
-      { wch: 40 }, // name
       { wch: 40 }, // description
-      { wch: 16 }, // totalQuestion
-      // sisa kolom untuk tabel berikutnya tetap muat
+      { wch: 12 }, // totalQuiz
     ];
 
     // 4) Buat workbook & kirim sebagai .xls
@@ -707,7 +706,6 @@ exports.importTemplate = async (req, res) => {
     }
 
     const file = req.files[0];
-
     const allowedMimes = new Set([
       "application/vnd.ms-excel", // .xls
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
@@ -772,7 +770,7 @@ exports.importTemplate = async (req, res) => {
         .toLowerCase()
     );
     const expected = [
-      "quizcategoryid",
+      "topicid",
       "question",
       "answera",
       "answerb",
@@ -810,8 +808,7 @@ exports.importTemplate = async (req, res) => {
       Array.isArray(row) &&
       row.some((c) => typeof c === "string" && HINT_MARKERS.has(c.trim()));
 
-    // Jika baris ke-2 berisi petunjuk, startIndex = 2; kalau tidak, startIndex = 1
-    const startIndex = isHintRow(rows[1]) ? 2 : 1;
+    const startIndex = isHintRow(rows[1]) ? 2 : 1; // kalau ada petunjuk, data mulai baris 3
     const excelStartRow = startIndex + 1;
 
     const dataRows = rows.slice(startIndex);
@@ -826,7 +823,7 @@ exports.importTemplate = async (req, res) => {
       const excelRowNum = excelStartRow + i; // baris excel (1-based)
 
       const obj = {
-        quizCategoryId: toIntOrNaN(r[0]),
+        topicId: toIntOrNaN(r[0]),
         question: toStr(r[1]),
         answerA: toStr(r[2]),
         answerB: toStr(r[3]),
@@ -891,22 +888,20 @@ exports.importTemplate = async (req, res) => {
       return res.status(400).json(response.toResponse());
     }
 
-    // --- 6) Validasi keberadaan quizCategoryId
-    const qcIds = [...new Set(items.map((x) => x.quizCategoryId))];
-    const qcRows = await knex("kmis_quiz_categories as qc")
-      .leftJoin("kmis_categories as c", "c.id", "qc.kmis_categories_id")
-      .leftJoin("kmis_topics as t", "t.id", "qc.kmis_topics_id")
-      .whereIn("qc.id", qcIds)
-      .whereNull("qc.deleted_at")
-      .whereNull("c.deleted_at")
+    // --- 6) Validasi keberadaan topicId
+    const topicIds = [...new Set(items.map((x) => x.topicId))];
+    const topicsExist = await trx("kmis_topics as t")
+      .leftJoin("kmis_categories as c", "c.id", "t.kmis_categories_id")
+      .whereIn("t.id", topicIds)
       .whereNull("t.deleted_at")
-      .select("qc.id");
+      .whereNull("c.deleted_at")
+      .select("t.id");
 
-    const qcIdSet = new Set(qcRows.map((r) => Number(r.id)));
+    const topicIdSet = new Set(topicsExist.map((r) => Number(r.id)));
     for (const it of items) {
-      if (!qcIdSet.has(it.quizCategoryId)) {
+      if (!topicIdSet.has(it.topicId)) {
         perRowErrors.push(
-          `Baris ${it.excelRowNum}: quizCategoryId (${it.quizCategoryId}) tidak valid / tidak ditemukan.`
+          `Baris ${it.excelRowNum}: topicId (${it.topicId}) tidak valid / tidak ditemukan.`
         );
       }
     }
@@ -922,10 +917,10 @@ exports.importTemplate = async (req, res) => {
 
     // --- 7) Cek duplikat pertanyaan di DB (case-insensitive)
     const uniqueQLower = [...seen.keys()];
-    const dupDb = await knex("kmis_quiz")
+    const dupDb = await trx("kmis_quiz")
       .select("question")
       .whereNull("deleted_at")
-      .whereIn(knex.raw("lower(question)"), uniqueQLower);
+      .whereIn(trx.raw("lower(question)"), uniqueQLower);
     if (dupDb.length) {
       const dupSet = new Set(dupDb.map((d) => d.question.toLowerCase()));
       for (const it of items) {
@@ -946,7 +941,13 @@ exports.importTemplate = async (req, res) => {
 
     // --- 8) VALIDASI KUOTA total_question
     try {
-      await validateTotalQuestionQuota(items, trx);
+      await validateTopicTotalQuizQuota(
+        items.map((it) => ({
+          topicId: it.topicId,
+          excelRowNum: it.excelRowNum,
+        })),
+        trx
+      );
     } catch (e) {
       await trx.rollback();
       const response = new WithoutDataResource(
@@ -961,7 +962,7 @@ exports.importTemplate = async (req, res) => {
     // --- 9) Insert batch dalam transaksi
     try {
       const toInsert = items.map((it) => ({
-        kmis_quiz_categories_id: it.quizCategoryId,
+        kmis_topic_id: it.topicId,
         question: it.question,
         answer_a: it.answerA,
         answer_b: it.answerB,
@@ -1018,56 +1019,69 @@ exports.importTemplate = async (req, res) => {
   }
 };
 
-async function validateTotalQuestionQuota(items, trx) {
+async function validateTopicTotalQuizQuota(items, trx) {
   const group = new Map(); // qcId -> { countInFile, rows[] }
   for (const it of items) {
-    const qcId = Number(it.quizCategoryId);
-    if (!group.has(qcId)) group.set(qcId, { countInFile: 0, rows: [] });
-    const g = group.get(qcId);
+    const topicId = Number(it.topicId);
+    if (!group.has(topicId)) group.set(topicId, { countInFile: 0, rows: [] });
+    const g = group.get(topicId);
     g.countInFile += 1;
     if (it.excelRowNum) g.rows.push(it.excelRowNum);
   }
-  const qcIds = [...group.keys()];
+  const topicIds = [...group.keys()];
+  if (topicIds.length === 0) return;
 
-  const qcRows = await trx("kmis_quiz_categories")
-    .whereIn("id", qcIds)
+  const topicRows = await trx("kmis_topics")
+    .whereIn("id", topicIds)
     .whereNull("deleted_at")
-    .select("id", "total_question")
-    .forUpdate(); // kunci parent untuk cegah race
+    .select("id", "total_quiz")
+    .forUpdate();
 
   const totalMap = new Map(
-    qcRows.map((r) => [Number(r.id), Number(r.total_question)])
+    topicRows.map((r) => [
+      Number(r.id),
+      r.total_quiz === null ? null : Number(r.total_quiz),
+    ])
   );
 
   const existingRows = await trx("kmis_quiz")
-    .whereIn("kmis_quiz_categories_id", qcIds)
+    .whereIn("kmis_topic_id", topicIds)
     .whereNull("deleted_at")
-    .select("kmis_quiz_categories_id")
+    .select("kmis_topic_id")
     .count({ n: "*" })
-    .groupBy("kmis_quiz_categories_id");
+    .groupBy("kmis_topic_id");
 
   const existMap = new Map(
-    existingRows.map((r) => [Number(r.kmis_quiz_categories_id), Number(r.n)])
+    existingRows.map((r) => [Number(r.kmis_topic_id), Number(r.n)])
   );
 
   const errors = [];
-  for (const [qcId, { countInFile }] of group.entries()) {
-    const total = totalMap.get(qcId);
-    if (typeof total !== "number") {
-      errors.push(`quizCategoryId ${qcId} tidak ditemukan / nonaktif.`);
+  for (const [topicId, { countInFile, rows }] of group.entries()) {
+    const total = totalMap.get(topicId);
+    if (total === undefined) {
+      errors.push(`topicId ${topicId} tidak ditemukan / nonaktif.`);
       continue;
     }
-    const existing = existMap.get(qcId) ?? 0;
+    if (total === null) {
+      // unlimited → tidak dibatasi
+      continue;
+    }
+    const existing = existMap.get(topicId) ?? 0;
     const remaining = total - existing;
+
     if (remaining < 0) {
       errors.push(
-        `Kuota kategori ${qcId} sudah melebihi batas (existing ${existing} > total ${total}).`
+        `Kuota topik ${topicId} sudah melebihi batas (existing ${existing} > total ${total}).`
       );
       continue;
     }
     if (countInFile > remaining) {
       errors.push(
-        `Kategori kuis ${qcId}: sisa kuota ${remaining}, tetapi mencoba menambah ${countInFile} item.`
+        rows?.length
+          ? `Topik ID ${topicId}: sisa kuota quiz ${remaining}, namun file template mencoba menambahkan ${countInFile} item (baris: ${rows.join(
+              ", "
+            )}).`
+          : `Topik ID ${topicId}: sisa kuota quiz ${remaining}, namun file template mencoba menambahkan ${countInFile} item.`
       );
     }
   }

@@ -1,10 +1,7 @@
 const { validationResult } = require("express-validator");
 const knex = require("../../config/database");
 const logger = require("../../utils/logger");
-const {
-  normJsonbArray,
-  normIdArray,
-} = require("../../helpers/inputNorm");
+const { normJsonbArray, normIdArray } = require("../../helpers/inputNorm");
 const { asJsonb } = require("../../helpers/dbJson");
 const {
   applyRelationIn,
@@ -30,12 +27,12 @@ exports.index = async (req, res) => {
         "category.id",
         "material.kmis_categories_id"
       )
-      .leftJoin("kmis_topics as topic", "topic.id", "material.kmis_topics_id")
+      .leftJoin("kmis_topics as topic", "topic.id", "material.kmis_topic_id")
       .select([
         // kolom material (eksplisit agar tidak bentrok)
         "material.id",
         "material.kmis_categories_id",
-        "material.kmis_topics_id",
+        "material.kmis_topic_id",
         "material.created_by",
         "material.uploaded_by",
         "material.materials_file_ids",
@@ -61,8 +58,10 @@ exports.index = async (req, res) => {
 
     // applyTrashedScope(query, req, "material.deleted_at");
 
-    applyRelationIn(query, "material.kmis_categories_id", categoryId, { as: "number" });
-    applyRelationIn(query, "material.kmis_topics_id",     topicId,    { as: "number" });
+    applyRelationIn(query, "material.kmis_categories_id", categoryId, {
+      as: "number",
+    });
+    applyRelationIn(query, "material.kmis_topic_id", topicId, { as: "number" });
 
     applySearch(query, search, [
       "material.title",
@@ -309,7 +308,7 @@ exports.store = async (req, res) => {
         created_by: userId,
         uploaded_by: uploadedBy,
         kmis_categories_id: categoryId ?? null,
-        kmis_topics_id: topicId ?? null,
+        kmis_topic_id: topicId ?? null,
         material_types: type,
         title,
         description,
@@ -631,7 +630,7 @@ exports.update = async (req, res) => {
       .where("id", id)
       .update({
         kmis_categories_id: categoryId ?? existing.kmis_categories_id,
-        kmis_topics_id: topicId ?? existing.kmis_topics_id,
+        kmis_topic_id: topicId ?? existing.kmis_topic_id,
         material_types: type || existing.material_types,
         title: title ?? existing.title,
         description: description ?? existing.description,

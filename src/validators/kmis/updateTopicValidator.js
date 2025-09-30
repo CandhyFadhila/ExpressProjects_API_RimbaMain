@@ -35,4 +35,12 @@ exports.updateTopicValidator = [
     .bail()
     .isString()
     .withMessage("Deskripsi topik harus berupa teks."),
+
+  body("totalQuiz")
+    .trim()
+    .notEmpty()
+    .withMessage("Jumlah soal pertanyaan tidak boleh kosong.")
+    .bail()
+    .isInt()
+    .withMessage("Jumlah soal pertanyaan harus berupa angka."),
 ];

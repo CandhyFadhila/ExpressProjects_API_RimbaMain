@@ -30,16 +30,7 @@ exports.index = async (req, res) => {
         "topic.kmis_categories_id",
         "category.id"
       )
-      .select(
-        "topic.id",
-        "topic.kmis_categories_id",
-        "topic.topic_cover_ids",
-        "topic.title",
-        "topic.description",
-        "topic.deleted_at",
-        "topic.created_at",
-        "topic.updated_at"
-      )
+      .select("*")
       .orderBy("topic.created_at", "desc");
 
     applyTrashedScope(query, req, "topic.deleted_at");
@@ -92,7 +83,7 @@ exports.index = async (req, res) => {
 
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
-  const { title, description, categoryId } = req.body;
+  const { title, description, totalQuiz, categoryId } = req.body;
 
   try {
     const errors = validationResult(req);
@@ -183,6 +174,7 @@ exports.store = async (req, res) => {
         topic_cover_ids: asJsonb([coverId]),
         title,
         description,
+        total_quiz: totalQuiz,
       })
       .returning("*");
 
@@ -257,7 +249,7 @@ exports.show = async (req, res) => {
 
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
-  const { title, description, categoryId, deleteDocumentIds } = req.body;
+  const { title, description, categoryId, totalQuiz, deleteDocumentIds } = req.body;
   const id = req.params.id;
 
   try {
@@ -348,6 +340,7 @@ exports.update = async (req, res) => {
         topic_cover_ids: asJsonb(coverArr),
         title,
         description,
+        total_quiz: totalQuiz,
         updated_at: trx.fn.now(),
       });
 

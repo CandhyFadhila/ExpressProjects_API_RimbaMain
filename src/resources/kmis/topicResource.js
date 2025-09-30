@@ -24,6 +24,7 @@ async function topicResource(topic) {
     topicCover: photos,
     title: topic.title,
     description: topic.description,
+    totalQuiz: topic.total_quiz,
     createdAt: topic.created_at,
     updatedAt: topic.updated_at,
     deletedAt: topic.deleted_at,

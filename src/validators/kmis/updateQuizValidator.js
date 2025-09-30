@@ -3,20 +3,20 @@ const knex = require("../../config/database");
 const QUIZ_ALLOWED_ANSWER_TYPES = Object.freeze(["A", "B", "C", "D"]);
 
 exports.updateQuizValidator = [
-  body("quizCategoryId")
+  body("topicId")
     .notEmpty()
-    .withMessage("Kategori kuis wajib dipilih.")
+    .withMessage("Topic kuis wajib dipilih.")
     .bail()
     .isInt()
-    .withMessage("Kategori kuis harus berupa angka.")
+    .withMessage("Topic kuis harus berupa angka.")
     .bail()
     .custom(async (value) => {
-      const category = await knex("kmis_quiz_categories")
+      const category = await knex("kmis_topics")
         .where("id", value)
         .whereNull("deleted_at")
         .first();
       if (!category) {
-        throw new Error("Kategori kuis yang Anda pilih tidak ditemukan.");
+        throw new Error("Topic kuis yang Anda pilih tidak ditemukan.");
       }
       return true;
     }),

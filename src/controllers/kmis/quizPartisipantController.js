@@ -2,12 +2,8 @@ const knex = require("../../config/database");
 const PDFDocument = require("pdfkit");
 const logger = require("../../utils/logger");
 const {
-  normIdArray,
-} = require("../../helpers/inputNorm");
-const {
   applySearch,
   applyPagination,
-  applyRelationIn,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
 const { formatTanggalIndonesia } = require("../../helpers/dateHelper");
@@ -18,20 +14,14 @@ const quizParticipantResource = require("../../resources/kmis/quizParticipantRes
 // const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 
 exports.index = async (req, res) => {
-  const { search, quizCategoryId } = req.query;
+  const { search } = req.query;
 
   try {
     let query = knex("kmis_quiz_attempts as quizParticipant")
       .leftJoin("users as user", "quizParticipant.attempt_by", "user.id")
-      .leftJoin(
-        "kmis_quiz_categories as category",
-        "quizParticipant.kmis_quiz_categories_id",
-        "category.id"
-      )
       .select(
         "quizParticipant.id",
         "quizParticipant.attempt_by",
-        "quizParticipant.kmis_quiz_categories_id",
         "quizParticipant.attempt_status",
         "quizParticipant.assessment_status",
         "quizParticipant.started_at",
@@ -50,16 +40,7 @@ exports.index = async (req, res) => {
 
     // applyTrashedScope(query, req, "quizParticipant.deleted_at");
 
-    applyRelationIn(
-      query,
-      "quizParticipant.kmis_quiz_categories_id",
-      quizCategoryId,
-      {
-        as: "number",
-      }
-    );
-
-    applySearch(query, search, ["user.name", "category.name"]);
+    applySearch(query, search, ["user.name"]);
 
     const paginationInfo = applyPagination(query, req.query);
 
@@ -105,6 +86,7 @@ exports.index = async (req, res) => {
   }
 };
 
+// TODO Refactor ini, karena quizcategory sudah tidak ada
 exports.generateCertificate = async (req, res) => {
   const { id } = req.params;
 
@@ -116,7 +98,7 @@ exports.generateCertificate = async (req, res) => {
         "qc.id",
         "a.kmis_quiz_categories_id"
       )
-      .leftJoin("kmis_topics as t", "t.id", "qc.kmis_topics_id")
+      .leftJoin("kmis_topics as t", "t.id", "qc.kmis_topic_id")
       .where("a.id", id)
       .whereNull("a.deleted_at")
       .whereNull("qc.deleted_at")

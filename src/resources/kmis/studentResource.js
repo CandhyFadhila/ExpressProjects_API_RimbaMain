@@ -15,7 +15,7 @@ async function studentResource(student) {
       knex.raw(
         "COALESCE(AVG(CASE WHEN status = 2 THEN score_total END), 0)::double precision AS avg_score_finished"
       ),
-      knex.raw("COUNT(DISTINCT kmis_topics_id)::int AS total_topics_taken")
+      knex.raw("COUNT(DISTINCT kmis_topic_id)::int AS total_topics_taken")
     )
     .first();
 
