@@ -813,12 +813,12 @@ exports.getMaterialbyTopicIdorCategoryId = async (req, res) => {
   try {
     if (categoryIds.length === 0 && topicIds.length === 0) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         "Payload harus diisi minimal salah satu: categoryId[] atau topicId[]."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     if (categoryIds.length > 0) {
@@ -832,12 +832,12 @@ exports.getMaterialbyTopicIdorCategoryId = async (req, res) => {
 
       if (missCat.length > 0) {
         const response = new WithoutDataResource(
-          400,
+          422,
           "FAILED_VALIDATION",
           "Validasi Gagal",
           `Beberapa categoryId tidak ditemukan: [${missCat.join(", ")}].`
         );
-        return res.status(400).json(response.toResponse());
+        return res.status(422).json(response.toResponse());
       }
     }
 
@@ -852,12 +852,12 @@ exports.getMaterialbyTopicIdorCategoryId = async (req, res) => {
 
       if (missTop.length > 0) {
         const response = new WithoutDataResource(
-          400,
+          422,
           "FAILED_VALIDATION",
           "Validasi Gagal",
           `Beberapa topicId tidak ditemukan: [${missTop.join(", ")}].`
         );
-        return res.status(400).json(response.toResponse());
+        return res.status(422).json(response.toResponse());
       }
     }
 
@@ -1085,12 +1085,12 @@ exports.getMaterialbyMaterialTypes = async (req, res) => {
   try {
     if (!Array.isArray(materialType) || materialType.length === 0) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         "materialType harus berupa array berisi minimal satu tipe materi."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const ALLOWED = new Set(["text", "gambar", "video", "dokumen"]);
@@ -1113,12 +1113,12 @@ exports.getMaterialbyMaterialTypes = async (req, res) => {
     const invalid = normalized.filter((t) => !ALLOWED.has(t));
     if (invalid.length > 0) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_MATERIAL_TYPES",
         "Tipe materi tidak didukung",
         `Tipe yang diizinkan hanya: text, gambar, video, dokumen.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     let query = knex("kmis_materials as material")
@@ -1196,22 +1196,22 @@ exports.getMaterialbyIsPublic = async (req, res) => {
   try {
     if (!Array.isArray(isPublic) || isPublic.length === 0) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_INPUT",
         "Format Data Tidak Sesuai Ketentuan",
         "isPublic harus berupa array boolean, misalnya: [true] atau [true, false]."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
     const allBoolean = isPublic.every((v) => typeof v === "boolean");
     if (!allBoolean) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_INPUT_TYPE",
         "Format Data Tidak Sesuai Ketentuan",
         "Setiap nilai pada isPublic harus bertipe boolean (true/false)."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const normalized = [...new Set(isPublic)];
@@ -1421,12 +1421,12 @@ exports.getQuizbytopicId = async (req, res) => {
   try {
     if (topicIds.length === 0) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         "Payload harus diisi topicId[]."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const existsTopicIds = await knex("kmis_topics")
@@ -2500,7 +2500,7 @@ exports.getAllLegalDocument = async (req, res) => {
     const dr = validateDateRangeRequiredBoth(start_date, end_date);
     if (!dr.ok) {
       const response = new WithoutDataResource(400, dr.code, dr.title, dr.desc);
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     let query = knex("cms_legal_documents as document")
@@ -2746,12 +2746,12 @@ exports.getContentbyOrder = async (req, res) => {
   const ord = Number(req.params.id);
   if (!Number.isInteger(ord) || ord < 0) {
     const response = new WithoutDataResource(
-      400,
+      422,
       "FAILED_VALIDATION",
       "Format Data Tidak Sesuai Ketentuan",
       "Parameter order harus bilangan bulat >= 0."
     );
-    return res.status(400).json(response.toResponse());
+    return res.status(422).json(response.toResponse());
   }
 
   try {

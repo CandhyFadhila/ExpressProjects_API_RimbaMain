@@ -105,12 +105,12 @@ exports.store = async (req, res) => {
         .map((err) => err.msg)
         .join(" ");
       const response = new WithoutDataResource(
-        400,
+        422,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         message
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const exists = await trx("kmis_quiz")
@@ -119,12 +119,12 @@ exports.store = async (req, res) => {
       .first();
     if (exists) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "DUPLICATE_TITLE",
         "Duplikat Data",
         "Ada soal pertanyaan yang sama dengan yang anda buat. Silakan buat soal yang lain."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     await validateTopicTotalQuizQuota([{ topicId }], trx);
@@ -174,12 +174,12 @@ exports.store = async (req, res) => {
 
     if (error.code === "OVER_QUOTA") {
       const response = new WithoutDataResource(
-        400,
+        422,
         "OVER_QUOTA",
         "Melebihi Batas Kuota Soal",
         error.message
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
     logger.error(`| Quiz KMIS | - Error function store: ${error.message}`);
     const response = new WithoutDataResource(
@@ -250,12 +250,12 @@ exports.update = async (req, res) => {
         .map((err) => err.msg)
         .join(" ");
       const response = new WithoutDataResource(
-        400,
+        422,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         message
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const existing = await trx("kmis_quiz").where("id", id).first();
@@ -276,12 +276,12 @@ exports.update = async (req, res) => {
       .first();
     if (duplicate) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "DUPLICATE_TITLE",
         "Duplikat Data",
         "Ada soal pertanyaan yang sama dengan yang anda perbarui. Silakan buat soal yang lain."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     await trx("kmis_quiz")
@@ -339,24 +339,24 @@ exports.destroy = async (req, res) => {
     if (ids.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_INPUT",
         "Gagal Menghapus Data",
         "Mohon kirimkan deleteIds berupa array ID numerik, misal: [1,2,3]."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const MAX_BULK = 50;
     if (ids.length > MAX_BULK) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "TOO_MANY_IDS",
         "Terlalu Banyak Data",
         `Maksimal id yang bisa dihapus adalah ${MAX_BULK} ID.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const existing = await trx("kmis_quiz")
@@ -421,24 +421,24 @@ exports.restore = async (req, res) => {
     if (ids.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_INPUT",
         "Gagal Menghapus Data",
         "Mohon kirimkan restoreIds berupa array ID numerik, misal: [1,2,3]."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const MAX_BULK = 50;
     if (ids.length > MAX_BULK) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "TOO_MANY_IDS",
         "Terlalu Banyak Data",
         `Maksimal id yang bisa dikembalikan adalah ${MAX_BULK} ID.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const softDeleted = await trx("kmis_quiz")
@@ -521,12 +521,12 @@ exports.restore = async (req, res) => {
 
     if (restoredCount === 0) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "DUPLICATE_NAME",
         "Restore Gagal",
         "Semua ID gagal direstore karena duplikat data dengan entri aktif atau duplikat data di dalam batch."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const descParts = [
@@ -688,21 +688,21 @@ exports.importTemplate = async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "FILES_NOT_FOUND",
         "File Tidak Ditemukan",
         "File soal pertanyaan wajib diunggah."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
     if (req.files.length > 1) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "MAX_FILES",
         "Terlalu Banyak File",
         "Maksimal upload adalah 1 file."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const file = req.files[0];
@@ -712,12 +712,12 @@ exports.importTemplate = async (req, res) => {
     ]);
     if (!allowedMimes.has(file.mimetype)) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_FILE_TYPE",
         "Tipe File Tidak Didukung",
         "Format file harus .xls atau .xlsx."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     // --- 1) Parse Excel & ambil Sheet 1 (Template)
@@ -726,12 +726,12 @@ exports.importTemplate = async (req, res) => {
       wb = XLSX.read(file.buffer, { type: "buffer" });
     } catch (e) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "BAD_EXCEL",
         "File Excel Tidak Valid",
         "File Excel rusak atau tidak dapat dibaca."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const sheetName =
@@ -740,12 +740,12 @@ exports.importTemplate = async (req, res) => {
     const ws = wb.Sheets[sheetName];
     if (!ws) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "SHEET_NOT_FOUND",
         "Sheet Tidak Ditemukan",
         'Sheet "Template" tidak ditemukan pada file yang diunggah.'
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const rows = XLSX.utils.sheet_to_json(ws, {
@@ -755,12 +755,12 @@ exports.importTemplate = async (req, res) => {
     });
     if (!rows.length) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "EMPTY_SHEET",
         "Sheet Kosong",
         "Sheet Template tidak berisi data."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     // --- 2) Validasi header
@@ -781,12 +781,12 @@ exports.importTemplate = async (req, res) => {
     ];
     if (rawHeader.join("|") !== expected.join("|")) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "HEADER_MISMATCH",
         "Format Header Tidak Sesuai",
         "Header pada sheet Template tidak sesuai dengan format terbaru."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     // --- 3) Siapkan helper parsing
@@ -855,14 +855,14 @@ exports.importTemplate = async (req, res) => {
 
     if (!items.length) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "NO_VALID_ROWS",
         "Tidak Ada Data Valid",
         perRowErrors.length
           ? perRowErrors.join(" ")
           : "Tidak ada baris data yang dapat diproses."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     // --- 5) Cek duplikat pertanyaan dalam batch (case-insensitive)
@@ -880,12 +880,12 @@ exports.importTemplate = async (req, res) => {
     }
     if (perRowErrors.length) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         perRowErrors.join(" ")
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     // --- 6) Validasi keberadaan topicId
@@ -907,12 +907,12 @@ exports.importTemplate = async (req, res) => {
     }
     if (perRowErrors.length) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_RELATION",
         "Relasi Tidak Valid",
         perRowErrors.join(" ")
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     // --- 7) Cek duplikat pertanyaan di DB (case-insensitive)
@@ -931,12 +931,12 @@ exports.importTemplate = async (req, res) => {
         }
       }
       const response = new WithoutDataResource(
-        400,
+        422,
         "DUPLICATE_QUESTION",
         "Duplikat Pada Database",
         perRowErrors.join(" ")
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     // --- 8) VALIDASI KUOTA total_question
@@ -951,12 +951,12 @@ exports.importTemplate = async (req, res) => {
     } catch (e) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        e.statusCode || 400,
+        e.statusCode || 422,
         e.code || "OVER_QUOTA",
         "Melebihi Batas Kuota Soal",
         e.message || "Jumlah soal pada file melebihi kuota yang diperbolehkan."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     // --- 9) Insert batch dalam transaksi
@@ -1088,7 +1088,7 @@ async function validateTopicTotalQuizQuota(items, trx) {
 
   if (errors.length) {
     const err = new Error(errors.join(" "));
-    err.statusCode = 400;
+    err.statusCode = 422;
     err.code = "OVER_QUOTA";
     throw err;
   }

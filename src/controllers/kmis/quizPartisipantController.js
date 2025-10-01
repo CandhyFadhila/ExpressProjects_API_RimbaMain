@@ -128,12 +128,12 @@ exports.generateCertificate = async (req, res) => {
       attempt.attempt_status === 2 || (attempt.score_total ?? 0) > 0;
     if (!eligible) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "NOT_ELIGIBLE",
         "Belum Memenuhi Syarat",
         "Sertifikat hanya dapat dicetak jika attempt sudah selesai atau nilai total sudah tersedia."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const topicName = attempt.topic_name || "-";

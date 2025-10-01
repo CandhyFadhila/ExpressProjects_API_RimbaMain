@@ -91,52 +91,52 @@ exports.store = async (req, res) => {
         .map((err) => err.msg)
         .join(" ");
       const response = new WithoutDataResource(
-        400,
+        422,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         message
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     if (!req.files || req.files.length === 0) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "FILES_NOT_FOUND",
         "File Tidak Ditemukan",
         "File cover wajib diunggah."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
     if (req.files.length > 1) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "MAX_FILES",
         "Terlalu Banyak File",
         "Maksimal upload adalah 1 file."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     for (const file of req.files) {
       const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
       if (!allowedTypes.includes(file.mimetype)) {
         const response = new WithoutDataResource(
-          400,
+          422,
           "INVALID_FILE_TYPE",
           "Tipe File Salah",
           "File File hanya boleh JPG, JPEG, PNG, dan WebP."
         );
-        return res.status(400).json(response.toResponse());
+        return res.status(422).json(response.toResponse());
       }
       if (file.size > 10 * 1024 * 1024) {
         const response = new WithoutDataResource(
-          400,
+          422,
           "FILE_TOO_LARGE",
           "Ukuran File Terlalu Besar",
           "Ukuran maksimal tiap file adalah 10MB."
         );
-        return res.status(400).json(response.toResponse());
+        return res.status(422).json(response.toResponse());
       }
     }
 
@@ -146,12 +146,12 @@ exports.store = async (req, res) => {
       .first();
     if (exists) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "DUPLICATE_TITLE",
         "Duplikat Data",
         `Judul kategori '${title}' sudah digunakan. Silakan gunakan judul lain.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const uploadedDocuments = await documentHelper.uploadDocuments(
@@ -254,12 +254,12 @@ exports.update = async (req, res) => {
         .map((err) => err.msg)
         .join(" ");
       const response = new WithoutDataResource(
-        400,
+        422,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         message
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const existing = await trx("kmis_categories").where("id", id).first();
@@ -280,12 +280,12 @@ exports.update = async (req, res) => {
       .first();
     if (duplicate) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "DUPLICATE_TITLE",
         "Duplikat Data",
         `Judul '${title}' sudah digunakan pada kategori lain.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const deletedIds = toArray(deleteDocumentIds).map(String);
@@ -380,24 +380,24 @@ exports.destroy = async (req, res) => {
     if (ids.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_INPUT",
         "Gagal Menghapus Data",
         "Mohon kirimkan deleteIds berupa array ID numerik, misal: [1,2,3]."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const MAX_BULK = 50;
     if (ids.length > MAX_BULK) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "TOO_MANY_IDS",
         "Terlalu Banyak Data",
         `Maksimal id yang bisa dihapus adalah ${MAX_BULK} ID.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const existing = await trx("kmis_categories")
@@ -466,24 +466,24 @@ exports.restore = async (req, res) => {
     if (ids.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_INPUT",
         "Gagal Menghapus Data",
         "Mohon kirimkan restoreIds berupa array ID numerik, misal: [1,2,3]."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const MAX_BULK = 50;
     if (ids.length > MAX_BULK) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "TOO_MANY_IDS",
         "Terlalu Banyak Data",
         `Maksimal id yang bisa dikembalikan adalah ${MAX_BULK} ID.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const softDeleted = await trx("kmis_categories")
@@ -564,12 +564,12 @@ exports.restore = async (req, res) => {
 
     if (restoredCount === 0) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "DUPLICATE_NAME",
         "Restore Gagal",
         "Semua ID gagal direstore karena duplikat data dengan entri aktif atau duplikat data di dalam batch."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const descParts = [
@@ -637,7 +637,7 @@ async function validateFilesQuotaAndTypesOnUpdate({
   if (remaining === 0) {
     return {
       ok: false,
-      http: 400,
+      http: 422,
       code: "MAX_CAPACITY",
       title: "Kapasitas Sudah Penuh",
       desc: "Kapasitas file untuk data ini sudah terpenuhi. Tidak ada slot tersisa.",
@@ -649,7 +649,7 @@ async function validateFilesQuotaAndTypesOnUpdate({
     const s = remaining;
     return {
       ok: false,
-      http: 400,
+      http: 422,
       code: "UPLOAD_LIMIT_EXCEEDED",
       title: "Terlalu Banyak File",
       desc: `File yang diperbolehkan di upload adalah ${s} file.`,
@@ -661,7 +661,7 @@ async function validateFilesQuotaAndTypesOnUpdate({
     if (!allowedTypes.includes(f.mimetype)) {
       return {
         ok: false,
-        http: 400,
+        http: 422,
         code: "INVALID_FILE_TYPE",
         title: "Tipe File Salah",
         desc: `File hanya boleh bertipe: JPG, JPEG, PNG, dan WebP.`,
@@ -670,7 +670,7 @@ async function validateFilesQuotaAndTypesOnUpdate({
     if (f.size > sizeLimitBytes) {
       return {
         ok: false,
-        http: 400,
+        http: 422,
         code: "FILE_TOO_LARGE",
         title: "Ukuran File Terlalu Besar",
         desc: `Ukuran maksimal tiap file adalah ${Math.floor(

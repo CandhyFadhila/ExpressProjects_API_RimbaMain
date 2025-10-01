@@ -125,12 +125,12 @@ exports.store = async (req, res) => {
         .map((err) => err.msg)
         .join(" ");
       const response = new WithoutDataResource(
-        400,
+        422,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         message
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const type = String(materialTypes || "").toLowerCase();
@@ -174,7 +174,7 @@ exports.store = async (req, res) => {
       for (const f of files) {
         if (!allowed.includes(f.mimetype)) {
           throw new WithoutDataResource(
-            400,
+            422,
             "INVALID_FILE_TYPE",
             "Tipe File Salah",
             `${label} harus berformat: ${allowedExts}.`
@@ -182,7 +182,7 @@ exports.store = async (req, res) => {
         }
         if (f.size > MAX_SIZE) {
           throw new WithoutDataResource(
-            400,
+            422,
             "FILE_TOO_LARGE",
             "Ukuran File Terlalu Besar",
             `Ukuran maksimal tiap file pada ${label} adalah 10MB.`
@@ -196,12 +196,12 @@ exports.store = async (req, res) => {
     if (type === "gambar") {
       if (materiFiles.length === 0) {
         const r = new WithoutDataResource(
-          400,
+          422,
           "FILES_NOT_FOUND",
           "File Tidak Ditemukan",
           "Berkas materi (materialFiles) wajib diunggah untuk tipe gambar."
         );
-        return res.status(400).json(r.toResponse());
+        return res.status(422).json(r.toResponse());
       }
       checkFiles(materiFiles, IMAGE_TYPES, "Berkas materi (materialFiles)");
       if (coverFiles.length > 0)
@@ -209,30 +209,30 @@ exports.store = async (req, res) => {
     } else if (type === "dokumen") {
       if (materiFiles.length === 0) {
         const r = new WithoutDataResource(
-          400,
+          422,
           "FILES_NOT_FOUND",
           "File Tidak Ditemukan",
           "Berkas materi (materialFiles) wajib diunggah untuk tipe dokumen."
         );
-        return res.status(400).json(r.toResponse());
+        return res.status(422).json(r.toResponse());
       }
       if (coverFiles.length === 0) {
         const r = new WithoutDataResource(
-          400,
+          422,
           "FILES_NOT_FOUND",
           "File Tidak Ditemukan",
           "File cover (materialCovers) wajib diunggah untuk tipe dokumen."
         );
-        return res.status(400).json(r.toResponse());
+        return res.status(422).json(r.toResponse());
       }
       if (coverFiles.length > 1) {
         const r = new WithoutDataResource(
-          400,
+          422,
           "MAX_FILES",
           "Terlalu Banyak File",
           "Maksimal upload cover adalah 1 file."
         );
-        return res.status(400).json(r.toResponse());
+        return res.status(422).json(r.toResponse());
       }
       checkFiles(coverFiles, IMAGE_TYPES, "File cover (materialCovers)");
       checkFiles(materiFiles, DOC_TYPES, "Berkas materi (materialFiles)");
@@ -251,12 +251,12 @@ exports.store = async (req, res) => {
       .first();
     if (exists) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "DUPLICATE_TITLE",
         "Duplikat Data",
         `Judul materi '${title}' sudah digunakan. Silakan gunakan judul lain.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     let uploadedCoverIds = [];
@@ -330,7 +330,7 @@ exports.store = async (req, res) => {
   } catch (error) {
     await trx.rollback();
     if (error && typeof error.toResponse === "function") {
-      const status = error.status || error.statusCode || 400;
+      const status = error.status || error.statusCode || 422;
       return res.status(status).json(error.toResponse());
     }
 
@@ -413,12 +413,12 @@ exports.update = async (req, res) => {
         .map((err) => err.msg)
         .join(" ");
       const response = new WithoutDataResource(
-        400,
+        422,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         message
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const existing = await trx("kmis_materials").where("id", id).first();
@@ -475,7 +475,7 @@ exports.update = async (req, res) => {
       for (const f of files) {
         if (!allowed.includes(f.mimetype)) {
           throw new WithoutDataResource(
-            400,
+            422,
             "INVALID_FILE_TYPE",
             "Tipe File Salah",
             `${label} harus berformat: ${allowedExts}.`
@@ -483,7 +483,7 @@ exports.update = async (req, res) => {
         }
         if (f.size > MAX_SIZE) {
           throw new WithoutDataResource(
-            400,
+            422,
             "FILE_TOO_LARGE",
             "Ukuran File Terlalu Besar",
             `Ukuran maksimal tiap file pada ${label} adalah 10MB.`
@@ -499,13 +499,13 @@ exports.update = async (req, res) => {
         IMAGE_TYPES,
         "File cover (materialCovers)"
       );
-      if (err) return res.status(400).json(err.toResponse());
+      if (err) return res.status(422).json(err.toResponse());
       if (coverFiles.length > 1) {
         return res
-          .status(400)
+          .status(422)
           .json(
             new WithoutDataResource(
-              400,
+              422,
               "MAX_FILES",
               "Terlalu Banyak File",
               "Maksimal upload cover per request adalah 1 file."
@@ -520,7 +520,7 @@ exports.update = async (req, res) => {
         allow,
         "Berkas materi (materialFiles)"
       );
-      if (err) return res.status(400).json(err.toResponse());
+      if (err) return res.status(422).json(err.toResponse());
     }
 
     // ===== siapkan list lama =====
@@ -571,31 +571,31 @@ exports.update = async (req, res) => {
     if (type === "gambar") {
       if (newFileIds.length === 0) {
         const response = new WithoutDataResource(
-          400,
+          422,
           "FILES_REQUIRED",
           "File Wajib",
           "Untuk tipe 'gambar', minimal harus ada 1 berkas pada materialFiles."
         );
-        return res.status(400).json(response.toResponse());
+        return res.status(422).json(response.toResponse());
       }
     } else if (type === "dokumen") {
       if (newFileIds.length === 0) {
         const response = new WithoutDataResource(
-          400,
+          422,
           "FILES_REQUIRED",
           "File Wajib",
           "Untuk tipe 'dokumen', minimal harus ada 1 berkas pada materialFiles."
         );
-        return res.status(400).json(response.toResponse());
+        return res.status(422).json(response.toResponse());
       }
       if (newCoverIds.length === 0) {
         const response = new WithoutDataResource(
-          400,
+          422,
           "COVERS_REQUIRED",
           "Cover Wajib",
           "Untuk tipe 'dokumen', minimal harus ada 1 cover pada materialCovers."
         );
-        return res.status(400).json(response.toResponse());
+        return res.status(422).json(response.toResponse());
       }
     }
 
@@ -606,12 +606,12 @@ exports.update = async (req, res) => {
       .first();
     if (duplicate) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "DUPLICATE_TITLE",
         "Duplikat Data",
         `Judul '${title}' sudah digunakan pada topik lain.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     await trx("kmis_materials")
@@ -663,7 +663,7 @@ exports.update = async (req, res) => {
   } catch (error) {
     await trx.rollback();
     if (error && typeof error.toResponse === "function") {
-      const status = error.status || error.statusCode || 400;
+      const status = error.status || error.statusCode || 422;
       return res.status(status).json(error.toResponse());
     }
 
@@ -691,24 +691,24 @@ exports.destroy = async (req, res) => {
     if (ids.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_INPUT",
         "Gagal Menghapus Data",
         "Mohon kirimkan deleteIds berupa array ID numerik, misal: [1,2,3]."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const MAX_BULK = 50;
     if (ids.length > MAX_BULK) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "TOO_MANY_IDS",
         "Terlalu Banyak Data",
         `Maksimal id yang bisa dihapus adalah ${MAX_BULK} ID.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const existing = await trx("kmis_materials")
@@ -775,24 +775,24 @@ exports.restore = async (req, res) => {
     if (ids.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_INPUT",
         "Gagal Menghapus Data",
         "Mohon kirimkan restoreIds berupa array ID numerik, misal: [1,2,3]."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const MAX_BULK = 50;
     if (ids.length > MAX_BULK) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "TOO_MANY_IDS",
         "Terlalu Banyak Data",
         `Maksimal id yang bisa dikembalikan adalah ${MAX_BULK} ID.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const softDeleted = await trx("kmis_materials")
@@ -873,12 +873,12 @@ exports.restore = async (req, res) => {
 
     if (restoredCount === 0) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "DUPLICATE_NAME",
         "Restore Gagal",
         "Semua ID gagal direstore karena duplikat data dengan entri aktif atau duplikat data di dalam batch."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const descParts = [

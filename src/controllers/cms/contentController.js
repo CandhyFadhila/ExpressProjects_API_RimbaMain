@@ -64,7 +64,7 @@ function isEmpty(val) {
   );
 }
 
-function badRequest(res, code, title, message, http = 400) {
+function badRequest(res, code, title, message, http = 422) {
   const response = new WithoutDataResource(http, code, title, message);
   return res.status(http).json(response.toResponse());
 }
@@ -72,7 +72,7 @@ function badRequest(res, code, title, message, http = 400) {
 function validateFilesForType(type, files) {
   // return null jika OK; kalau ada error return WithoutDataResource
   const err = (code, title, msg) =>
-    new WithoutDataResource(400, code, title, msg);
+    new WithoutDataResource(422, code, title, msg);
 
   const mustExactlyOne = () => {
     if (files.length === 0)
@@ -262,7 +262,7 @@ function handleLink(content) {
   const ok = ensureHttpUrlOrNull(content);
   if (!ok) {
     const err = new WithoutDataResource(
-      400,
+      422,
       "INVALID_LINK",
       "URL Tidak Valid",
       "Nilai content untuk tipe Link harus URL valid (http/https)."
@@ -287,7 +287,7 @@ function handleText(rawContent) {
     )
   ) {
     const err = new WithoutDataResource(
-      400,
+      422,
       "INVALID_CONTENT_FORMAT",
       "Format Konten Salah",
       "Untuk tipe Text/TextArray, content harus objek dengan properti id dan en bertipe string."
@@ -306,7 +306,7 @@ function handleTextArray(rawContent) {
 
   if (!Array.isArray(arr)) {
     const err = new WithoutDataResource(
-      400,
+      422,
       "INVALID_CONTENT_FORMAT",
       "Format Konten Salah",
       "Untuk tipe TextArray, content harus array of object dengan properti id dan en bertipe string."
@@ -325,7 +325,7 @@ function handleTextArray(rawContent) {
 
   if (cleaned.length !== arr.length || cleaned.length === 0) {
     const err = new WithoutDataResource(
-      400,
+      422,
       "INVALID_CONTENT_ITEMS",
       "Elemen Konten Tidak Valid",
       "Setiap elemen harus objek dengan id dan en (string), dan minimal satu elemen valid."
@@ -365,7 +365,7 @@ exports.store = async (req, res) => {
     // 3) Validasi files per tipe
     const fileErr = validateFilesForType(type, files);
     if (fileErr) {
-      return res.status(400).json(fileErr.toResponse());
+      return res.status(422).json(fileErr.toResponse());
     }
 
     // 4) Proses sesuai tipe
@@ -382,17 +382,17 @@ exports.store = async (req, res) => {
       content_value = result.contentValue;
     } else if (type === "Link") {
       const result = handleLink(content);
-      if (result.error) return res.status(400).json(result.error.toResponse());
+      if (result.error) return res.status(422).json(result.error.toResponse());
       content_file_ids = result.contentFileIds;
       content_value = result.contentValue;
     } else if (type === "Text") {
       const result = handleText(content);
-      if (result.error) return res.status(400).json(result.error.toResponse());
+      if (result.error) return res.status(422).json(result.error.toResponse());
       content_file_ids = result.contentFileIds;
       content_value = result.contentValue;
     } else if (type === "TextArray") {
       const result = handleTextArray(content);
-      if (result.error) return res.status(400).json(result.error.toResponse());
+      if (result.error) return res.status(422).json(result.error.toResponse());
       content_file_ids = result.contentFileIds;
       content_value = result.contentValue;
     } else {
@@ -501,7 +501,7 @@ exports.update = async (req, res) => {
     // Normalisasi & validasi file (hanya jika ada upload)
     const files = normalizeFiles(req);
     const fileErr = validateUploadedFilesForUpdate(effType, files);
-    if (fileErr) return res.status(400).json(fileErr.toResponse());
+    if (fileErr) return res.status(422).json(fileErr.toResponse());
 
     // 1) Dokumen lama
     const oldIds = normIdArray(normJsonbArray(existing.content_file_ids), {
@@ -599,17 +599,17 @@ exports.update = async (req, res) => {
       content_value = JSON.stringify(urls);
     } else if (effType === "Link") {
       const built = handleLink(content);
-      if (built.error) return res.status(400).json(built.error.toResponse());
+      if (built.error) return res.status(422).json(built.error.toResponse());
       content_value = built.contentValue;
       content_file_ids = built.contentFileIds; // null
     } else if (effType === "Text") {
       const built = handleText(content);
-      if (built.error) return res.status(400).json(built.error.toResponse());
+      if (built.error) return res.status(422).json(built.error.toResponse());
       content_value = built.contentValue;
       content_file_ids = built.contentFileIds; // null
     } else if (effType === "TextArray") {
       const built = handleTextArray(content);
-      if (built.error) return res.status(400).json(built.error.toResponse());
+      if (built.error) return res.status(422).json(built.error.toResponse());
       content_value = built.contentValue;
       content_file_ids = built.contentFileIds; // null
     } else {

@@ -103,12 +103,12 @@ exports.store = async (req, res) => {
         .map((err) => err.msg)
         .join(" ");
       const response = new WithoutDataResource(
-        400,
+        422,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         message
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const nameNorm = handleLocalizedText(name, {
@@ -118,12 +118,12 @@ exports.store = async (req, res) => {
     });
     if (nameNorm.error) {
       const r = new WithoutDataResource(
-        400,
+        422,
         "INVALID_CONTENT_FORMAT",
         "Format Konten Salah",
         nameNorm.error.message
       );
-      return res.status(400).json(r.toResponse());
+      return res.status(422).json(r.toResponse());
     }
 
     const descNorm = handleLocalizedText(description, {
@@ -133,12 +133,12 @@ exports.store = async (req, res) => {
     });
     if (descNorm.error) {
       const r = new WithoutDataResource(
-        400,
+        422,
         "INVALID_CONTENT_FORMAT",
         "Format Konten Salah",
         descNorm.error.message
       );
-      return res.status(400).json(r.toResponse());
+      return res.status(422).json(r.toResponse());
     }
 
     const exists = await trx("cms_events_categories")
@@ -151,12 +151,12 @@ exports.store = async (req, res) => {
       .first();
     if (exists) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "DUPLICATE_TITLE",
         "Duplikat Data",
         "Nama kategori kegiatan ini sudah digunakan pada kategori lain."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     await trx("cms_events_categories").insert({
@@ -251,12 +251,12 @@ exports.update = async (req, res) => {
         .map((err) => err.msg)
         .join(" ");
       const response = new WithoutDataResource(
-        400,
+        422,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         message
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const existing = await trx("cms_events_categories").where("id", id).first();
@@ -287,12 +287,12 @@ exports.update = async (req, res) => {
       });
       if (norm.error) {
         const r = new WithoutDataResource(
-          400,
+          422,
           "INVALID_CONTENT_FORMAT",
           "Format Konten Salah",
           norm.error.message
         );
-        return res.status(400).json(r.toResponse());
+        return res.status(422).json(r.toResponse());
       }
       const n = { ...exName, ...norm.value };
       // abaikan string kosong yang dikirim
@@ -310,12 +310,12 @@ exports.update = async (req, res) => {
       // pastikan id & en akhir tidak kosong
       if (!n.id || !n.en) {
         const r = new WithoutDataResource(
-          400,
+          422,
           "INVALID_CONTENT_FORMAT",
           "Format Konten Salah",
           "Nama harus memiliki id dan en yang tidak kosong."
         );
-        return res.status(400).json(r.toResponse());
+        return res.status(422).json(r.toResponse());
       }
       nextName = { id: String(n.id).trim(), en: String(n.en).trim() };
     }
@@ -329,12 +329,12 @@ exports.update = async (req, res) => {
       });
       if (norm.error) {
         const r = new WithoutDataResource(
-          400,
+          422,
           "INVALID_CONTENT_FORMAT",
           "Format Konten Salah",
           norm.error.message
         );
-        return res.status(400).json(r.toResponse());
+        return res.status(422).json(r.toResponse());
       }
       const d = { ...exDesc, ...norm.value };
       if (
@@ -350,12 +350,12 @@ exports.update = async (req, res) => {
 
       if (!d.id || !d.en) {
         const r = new WithoutDataResource(
-          400,
+          422,
           "INVALID_CONTENT_FORMAT",
           "Format Konten Salah",
           "Deskripsi harus memiliki id dan en yang tidak kosong."
         );
-        return res.status(400).json(r.toResponse());
+        return res.status(422).json(r.toResponse());
       }
       nextDescription = { id: String(d.id).trim(), en: String(d.en).trim() };
     }
@@ -375,12 +375,12 @@ exports.update = async (req, res) => {
         .first();
       if (duplicate) {
         const response = new WithoutDataResource(
-          400,
+          422,
           "DUPLICATE_TITLE",
           "Duplikat Data",
           "Nama kategori berita (ID/EN) sudah digunakan pada kategori lain."
         );
-        return res.status(400).json(response.toResponse());
+        return res.status(422).json(response.toResponse());
       }
     }
 
@@ -433,24 +433,24 @@ exports.destroy = async (req, res) => {
     if (ids.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_INPUT",
         "Gagal Menghapus Data",
         "Mohon kirimkan deleteIds berupa array ID numerik, misal: [1,2,3]."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const MAX_BULK = 50;
     if (ids.length > MAX_BULK) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "TOO_MANY_IDS",
         "Terlalu Banyak Data",
         `Maksimal id yang bisa dihapus adalah ${MAX_BULK} ID.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const existing = await trx("cms_events_categories")
@@ -517,24 +517,24 @@ exports.restore = async (req, res) => {
     if (ids.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_INPUT",
         "Gagal Menghapus Data",
         "Mohon kirimkan restoreIds berupa array ID numerik, misal: [1,2,3]."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const MAX_BULK = 50;
     if (ids.length > MAX_BULK) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "TOO_MANY_IDS",
         "Terlalu Banyak Data",
         `Maksimal id yang bisa dikembalikan adalah ${MAX_BULK} ID.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const softDeleted = await trx("cms_events_categories")
@@ -678,12 +678,12 @@ exports.restore = async (req, res) => {
 
     if (restoredCount === 0) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "DUPLICATE_NAME",
         "Restore Gagal",
         "Semua ID gagal direstore karena duplikat data dengan entri aktif atau duplikat data di dalam batch."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const descParts = [

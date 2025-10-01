@@ -9,12 +9,12 @@ module.exports = (req, res, next) => {
       .map((err) => err.msg)
       .join(" ");
     const response = new WithoutDataResource(
-      400,
+      422,
       "FAILED_VALIDATION",
       "Format Data Tidak Sesuai Ketentuan",
       message
     );
-    return res.status(400).json(response.toResponse());
+    return res.status(422).json(response.toResponse());
   }
   next();
 };

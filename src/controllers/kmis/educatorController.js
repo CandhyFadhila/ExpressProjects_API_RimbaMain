@@ -103,12 +103,12 @@ exports.store = async (req, res) => {
         .map((err) => err.msg)
         .join(" ");
       const response = new WithoutDataResource(
-        400,
+        422,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         message
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const exists = await trx("users")
@@ -117,12 +117,12 @@ exports.store = async (req, res) => {
       .first();
     if (exists) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "DUPLICATE_EMAIL",
         "Duplikat Data",
         `Email '${email}' sudah digunakan oleh akun pengajar lain. Silakan gunakan email lain.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const displayName = stripTitlesOnly(name);
@@ -254,12 +254,12 @@ exports.update = async (req, res) => {
         .map((err) => err.msg)
         .join(" ");
       const response = new WithoutDataResource(
-        400,
+        422,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         message
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const existing = await trx("users")
@@ -283,12 +283,12 @@ exports.update = async (req, res) => {
       .first();
     if (duplicate) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "DUPLICATE_TITLE",
         "Duplikat Data",
         `Email '${email}' sudah digunakan pada pengguna lain.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const patch = {
@@ -354,24 +354,24 @@ exports.destroy = async (req, res) => {
     if (ids.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_INPUT",
         "Gagal Menghapus Data",
         "Mohon kirimkan deleteIds berupa array ID numerik, misal: [1,2,3]."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const MAX_BULK = 50;
     if (ids.length > MAX_BULK) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "TOO_MANY_IDS",
         "Terlalu Banyak Data",
         `Maksimal id yang bisa dihapus adalah ${MAX_BULK} ID.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const alreadyDeleted = await trx("users")
@@ -467,24 +467,24 @@ exports.restore = async (req, res) => {
     if (ids.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_INPUT",
         "Gagal Menghapus Data",
         "Mohon kirimkan restoreIds berupa array ID numerik, misal: [1,2,3]."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const MAX_BULK = 50;
     if (ids.length > MAX_BULK) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "TOO_MANY_IDS",
         "Terlalu Banyak Data",
         `Maksimal id yang bisa dikembalikan adalah ${MAX_BULK} ID.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const alreadyRestored = await trx("users")
@@ -596,12 +596,12 @@ exports.restore = async (req, res) => {
 
     if (restoredCount === 0) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "DUPLICATE_EMAIL",
         "Restore Gagal",
         "Semua ID gagal direstore karena duplikat email dengan entri aktif atau duplikat email di dalam batch."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const descParts = [
@@ -644,24 +644,24 @@ exports.deactivateAccount = async (req, res) => {
     if (ids.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_INPUT",
         "Gagal Menghapus Data",
         "Mohon kirimkan deactivateAccountIds berupa array ID numerik, misal: [1,2,3]."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const MAX_BULK = 50;
     if (ids.length > MAX_BULK) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "TOO_MANY_IDS",
         "Terlalu Banyak Data",
         `Maksimal id yang bisa dihapus adalah ${MAX_BULK} ID.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const alreadyInactive = await trx("users")
@@ -769,24 +769,24 @@ exports.activateAccount = async (req, res) => {
     if (ids.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_INPUT",
         "Gagal Menghapus Data",
         "Mohon kirimkan activateAccountIds berupa array ID numerik, misal: [1,2,3]."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const MAX_BULK = 50;
     if (ids.length > MAX_BULK) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        400,
+        422,
         "TOO_MANY_IDS",
         "Terlalu Banyak Data",
         `Maksimal id yang bisa dihapus adalah ${MAX_BULK} ID.`
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const alreadyActive = await trx("users")

@@ -39,12 +39,12 @@ exports.createAccount = async (req, res) => {
         .map((err) => err.msg)
         .join(" ");
       const response = new WithoutDataResource(
-        400,
+        422,
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         message
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const existed = await trx("users")
@@ -413,12 +413,12 @@ exports.sendOTP = async (req, res) => {
 
   if (!email || !validator.isEmail(email)) {
     const response = new WithoutDataResource(
-      400,
-      "VALIDATION_FAILED",
+      422,
+      "FAILED_VALIDATION",
       "Pengiriman OTP Gagal",
       "Email tidak valid atau kosong. Pastikan Anda mengisi email dengan benar."
     );
-    return res.status(400).json(response.toResponse());
+    return res.status(422).json(response.toResponse());
   }
 
   try {
@@ -528,12 +528,12 @@ exports.verifyOTP = async (req, res) => {
     if (!storedHashedOtp) {
       logger.info(`| Verify OTP | - OTP not found for user ${email}`);
       const response = new WithoutDataResource(
-        400,
-        "DATA_NOT_FOUND",
+        422,
+        "OTP_NOT_FOUND",
         "OTP Tidak Ditemukan",
         "Kode OTP tidak ditemukan atau sudah kadaluarsa. Silakan kirim ulang OTP."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const hash = crypto.createHash("sha256").update(String(otp)).digest("hex");
@@ -541,12 +541,12 @@ exports.verifyOTP = async (req, res) => {
     if (hash !== storedHashedOtp) {
       logger.info(`| Verify OTP | - Incorrect OTP for user ${email}`);
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_OTP",
         "OTP Tidak Valid",
         "Kode OTP yang anda masukkan tidak sesuai."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     logger.info(`| Verify OTP | - Success for user ${email}`);
@@ -609,12 +609,12 @@ exports.resetPassword = async (req, res) => {
     const storedHashedOtp = await redisClient.get(key);
     if (!storedHashedOtp) {
       const response = new WithoutDataResource(
-        400,
+        422,
         "OTP_NOT_FOUND",
         "OTP Tidak Ditemukan",
         "Kode OTP tidak ditemukan atau sudah kadaluarsa. Silakan kirim ulang OTP."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const hashedInputOtp = crypto
@@ -700,12 +700,12 @@ async function signInWithContext(
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       const response = new WithoutDataResource(
-        400,
-        "VALIDATION_FAILED",
+        422,
+        "FAILED_VALIDATION",
         "Login Gagal.",
         "Tolong periksa kembali input anda. Pastikan email dan password terisi dengan benar."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
   }
 
@@ -720,12 +720,12 @@ async function signInWithContext(
         `| Login | - Invalid credentials for email: ${email}, at ${new Date().toISOString()}`
       );
       const response = new WithoutDataResource(
-        400,
+        422,
         "INVALID_CREDENTIALS",
         "Login Gagal.",
         "Password atau email yang anda masukkan tidak valid, silahkan periksa kembali dan pastikan akun anda sudah terdaftar."
       );
-      return res.status(400).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     // Validasi status akun: 1 (nonaktif) dan 3 (suspended) -> TOLAK
@@ -783,12 +783,12 @@ async function signInWithContext(
           `| Login | - Invalid credentials for email: ${email}, at ${new Date().toISOString()}`
         );
         const response = new WithoutDataResource(
-          400,
+          422,
           "INVALID_CREDENTIALS",
           "Login Gagal.",
           "Password atau email yang anda masukkan tidak valid, silahkan periksa kembali dan pastikan akun anda sudah terdaftar."
         );
-        return res.status(400).json(response.toResponse());
+        return res.status(422).json(response.toResponse());
       }
     }
 
