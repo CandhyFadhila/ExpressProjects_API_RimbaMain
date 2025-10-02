@@ -1,30 +1,25 @@
 const knex = require("../../config/database");
-const quizResource = require("../../resources/kmis/quizResource");
+const quizResource = require("../kmis/quizResource");
+const quizParticipantResource = require("../kmis/quizParticipantResource");
 
-/**
- * @param {Object} quizResponse - row dari kmis_quiz_responses
- * @param {Object} [opts]
- * @param {Object|null} [opts.quizRow] - row kmis_quiz yang sudah di-preload (optional)
- * @param {boolean} [opts.includeQuiz=true] - kalau false, field quiz = null tanpa load
- */
-async function quizResponseResource(quizResponse, opts = {}) {
-  const { quizRow = null, includeQuiz = true } = opts;
-
-  let quiz = null;
-  if (includeQuiz) {
-    if (quizRow) {
-      quiz = await quizResource(quizRow);
-    } else if (quizResponse.kmis_quiz_id) {
-      const row = await knex("kmis_quiz")
-        .where("id", quizResponse.kmis_quiz_id)
-        .first();
-      quiz = row ? await quizResource(row) : null;
-    }
-  }
+async function quizResponseResource(quizResponse) {
+  const [quiz, quizParticipant] = await Promise.all([
+    quizResponse.kmis_quiz_id
+      ? knex("kmis_quiz").where("id", quizResponse.kmis_quiz_id).first()
+      : null,
+    quizResponse.kmis_quiz_attempt_id
+      ? knex("kmis_quiz_attempts")
+          .where("id", quizResponse.kmis_quiz_attempt_id)
+          .first()
+      : null,
+  ]);
 
   return {
     id: quizResponse.id,
-    quiz,
+    quizParticipant: quizParticipant
+      ? await quizParticipantResource(quizParticipant)
+      : null,
+    quiz: quiz ? await quizResource(quiz) : null,
     selectedOption: quizResponse.selected_option,
     isMarker: quizResponse.is_marker,
     isCorrect: quizResponse.is_correct,

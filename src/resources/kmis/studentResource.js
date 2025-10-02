@@ -10,10 +10,10 @@ async function studentResource(student) {
     .select(
       knex.raw("COUNT(*)::int AS total_attempts"),
       knex.raw(
-        "SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END)::int AS total_finished"
+        "SUM(CASE WHEN attempt_status = 2 THEN 1 ELSE 0 END)::int AS total_finished"
       ),
       knex.raw(
-        "COALESCE(AVG(CASE WHEN status = 2 THEN score_total END), 0)::double precision AS avg_score_finished"
+        "COALESCE(AVG(CASE WHEN attempt_status = 2 THEN score_total END), 0)::double precision AS avg_score_finished"
       ),
       knex.raw("COUNT(DISTINCT kmis_topic_id)::int AS total_topics_taken")
     )

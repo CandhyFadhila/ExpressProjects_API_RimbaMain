@@ -4,6 +4,7 @@ const logger = require("../../utils/logger");
 const {
   applySearch,
   applyPagination,
+  applyRelationIn,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
 const { formatTanggalIndonesia } = require("../../helpers/dateHelper");
@@ -11,17 +12,24 @@ const { stripTitlesOnly } = require("../../helpers/credentialHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const quizParticipantResource = require("../../resources/kmis/quizParticipantResource");
+const quizResponseResource = require("../../resources/kmis/quizResponseResource");
 // const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 
 exports.index = async (req, res) => {
-  const { search } = req.query;
+  const { search, topicId } = req.query;
 
   try {
     let query = knex("kmis_quiz_attempts as quizParticipant")
       .leftJoin("users as user", "quizParticipant.attempt_by", "user.id")
+      .leftJoin(
+        "kmis_topics as topic",
+        "quizParticipant.kmis_topic_id",
+        "topic.id"
+      )
       .select(
         "quizParticipant.id",
         "quizParticipant.attempt_by",
+        "quizParticipant.kmis_topic_id",
         "quizParticipant.attempt_status",
         "quizParticipant.assessment_status",
         "quizParticipant.started_at",
@@ -32,6 +40,8 @@ exports.index = async (req, res) => {
         "quizParticipant.wrong_count",
         "quizParticipant.empty_count",
         "quizParticipant.score_total",
+        "quizParticipant.feedback",
+        "quizParticipant.certificate_ids",
         "quizParticipant.deleted_at",
         "quizParticipant.created_at",
         "quizParticipant.updated_at"
@@ -40,7 +50,11 @@ exports.index = async (req, res) => {
 
     // applyTrashedScope(query, req, "quizParticipant.deleted_at");
 
-    applySearch(query, search, ["user.name"]);
+    applyRelationIn(query, "quiz.kmis_topic_id", topicId, {
+      as: "number",
+    });
+
+    applySearch(query, search, ["user.name", "topic.title"]);
 
     const paginationInfo = applyPagination(query, req.query);
 
@@ -86,8 +100,77 @@ exports.index = async (req, res) => {
   }
 };
 
+exports.show = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const attempt = await knex("kmis_quiz_attempts")
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!attempt) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data partisipan ujian dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const rows = await knex("kmis_quiz_responses as r")
+      .select([
+        "r.id",
+        "r.kmis_quiz_attempt_id",
+        "r.kmis_quiz_id",
+        "r.selected_option",
+        "r.is_marker",
+        "r.is_correct",
+        "r.answered_at",
+        "r.created_at",
+        "r.updated_at",
+        "r.deleted_at",
+      ])
+      .where("r.kmis_quiz_attempt_id", id)
+      .whereNull("r.deleted_at")
+      .orderBy("r.answered_at", "asc");
+    if (rows.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data jawaban kuis untuk attempt '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      rows.map((row) => quizResponseResource(row))
+    );
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Detail jawaban kuis yang dikerjakan peserta berhasil didapatkan.",
+      serializedData
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Quiz Partisipant KMIS | - Error function show: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
 // TODO Refactor ini, karena quizcategory sudah tidak ada
-// tidak langsung di download, melainkan simpan di tabel kmis_certificates
+// tidak langsung di download, melainkan simpan di kolom certificate_ids
 exports.generateCertificate = async (req, res) => {
   const { id } = req.params;
 
