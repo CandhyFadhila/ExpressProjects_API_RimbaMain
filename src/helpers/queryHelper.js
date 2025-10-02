@@ -185,7 +185,7 @@ function applyJsonbSearch(queryBuilder, search, exprs, opts = {}) {
 function applyPagination(queryBuilder, { page = 1, limit = 10 }) {
   const offset = (page - 1) * limit;
   queryBuilder.limit(limit).offset(offset);
-  return { page: parseInt(page), limit: parseInt(limit) };
+  return { page: Math.max(parseInt(page), 1), limit: parseInt(limit) };
 }
 
 async function formatPaginationResult(
@@ -199,7 +199,7 @@ async function formatPaginationResult(
     .from(queryBuilder.clone().clearSelect().clearOrder().as("subquery"));
 
   const total = parseInt(count);
-  const lastPage = Math.ceil(total / paginationInfo.limit);
+  const lastPage = total === 0 ? 1 : Math.ceil(total / paginationInfo.limit);
 
   return {
     data,

@@ -26,26 +26,7 @@ exports.index = async (req, res) => {
         "quizParticipant.kmis_topic_id",
         "topic.id"
       )
-      .select(
-        "quizParticipant.id",
-        "quizParticipant.attempt_by",
-        "quizParticipant.kmis_topic_id",
-        "quizParticipant.attempt_status",
-        "quizParticipant.assessment_status",
-        "quizParticipant.started_at",
-        "quizParticipant.finished_at",
-        "quizParticipant.duration",
-        "quizParticipant.questions_answered",
-        "quizParticipant.correct_count",
-        "quizParticipant.wrong_count",
-        "quizParticipant.empty_count",
-        "quizParticipant.score_total",
-        "quizParticipant.feedback",
-        "quizParticipant.certificate_ids",
-        "quizParticipant.deleted_at",
-        "quizParticipant.created_at",
-        "quizParticipant.updated_at"
-      )
+      .select("*")
       .orderBy("quizParticipant.created_at", "desc");
 
     // applyTrashedScope(query, req, "quizParticipant.deleted_at");
