@@ -1,23 +1,23 @@
 const knex = require("../../config/database");
 const quizResource = require("../kmis/quizResource");
-const quizParticipantResource = require("../kmis/quizParticipantResource");
+const learningParticipantResource = require("../kmis/learningParticipantResource");
 
 async function quizResponseResource(quizResponse) {
-  const [quiz, quizParticipant] = await Promise.all([
+  const [quiz, learningParticipant] = await Promise.all([
     quizResponse.kmis_quiz_id
       ? knex("kmis_quiz").where("id", quizResponse.kmis_quiz_id).first()
       : null,
-    quizResponse.kmis_quiz_attempt_id
-      ? knex("kmis_quiz_attempts")
-          .where("id", quizResponse.kmis_quiz_attempt_id)
+    quizResponse.kmis_learning_attempt_id
+      ? knex("kmis_learning_attempts")
+          .where("id", quizResponse.kmis_learning_attempt_id)
           .first()
       : null,
   ]);
 
   return {
     id: quizResponse.id,
-    quizParticipant: quizParticipant
-      ? await quizParticipantResource(quizParticipant)
+    learningParticipant: learningParticipant
+      ? await learningParticipantResource(learningParticipant)
       : null,
     quiz: quiz ? await quizResource(quiz) : null,
     selectedOption: quizResponse.selected_option,

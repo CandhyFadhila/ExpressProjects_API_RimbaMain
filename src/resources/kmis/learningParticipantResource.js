@@ -2,11 +2,11 @@ const knex = require("../../config/database");
 const {
   resolveArrayRelations,
 } = require("../../helpers/resolveArrayRelations");
-const documentResource = require("../../resources/doc/documentResource");
+const documentResource = require("../doc/documentResource");
 const UserResource = require("../auth/UserResource");
 const topicResource = require("./topicResource");
 
-async function quizParticipantResource(quizParticipant) {
+async function learningParticipantResource(quizParticipant) {
   const [user, topic] = await Promise.all([
     quizParticipant.attempt_by
       ? knex("users").where("id", quizParticipant.attempt_by).first()
@@ -22,20 +22,22 @@ async function quizParticipantResource(quizParticipant) {
     documentResource
   );
 
+  // TODO: Buat fitur student (create learning quiz) dulu baru bisa di test
   return {
     id: quizParticipant.id,
     attemptUser: user ? await UserResource(user) : null,
     topic: topic ? await topicResource(topic) : null,
-    totalCourse: quizParticipant.total_course,
+    attemptStatus: quizParticipant.quiz_attempt_status,
+    assessmentStatus: quizParticipant.quiz_assessment_status,
+    totalMaterial: quizParticipant.total_material,
     totalQuiz: quizParticipant.total_quiz,
-    completedCourse: quizParticipant.completed_course,
+    completedMaterial: quizParticipant.completed_material,
     completedQuiz: quizParticipant.completed_quiz,
-    attemptStatus: quizParticipant.attempt_status,
-    assessmentStatus: quizParticipant.assessment_status,
-    startedAt: quizParticipant.started_at,
-    finishedAt: quizParticipant.finished_at,
-    duration: quizParticipant.duration,
-    totalQuestions: quizParticipant.total_questions,
+    quizStarted: quizParticipant.quiz_started,
+    quizFinished: quizParticipant.quiz_finished,
+    quizDuration: quizParticipant.quiz_duration,
+    totalQuestion: quizParticipant.total_questions,
+    questionsAnswered: quizParticipant.questions_answered,
     correctCount: quizParticipant.correct_count,
     wrongCount: quizParticipant.wrong_count,
     emptyCount: quizParticipant.empty_count,
@@ -48,4 +50,4 @@ async function quizParticipantResource(quizParticipant) {
   };
 }
 
-module.exports = quizParticipantResource;
+module.exports = learningParticipantResource;

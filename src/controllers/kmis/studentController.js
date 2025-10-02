@@ -51,7 +51,7 @@ exports.index = async (req, res) => {
     const ids = result.data.map((r) => r.id);
 
     // Hitung total topic per user sekali saja
-    const totals = await knex("kmis_quiz_attempts")
+    const totals = await knex("kmis_learning_attempts")
       .whereIn("attempt_by", ids)
       .whereNull("deleted_at")
       .groupBy("attempt_by")

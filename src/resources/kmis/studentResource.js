@@ -4,16 +4,16 @@ const UserResource = require("../../resources/auth/UserResource");
 async function studentResource(student) {
   const user = await knex("users").where("id", student.id).first();
 
-  const statsRow = await knex("kmis_quiz_attempts")
+  const statsRow = await knex("kmis_learning_attempts")
     .where("attempt_by", user.id)
     .whereNull("deleted_at")
     .select(
       knex.raw("COUNT(*)::int AS total_attempts"),
       knex.raw(
-        "SUM(CASE WHEN attempt_status = 2 THEN 1 ELSE 0 END)::int AS total_finished"
+        "SUM(CASE WHEN quiz_attempt_status = 2 THEN 1 ELSE 0 END)::int AS total_finished"
       ),
       knex.raw(
-        "COALESCE(AVG(CASE WHEN attempt_status = 2 THEN score_total END), 0)::double precision AS avg_score_finished"
+        "COALESCE(AVG(CASE WHEN quiz_attempt_status = 2 THEN score_total END), 0)::double precision AS avg_score_finished"
       ),
       knex.raw("COUNT(DISTINCT kmis_topic_id)::int AS total_topics_taken")
     )

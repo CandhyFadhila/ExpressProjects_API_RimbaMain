@@ -13,7 +13,7 @@ const educatorRoutes = require("./routes/kmis/educatorRoutes");
 const studentRoutes = require("./routes/kmis/studentRoutes");
 const materialRoutes = require("./routes/kmis/materialRoutes");
 const quizRoutes = require("./routes/kmis/quizRoutes");
-const quizParticipantRoutes = require("./routes/kmis/quizParticipantRoutes");
+const learningParticipantRoutes = require("./routes/kmis/learningParticipantRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const newsCategoryRoutes = require("./routes/masterData/newsCategoryRoutes");
 const eventCategoryRoutes = require("./routes/masterData/eventCategoryRoutes");
@@ -126,8 +126,8 @@ app.use("/api/kmis/material", materialRoutes);
 // Quiz
 app.use("/api/kmis/quiz", quizRoutes);
 
-// Quiz Participant
-app.use("/api/kmis/quiz-participant", quizParticipantRoutes);
+// Learning Participant // TODO: Buat fitur student (create learning quiz) dulu baru bisa di test
+app.use("/api/kmis/learning-participant", learningParticipantRoutes);
 //! ======== KMIS MODULE ========
 
 //! ======== MASTER DATA MODULE ========
