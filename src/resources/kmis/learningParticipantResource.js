@@ -22,7 +22,6 @@ async function learningParticipantResource(quizParticipant) {
     documentResource
   );
 
-  // TODO: Buat fitur student (create learning quiz) dulu baru bisa di test
   return {
     id: quizParticipant.id,
     attemptUser: user ? await UserResource(user) : null,
@@ -30,13 +29,11 @@ async function learningParticipantResource(quizParticipant) {
     attemptStatus: quizParticipant.quiz_attempt_status,
     assessmentStatus: quizParticipant.quiz_assessment_status,
     totalMaterial: quizParticipant.total_material,
-    totalQuiz: quizParticipant.total_quiz,
     completedMaterial: quizParticipant.completed_material,
     completedQuiz: quizParticipant.completed_quiz,
     quizStarted: quizParticipant.quiz_started,
     quizFinished: quizParticipant.quiz_finished,
     quizDuration: quizParticipant.quiz_duration,
-    totalQuestion: quizParticipant.total_questions,
     questionsAnswered: quizParticipant.questions_answered,
     correctCount: quizParticipant.correct_count,
     wrongCount: quizParticipant.wrong_count,

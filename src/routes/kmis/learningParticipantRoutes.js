@@ -7,7 +7,6 @@ const requirePermission = require("../../middlewares/requirePermission");
 
 router.use(rateLimiter, authMiddleware);
 
-// TODO: Buat fitur student (create learning quiz) dulu baru bisa di test
 router.get(
   "/index",
   requirePermission(["view.kmis_quiz"]),

@@ -91,6 +91,7 @@ exports.index = async (req, res) => {
   }
 };
 
+// TODO: Buat helper untuk cek email (gmail) valid atau tidak
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
   const { name, email } = req.body;
@@ -243,7 +244,7 @@ exports.show = async (req, res) => {
 
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
-  const { name, email, accountStatus } = req.body;
+  const { name, email } = req.body;
   const id = req.params.id;
 
   try {
@@ -297,14 +298,6 @@ exports.update = async (req, res) => {
       updated_at: trx.fn.now(),
     };
 
-    if (accountStatus === true) {
-      patch.account_status = 2;
-      patch.deactivate_at = null;
-    } else {
-      patch.account_status = 3;
-      patch.deactivate_at = trx.fn.now();
-    }
-
     await trx("users").where("id", id).update(patch);
 
     await activityLogHelper.logUpdate(
@@ -321,12 +314,8 @@ exports.update = async (req, res) => {
     const response = new WithoutDataResource(
       200,
       "SUCCESS_UPDATE_DATA",
-      accountStatus
-        ? "Berhasil Mengaktifkan Akun"
-        : "Berhasil Menonaktifkan Akun",
-      accountStatus
-        ? `Akun pengajar dengan email '${email}' berhasil diaktifkan dan datanya diperbarui.`
-        : `Akun pengajar dengan email '${email}' berhasil dinonaktifkan dan datanya diperbarui.`
+      "Berhasil Memperbarui Data",
+      `Akun pengajar dengan email '${email}' berhasil diperbarui.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {

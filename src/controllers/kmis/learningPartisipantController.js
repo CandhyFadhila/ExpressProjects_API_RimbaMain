@@ -12,7 +12,6 @@ const learningParticipantResource = require("../../resources/kmis/learningPartic
 const quizResponseResource = require("../../resources/kmis/quizResponseResource");
 // const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 
-// TODO: Buat fitur student (create learning quiz) dulu baru bisa di test
 exports.index = async (req, res) => {
   const { search, topicId } = req.query;
 

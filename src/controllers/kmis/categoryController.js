@@ -99,6 +99,20 @@ exports.store = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
+    const exists = await trx("kmis_categories")
+      .whereRaw("lower(title) = lower(?)", [title])
+      .whereNull("deleted_at")
+      .first();
+    if (exists) {
+      const response = new WithoutDataResource(
+        422,
+        "DUPLICATE_TITLE",
+        "Duplikat Data",
+        `Judul kategori '${title}' sudah digunakan. Silakan gunakan judul lain.`
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
     if (!req.files || req.files.length === 0) {
       const response = new WithoutDataResource(
         422,
@@ -119,7 +133,12 @@ exports.store = async (req, res) => {
     }
 
     for (const file of req.files) {
-      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+      const allowedTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+      ];
       if (!allowedTypes.includes(file.mimetype)) {
         const response = new WithoutDataResource(
           422,
@@ -138,20 +157,6 @@ exports.store = async (req, res) => {
         );
         return res.status(422).json(response.toResponse());
       }
-    }
-
-    const exists = await trx("kmis_categories")
-      .whereRaw("lower(title) = lower(?)", [title])
-      .whereNull("deleted_at")
-      .first();
-    if (exists) {
-      const response = new WithoutDataResource(
-        422,
-        "DUPLICATE_TITLE",
-        "Duplikat Data",
-        `Judul kategori '${title}' sudah digunakan. Silakan gunakan judul lain.`
-      );
-      return res.status(422).json(response.toResponse());
     }
 
     const uploadedDocuments = await documentHelper.uploadDocuments(

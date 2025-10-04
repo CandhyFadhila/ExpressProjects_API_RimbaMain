@@ -101,6 +101,20 @@ exports.store = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
+    const exists = await trx("kmis_topics")
+      .whereRaw("lower(title) = lower(?)", [title])
+      .whereNull("deleted_at")
+      .first();
+    if (exists) {
+      const response = new WithoutDataResource(
+        422,
+        "DUPLICATE_TITLE",
+        "Duplikat Data",
+        `Judul topik '${title}' sudah digunakan. Silakan gunakan judul lain.`
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
     if (!req.files || req.files.length === 0) {
       const response = new WithoutDataResource(
         422,
@@ -145,20 +159,6 @@ exports.store = async (req, res) => {
         );
         return res.status(422).json(response.toResponse());
       }
-    }
-
-    const exists = await trx("kmis_topics")
-      .whereRaw("lower(title) = lower(?)", [title])
-      .whereNull("deleted_at")
-      .first();
-    if (exists) {
-      const response = new WithoutDataResource(
-        422,
-        "DUPLICATE_TITLE",
-        "Duplikat Data",
-        `Judul topik '${title}' sudah digunakan. Silakan gunakan judul lain.`
-      );
-      return res.status(422).json(response.toResponse());
     }
 
     const uploadedDocuments = await documentHelper.uploadDocuments(
@@ -249,7 +249,8 @@ exports.show = async (req, res) => {
 
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
-  const { title, description, categoryId, totalQuiz, deleteDocumentIds } = req.body;
+  const { title, description, categoryId, totalQuiz, deleteDocumentIds } =
+    req.body;
   const id = req.params.id;
 
   try {

@@ -4,20 +4,7 @@
     <meta charset="utf-8" />
     <meta name="x-apple-disable-message-reformatting" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Credential Akun Baru</title>
-    <span
-      style="
-        display: none !important;
-        visibility: hidden;
-        opacity: 0;
-        color: transparent;
-        height: 0;
-        width: 0;
-        overflow: hidden;
-      "
-    >
-      Credential akun Rimba {{name}}.
-    </span>
+    <title>Sertifikat Kelulusan KMIS</title>
   </head>
   <body style="margin: 0; padding: 0; background: #f6f7f9">
     <table
@@ -153,7 +140,7 @@
                 >
                   Subject:
                   <span style="font-weight: 400; color: #333"
-                    >Credential Akun Baru Rimba</span
+                    >Sertifikat Kelulusan KMIS</span
                   >
                 </div>
               </td>
@@ -172,7 +159,7 @@
             <tr>
               <td
                 style="
-                  padding: 24px 24px 8px 24px;
+                  padding: 24px 24px 0px 24px;
                   font: 400 15px/1.7 Arial, sans-serif;
                   color: #0a0a0a;
                 "
@@ -180,51 +167,19 @@
                 <p style="margin: 0 0 16px 0">
                   Kepada <strong>{{name}}</strong>,
                 </p>
-                <p style="margin: 0 0 16px 0">
-                  Terima kasih telah bergabung bersama kami. Akun
-                  <strong>Rimba</strong> Anda telah diperbarui dengan role
-                  <strong>{{role_name}}</strong>, dikarenakan email anda
-                  berhasil diubah. Silakan gunakan kredensial sementara di bawah
-                  ini untuk reset kata sandi baru.
+                <p style="margin: 0 0 10px 0">
+                  Selamat! Anda telah berhasil menyelesaikan kuis/topik
+                  <strong>{{topic_name}}</strong>. Sertifikat kelulusan Anda
+                  telah <strong>diterbitkan</strong> dan dilampirkan pada email
+                  ini. Anda juga dapat mengunduh atau melihat sertifikat lainnya melalui
+                  portal <strong>Rimba</strong>.
                 </p>
-              </td>
-            </tr>
-
-            <!-- Credential badge -->
-            <tr>
-              <td style="padding: 0 24px 8px 24px">
-                <div
-                  style="
-                    background: #568d5d;
-                    color: #ffffff;
-                    border-radius: 6px;
-                    padding: 14px 16px;
-                    font: 700 16px/1.4 Arial, sans-serif;
-                    text-align: left;
-                  "
-                >
-                  <div style="margin: 2px 0">
-                    Email: <span style="font-weight: 900">{{email}}</span>
-                  </div>
-                  <div style="margin: 2px 0">
-                    Password: <span style="font-weight: 900">{{password}}</span>
-                  </div>
-                </div>
-                <div
-                  style="
-                    font: 400 12px/1.6 Arial, sans-serif;
-                    color: #3b3b3b;
-                    margin-top: 8px;
-                  "
-                >
-                  Demi keamanan, segera ganti kata sandi anda.
-                </div>
               </td>
             </tr>
 
             <!-- CTA -->
             <tr>
-              <td align="left" style="padding: 8px 24px 8px 24px">
+              <td align="left" style="padding: 0px 24px 16px 24px">
                 <a
                   href="https://rimba-atrbpn.vercel.app"
                   target="_blank"
@@ -240,24 +195,6 @@
                 >
                   Masuk ke Portal Rimba
                 </a>
-              </td>
-            </tr>
-
-            <!-- Extra info -->
-            <tr>
-              <td
-                style="
-                  padding: 8px 24px 8px 24px;
-                  font: 400 14px/1.7 Arial, sans-serif;
-                  color: #444;
-                "
-              >
-                <p style="margin: 0 0 12px 0">
-                  Status akun Anda saat ini adalah
-                  <strong>Belum Diaktifkan</strong>. Jika Anda membutuhkan
-                  bantuan aktivasi atau tidak merasa meminta pembuatan akun ini,
-                  silakan hubungi admin.
-                </p>
               </td>
             </tr>
 

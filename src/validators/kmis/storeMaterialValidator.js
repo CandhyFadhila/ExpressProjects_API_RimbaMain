@@ -9,7 +9,7 @@ exports.storeMaterialValidator = [
 
     const raw = value == null ? "" : String(value).trim();
 
-    if (!isSuperAdmin && isEducator && raw === "") {
+    if (!isEducator && isSuperAdmin && raw === "") {
       throw new Error("Pengajar wajib diisi.");
     }
 

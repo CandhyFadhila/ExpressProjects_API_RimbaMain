@@ -64,10 +64,10 @@ exports.storeQuizValidator = [
   body("correctOption")
     .trim()
     .notEmpty()
-    .withMessage("Tipe konten tidak boleh kosong.")
+    .withMessage("Jawaban tidak boleh kosong.")
     .bail()
     .isString()
-    .withMessage("Tipe konten harus berupa teks.")
+    .withMessage("Jawaban harus berupa teks.")
     .bail()
     .isIn(QUIZ_ALLOWED_ANSWER_TYPES)
     .withMessage(
