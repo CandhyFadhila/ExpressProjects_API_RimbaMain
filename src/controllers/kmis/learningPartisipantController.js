@@ -34,7 +34,7 @@ exports.index = async (req, res) => {
 
     applySearch(query, search, ["user.name", "topic.title"]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -146,4 +146,3 @@ exports.show = async (req, res) => {
     res.status(500).json(response.toResponse());
   }
 };
-

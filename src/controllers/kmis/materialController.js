@@ -60,7 +60,7 @@ exports.index = async (req, res) => {
       "topic.title",
     ]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -102,14 +102,8 @@ exports.index = async (req, res) => {
 
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
-  const {
-    materialTypes,
-    title,
-    description,
-    topicId,
-    materialData,
-    isPublic,
-  } = req.body;
+  const { materialTypes, title, description, topicId, materialData, isPublic } =
+    req.body;
   const userId =
     req.auth?.userId ??
     req.auth?.user_id ??

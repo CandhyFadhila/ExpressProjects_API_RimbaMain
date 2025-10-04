@@ -44,7 +44,7 @@ exports.index = async (req, res) => {
 
     applySearch(query, search, ["quiz.question"]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -628,13 +628,7 @@ exports.downloadTemplate = async (req, res) => {
       [
         "TOPICS (pakai kolom 'id' untuk diisi ke 'topicId' pada sheet Template)",
       ],
-      [
-        "id",
-        "categoryName",
-        "topicName",
-        "description",
-        "totalQuiz",
-      ],
+      ["id", "categoryName", "topicName", "description", "totalQuiz"],
       ...topics.map((t) => [
         t.id,
         t.categoryName,

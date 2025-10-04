@@ -40,7 +40,7 @@ exports.getAllRole = async (req, res) => {
 
     applySearch(query, search, ["role.name"]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -98,7 +98,7 @@ exports.getAllCategory = async (req, res) => {
 
     applySearch(query, search, ["category.title"]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -209,7 +209,7 @@ exports.getAllTopic = async (req, res) => {
 
     applySearch(query, search, ["topic.title", "category.title"]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -323,7 +323,7 @@ exports.getTopicbyCategoryId = async (req, res) => {
 
     applySearch(query, search, ["topic.title", "category.title"]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -385,7 +385,7 @@ exports.getAllUser = async (req, res) => {
 
     applySearch(query, search, ["user.name", "role.name"]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -446,7 +446,7 @@ exports.getAllUserEducator = async (req, res) => {
 
     applySearch(query, search, ["user.name", "role.name"]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -507,7 +507,7 @@ exports.getAllUserStudent = async (req, res) => {
 
     applySearch(query, search, ["user.name", "role.name"]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -570,7 +570,7 @@ exports.getAllUserbyRoleId = async (req, res) => {
 
     applySearch(query, search, ["user.name", "role.name"]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -693,7 +693,7 @@ exports.getAllMaterial = async (req, res) => {
       "topic.title",
     ]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -890,7 +890,7 @@ exports.getMaterialbyTopicIdorCategoryId = async (req, res) => {
       "topic.title",
     ]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -963,7 +963,7 @@ exports.getMaterialbyCreatedId = async (req, res) => {
       "topic.title",
     ]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -1036,7 +1036,7 @@ exports.getMaterialbyUploadedId = async (req, res) => {
       "topic.title",
     ]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -1147,7 +1147,7 @@ exports.getMaterialbyMaterialTypes = async (req, res) => {
       "topic.title",
     ]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -1242,7 +1242,7 @@ exports.getMaterialbyIsPublic = async (req, res) => {
       "topic.title",
     ]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -1311,7 +1311,7 @@ exports.getAllQuiz = async (req, res) => {
 
     applySearch(query, search, ["quiz.question", "topic.title"]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -1468,7 +1468,7 @@ exports.getQuizbytopicId = async (req, res) => {
 
     applySearch(query, search, ["quiz.question", "topic.title"]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -1535,7 +1535,7 @@ exports.getAllNewsCategory = async (req, res) => {
       }
     );
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -1649,7 +1649,7 @@ exports.getAllEventCategory = async (req, res) => {
       }
     );
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -1763,7 +1763,7 @@ exports.getAllAnimalCategory = async (req, res) => {
       }
     );
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -1883,7 +1883,7 @@ exports.getAllEvent = async (req, res) => {
       }
     );
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -2004,7 +2004,7 @@ exports.getEventbyEventCategoryId = async (req, res) => {
 
     applySearch(query, search, ["event.title", "category.name"]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -2078,7 +2078,7 @@ exports.getAllNews = async (req, res) => {
       }
     );
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -2201,7 +2201,7 @@ exports.getNewsbyNewsCategoryId = async (req, res) => {
 
     applySearch(query, search, ["news.title", "category.name"]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -2331,7 +2331,7 @@ exports.getAllAnimalComposition = async (req, res) => {
       }
     );
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -2450,7 +2450,7 @@ exports.getAnimalCompositionbyAnimalCategoryId = async (req, res) => {
 
     applySearch(query, search, ["animal.name", "category.name"]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {
@@ -2534,7 +2534,7 @@ exports.getAllLegalDocument = async (req, res) => {
       }
     );
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {

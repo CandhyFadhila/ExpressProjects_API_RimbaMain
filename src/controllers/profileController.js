@@ -107,7 +107,7 @@ exports.getUserActivitybyUserId = async (req, res) => {
       "user.name",
     ]);
 
-    const paginationInfo = applyPagination(query, req.query);
+    const paginationInfo = applyPagination(req.query);
 
     const result = await formatPaginationResult(query, paginationInfo, knex);
     if (result.data.length === 0) {

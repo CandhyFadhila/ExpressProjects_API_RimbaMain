@@ -182,45 +182,46 @@ function applyJsonbSearch(queryBuilder, search, exprs, opts = {}) {
   return queryBuilder;
 }
 
-function applyPagination(queryBuilder, { page = 1, limit = 10 }) {
-  const offset = (page - 1) * limit;
-  queryBuilder.limit(limit).offset(offset);
-  return { page: Math.max(parseInt(page), 1), limit: parseInt(limit) };
+function applyPagination({ page = 1, limit = 10 }) {
+  const p = Math.max(parseInt(page) || 1, 1);
+  const l = Math.max(parseInt(limit) || 10, 1);
+  return { page: p, limit: l, offset: (p - 1) * l };
 }
 
 async function formatPaginationResult(
-  queryBuilder,
+  baseQueryBuilder,
   paginationInfo,
   knexInstance
 ) {
-  const data = await queryBuilder;
+  const { page, limit, offset } = paginationInfo;
+
+  // Ambil DATA dari baseQuery + limit/offset (di clone agar base tetap murni)
+  const dataQuery = baseQueryBuilder.clone().limit(limit).offset(offset);
+  const data = await dataQuery;
+
+  // Hitung TOTAL dari baseQuery TANPA limit/offset
+  const countWrapped = baseQueryBuilder.clone().clearSelect().clearOrder();
   const [{ count }] = await knexInstance
     .count("*")
-    .from(queryBuilder.clone().clearSelect().clearOrder().as("subquery"));
+    .from(countWrapped.as("subquery"));
 
-  const total = parseInt(count);
-  const lastPage = total === 0 ? 1 : Math.ceil(total / paginationInfo.limit);
+  const total = parseInt(count, 10) || 0;
+  const lastPage = total === 0 ? 1 : Math.ceil(total / limit);
 
   return {
     data,
     pagination: {
       meta: {
-        current_page: paginationInfo.page,
+        current_page: page,
         last_page: lastPage,
-        per_page: paginationInfo.limit,
+        per_page: limit,
         total,
       },
       links: {
-        first: `?page=1&limit=${paginationInfo.limit}`,
-        last: `?page=${lastPage}&limit=${paginationInfo.limit}`,
-        prev:
-          paginationInfo.page > 1
-            ? `?page=${paginationInfo.page - 1}&limit=${paginationInfo.limit}`
-            : null,
-        next:
-          paginationInfo.page < lastPage
-            ? `?page=${paginationInfo.page + 1}&limit=${paginationInfo.limit}`
-            : null,
+        first: `?page=1&limit=${limit}`,
+        last: `?page=${lastPage}&limit=${limit}`,
+        prev: page > 1 ? `?page=${page - 1}&limit=${limit}` : null,
+        next: page < lastPage ? `?page=${page + 1}&limit=${limit}` : null,
       },
     },
   };
