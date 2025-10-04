@@ -18,6 +18,7 @@ const {
   stripTitlesOnly,
   makeInitialPasswordFromName,
 } = require("../../helpers/credentialHelper");
+const { checkEmailDeliverability } = require("../../helpers/emailValidChecker");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 
 exports.index = async (req, res) => {
@@ -91,7 +92,6 @@ exports.index = async (req, res) => {
   }
 };
 
-// TODO: Buat helper untuk cek email (gmail) valid atau tidak
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
   const { name, email } = req.body;
@@ -108,6 +108,29 @@ exports.store = async (req, res) => {
         "FAILED_VALIDATION",
         "Format Data Tidak Sesuai Ketentuan",
         message
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
+    const probe = await checkEmailDeliverability(email, {
+      useSmtp: true,
+      strict: false, // penting: hindari false negative dari TEMP/UNAVAILABLE
+      timeoutMs: 7000,
+      maxMx: 3,
+    });
+
+    logger.info(
+      `[email-check] ${email} -> ${probe.ok} (${probe.reason}) ${JSON.stringify(
+        probe.detail || []
+      )}`
+    );
+
+    if (!probe.ok) {
+      const response = new WithoutDataResource(
+        422,
+        "EMAIL_NOT_DELIVERABLE",
+        "Email Tidak Dapat Dikirim",
+        `Alamat email '${email}' tampaknya tidak dapat menerima email. Gunakan email valid yang lain.`
       );
       return res.status(422).json(response.toResponse());
     }
@@ -275,6 +298,29 @@ exports.update = async (req, res) => {
         `Data pengajar dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
+    }
+
+    const probe = await checkEmailDeliverability(email, {
+      useSmtp: true,
+      strict: false, // penting: hindari false negative dari TEMP/UNAVAILABLE
+      timeoutMs: 7000,
+      maxMx: 3,
+    });
+
+    logger.info(
+      `[email-check] ${email} -> ${probe.ok} (${probe.reason}) ${JSON.stringify(
+        probe.detail || []
+      )}`
+    );
+
+    if (!probe.ok) {
+      const response = new WithoutDataResource(
+        422,
+        "EMAIL_NOT_DELIVERABLE",
+        "Email Tidak Dapat Dikirim",
+        `Alamat email '${email}' tampaknya tidak dapat menerima email. Gunakan email valid yang lain.`
+      );
+      return res.status(422).json(response.toResponse());
     }
 
     const duplicate = await trx("users")
