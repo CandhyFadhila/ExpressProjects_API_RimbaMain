@@ -21,25 +21,13 @@ const WithoutDataResource = require("../../resources/WithoutDataResource");
 const newsResource = require("../../resources/cms/newsResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
+const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
 exports.index = async (req, res) => {
   const { search, newsCategory } = req.query;
 
   try {
-    let query = knex("cms_news as news")
-      .select(
-        "news.id",
-        "news.cms_news_category_id",
-        "news.thumbnail_ids",
-        "news.title",
-        "news.slug",
-        "news.description",
-        "news.news_content",
-        "news.deleted_at",
-        "news.created_at",
-        "news.updated_at"
-      )
-      .orderBy("news.created_at", "desc");
+    let query = knex("cms_news as news").select("news.*");
 
     applyTrashedScope(query, req, "news.deleted_at");
 
@@ -56,6 +44,8 @@ exports.index = async (req, res) => {
         split: true,
       }
     );
+
+    applyLatestThenTrashed(query, "news.deleted_at", "news.created_at");
 
     const paginationInfo = applyPagination(req.query);
 

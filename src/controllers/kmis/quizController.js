@@ -16,33 +16,21 @@ const {
 } = require("../../validators/kmis/storeQuizValidator");
 const quizResource = require("../../resources/kmis/quizResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
+const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
 exports.index = async (req, res) => {
   const { search, topicId } = req.query;
 
   try {
-    let query = knex("kmis_quiz as quiz")
-      .select(
-        "quiz.id",
-        "quiz.kmis_topic_id",
-        "quiz.question",
-        "quiz.answer_a",
-        "quiz.answer_b",
-        "quiz.answer_c",
-        "quiz.answer_d",
-        "quiz.correct_option",
-        "quiz.explanation",
-        "quiz.deleted_at",
-        "quiz.created_at",
-        "quiz.updated_at"
-      )
-      .orderBy("quiz.created_at", "desc");
+    let query = knex("kmis_quiz as quiz").select("quiz.*");
 
     applyRelationIn(query, "quiz.kmis_topic_id", topicId, {
       as: "number",
     });
 
     applySearch(query, search, ["quiz.question"]);
+
+    applyLatestThenTrashed(query, "quiz.deleted_at", "quiz.created_at");
 
     const paginationInfo = applyPagination(req.query);
 

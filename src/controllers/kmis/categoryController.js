@@ -18,26 +18,19 @@ const WithoutDataResource = require("../../resources/WithoutDataResource");
 const categoryResource = require("../../resources/kmis/categoryResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
+const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
 exports.index = async (req, res) => {
   const { search } = req.query;
 
   try {
-    let query = knex("kmis_categories as category")
-      .select(
-        "category.id",
-        "category.category_cover_ids",
-        "category.title",
-        "category.description",
-        "category.deleted_at",
-        "category.created_at",
-        "category.updated_at"
-      )
-      .orderBy("category.created_at", "desc");
+    let query = knex("kmis_categories as category").select("category.*");
 
     applyTrashedScope(query, req, "category.deleted_at");
 
     applySearch(query, search, ["category.title"]);
+
+    applyLatestThenTrashed(query, "category.deleted_at", "category.created_at");
 
     const paginationInfo = applyPagination(req.query);
 

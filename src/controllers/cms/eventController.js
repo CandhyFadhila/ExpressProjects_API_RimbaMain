@@ -21,24 +21,13 @@ const WithoutDataResource = require("../../resources/WithoutDataResource");
 const eventResource = require("../../resources/cms/eventResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
+const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
 exports.index = async (req, res) => {
   const { search, eventCategory } = req.query;
 
   try {
-    let query = knex("cms_events as event")
-      .select(
-        "event.id",
-        "event.cms_event_category_id",
-        "event.thumbnail_ids",
-        "event.title",
-        "event.description",
-        "event.event_content",
-        "event.deleted_at",
-        "event.created_at",
-        "event.updated_at"
-      )
-      .orderBy("event.created_at", "desc");
+    let query = knex("cms_events as event").select("event.*");
 
     applyTrashedScope(query, req, "event.deleted_at");
 
@@ -55,6 +44,8 @@ exports.index = async (req, res) => {
         split: true,
       }
     );
+
+    applyLatestThenTrashed(query, "event.deleted_at", "event.created_at");
 
     const paginationInfo = applyPagination(req.query);
 

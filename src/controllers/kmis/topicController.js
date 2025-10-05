@@ -19,6 +19,7 @@ const WithoutDataResource = require("../../resources/WithoutDataResource");
 const topicResource = require("../../resources/kmis/topicResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
+const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
 exports.index = async (req, res) => {
   const { search, categoryId } = req.query;
@@ -30,8 +31,7 @@ exports.index = async (req, res) => {
         "topic.kmis_categories_id",
         "category.id"
       )
-      .select("topic.*")
-      .orderBy("topic.created_at", "desc");
+      .select("topic.*");
 
     applyTrashedScope(query, req, "topic.deleted_at");
 
@@ -40,6 +40,8 @@ exports.index = async (req, res) => {
     });
 
     applySearch(query, search, ["topic.title", "category.title"]);
+
+    applyLatestThenTrashed(query, "topic.deleted_at", "topic.created_at");
 
     const paginationInfo = applyPagination(req.query);
 

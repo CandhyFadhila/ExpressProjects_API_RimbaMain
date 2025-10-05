@@ -22,6 +22,7 @@ const WithoutDataResource = require("../../resources/WithoutDataResource");
 const legalDocumentResource = require("../../resources/cms/legalDocumentResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
+const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
 exports.index = async (req, res) => {
   const { search, start_date, end_date } = req.query;
@@ -33,17 +34,7 @@ exports.index = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    let query = knex("cms_legal_documents as document")
-      .select(
-        "document.id",
-        "document.document_ids",
-        "document.title",
-        "document.description",
-        "document.deleted_at",
-        "document.created_at",
-        "document.updated_at"
-      )
-      .orderBy("document.created_at", "desc");
+    let query = knex("cms_legal_documents as document").select("document.*");
 
     applyTrashedScope(query, req, "document.deleted_at");
 
@@ -66,6 +57,8 @@ exports.index = async (req, res) => {
         split: true,
       }
     );
+
+    applyLatestThenTrashed(query, "document.deleted_at", "document.created_at");
 
     const paginationInfo = applyPagination(req.query);
 

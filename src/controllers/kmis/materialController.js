@@ -15,6 +15,7 @@ const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 // const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
+const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 const materialResource = require("../../resources/kmis/materialResource");
 
 exports.index = async (req, res) => {
@@ -47,8 +48,7 @@ exports.index = async (req, res) => {
         // kolom topik
         "topic.id as topic_id",
         "topic.title as topic_title",
-      ])
-      .orderBy("material.created_at", "desc");
+      ]);
 
     // applyTrashedScope(query, req, "material.deleted_at");
 
@@ -59,6 +59,8 @@ exports.index = async (req, res) => {
       "category.title",
       "topic.title",
     ]);
+
+    applyLatestThenTrashed(query, "material.deleted_at", "material.created_at");
 
     const paginationInfo = applyPagination(req.query);
 
