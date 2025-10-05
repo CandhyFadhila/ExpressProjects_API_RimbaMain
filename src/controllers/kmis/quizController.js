@@ -107,20 +107,6 @@ exports.store = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    const exists = await trx("kmis_quiz")
-      .whereRaw("lower(question) = lower(?)", [question])
-      .whereNull("deleted_at")
-      .first();
-    if (exists) {
-      const response = new WithoutDataResource(
-        422,
-        "DUPLICATE_QUESTION",
-        "Duplikat Data",
-        "Ada soal pertanyaan yang sama dengan yang anda buat. Silakan buat soal yang lain."
-      );
-      return res.status(422).json(response.toResponse());
-    }
-
     {
       const pairs = [
         ["A", answerA],
@@ -145,7 +131,19 @@ exports.store = async (req, res) => {
       }
     }
 
-    await validateTopicTotalQuizQuota([{ topicId }], trx);
+    const exists = await trx("kmis_quiz")
+      .whereRaw("lower(question) = lower(?)", [question])
+      .whereNull("deleted_at")
+      .first();
+    if (exists) {
+      const response = new WithoutDataResource(
+        422,
+        "DUPLICATE_QUESTION",
+        "Duplikat Data",
+        "Ada soal pertanyaan yang sama dengan yang anda buat. Silakan buat soal yang lain."
+      );
+      return res.status(422).json(response.toResponse());
+    }
 
     const normalizedExplanation =
       explanation === undefined ||
@@ -168,6 +166,8 @@ exports.store = async (req, res) => {
         explanation: normalizedExplanation,
       })
       .returning("*");
+
+    await syncTopicTotalQuiz(trx, [topicId]);
 
     await activityLogHelper.logCreate(
       {
@@ -402,7 +402,7 @@ exports.destroy = async (req, res) => {
     }
 
     const existing = await trx("kmis_quiz")
-      .select("id", "question")
+      .select("id", "question", "kmis_topic_id as topicId")
       .whereIn("id", ids)
       .whereNull("deleted_at");
     if (existing.length === 0) {
@@ -417,10 +417,15 @@ exports.destroy = async (req, res) => {
     }
 
     const existingIds = existing.map((r) => r.id);
+    const touchedTopicIds = [
+      ...new Set(existing.map((r) => Number(r.topicId))),
+    ];
 
     await trx("kmis_quiz").whereIn("id", existingIds).update({
       deleted_at: trx.fn.now(),
     });
+
+    await syncTopicTotalQuiz(trx, touchedTopicIds);
 
     await activityLogHelper.logDelete(
       {
@@ -484,7 +489,7 @@ exports.restore = async (req, res) => {
     }
 
     const softDeleted = await trx("kmis_quiz")
-      .select("id", "question")
+      .select("id", "question", "kmis_topic_id as topicId")
       .whereIn("id", ids)
       .whereNotNull("deleted_at");
     if (softDeleted.length === 0) {
@@ -547,6 +552,12 @@ exports.restore = async (req, res) => {
       await trx("kmis_quiz")
         .whereIn("id", idsToRestore)
         .update({ deleted_at: null, updated_at: trx.fn.now() });
+
+      const touchedTopicIds = [
+        ...new Set(restorable.map((r) => Number(r.topicId))),
+      ];
+      await syncTopicTotalQuiz(trx, touchedTopicIds);
+
       restoredCount = idsToRestore.length;
     }
 
@@ -1001,27 +1012,7 @@ exports.importTemplate = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    // --- 8) VALIDASI KUOTA total_question
-    try {
-      await validateTopicTotalQuizQuota(
-        items.map((it) => ({
-          topicId: it.topicId,
-          excelRowNum: it.excelRowNum,
-        })),
-        trx
-      );
-    } catch (e) {
-      await trx.rollback();
-      const response = new WithoutDataResource(
-        e.statusCode || 422,
-        e.code || "OVER_QUOTA",
-        "Melebihi Batas Kuota Soal",
-        e.message || "Jumlah soal pada file melebihi kuota yang diperbolehkan."
-      );
-      return res.status(422).json(response.toResponse());
-    }
-
-    // --- 9) Insert batch dalam transaksi
+    // --- 8) Insert batch dalam transaksi
     try {
       const toInsert = items.map((it) => ({
         kmis_topic_id: it.topicId,
@@ -1035,6 +1026,9 @@ exports.importTemplate = async (req, res) => {
       }));
 
       await trx("kmis_quiz").insert(toInsert);
+
+      const touchedTopicIds = [...new Set(items.map((it) => it.topicId))];
+      await syncTopicTotalQuiz(trx, touchedTopicIds);
 
       await activityLogHelper.logCreate(
         {
@@ -1081,77 +1075,27 @@ exports.importTemplate = async (req, res) => {
   }
 };
 
-async function validateTopicTotalQuizQuota(items, trx) {
-  const group = new Map(); // qcId -> { countInFile, rows[] }
-  for (const it of items) {
-    const topicId = Number(it.topicId);
-    if (!group.has(topicId)) group.set(topicId, { countInFile: 0, rows: [] });
-    const g = group.get(topicId);
-    g.countInFile += 1;
-    if (it.excelRowNum) g.rows.push(it.excelRowNum);
-  }
-  const topicIds = [...group.keys()];
-  if (topicIds.length === 0) return;
+async function syncTopicTotalQuiz(trx, topicIds) {
+  const ids = [
+    ...new Set((topicIds || []).map((x) => Number(x)).filter(Number.isFinite)),
+  ];
+  if (ids.length === 0) return;
 
-  const topicRows = await trx("kmis_topics")
-    .whereIn("id", topicIds)
-    .whereNull("deleted_at")
-    .select("id", "total_quiz")
-    .forUpdate();
-
-  const totalMap = new Map(
-    topicRows.map((r) => [
-      Number(r.id),
-      r.total_quiz === null ? null : Number(r.total_quiz),
-    ])
-  );
-
-  const existingRows = await trx("kmis_quiz")
-    .whereIn("kmis_topic_id", topicIds)
-    .whereNull("deleted_at")
-    .select("kmis_topic_id")
+  // hitung jumlah quiz aktif per topik
+  const rows = await trx("kmis_quiz")
+    .select("kmis_topic_id as topic_id")
     .count({ n: "*" })
+    .whereNull("deleted_at")
+    .whereIn("kmis_topic_id", ids)
     .groupBy("kmis_topic_id");
 
-  const existMap = new Map(
-    existingRows.map((r) => [Number(r.kmis_topic_id), Number(r.n)])
-  );
+  const map = new Map(rows.map((r) => [Number(r.topic_id), Number(r.n)]));
 
-  const errors = [];
-  for (const [topicId, { countInFile, rows }] of group.entries()) {
-    const total = totalMap.get(topicId);
-    if (total === undefined) {
-      errors.push(`topicId ${topicId} tidak ditemukan / nonaktif.`);
-      continue;
-    }
-    if (total === null) {
-      // unlimited → tidak dibatasi
-      continue;
-    }
-    const existing = existMap.get(topicId) ?? 0;
-    const remaining = total - existing;
-
-    if (remaining < 0) {
-      errors.push(
-        `Kuota topik ${topicId} sudah melebihi batas (existing ${existing} > total ${total}).`
-      );
-      continue;
-    }
-    if (countInFile > remaining) {
-      errors.push(
-        rows?.length
-          ? `Topik ID ${topicId}: sisa kuota quiz ${remaining}, namun file template mencoba menambahkan ${countInFile} item (baris: ${rows.join(
-              ", "
-            )}).`
-          : `Topik ID ${topicId}: sisa kuota quiz ${remaining}, namun file template mencoba menambahkan ${countInFile} item.`
-      );
-    }
-  }
-
-  if (errors.length) {
-    const err = new Error(errors.join(" "));
-    err.statusCode = 422;
-    err.code = "OVER_QUOTA";
-    throw err;
+  // update total_quiz per topik (0 jika tidak ada quiz)
+  for (const id of ids) {
+    const n = map.get(id) ?? 0;
+    await trx("kmis_topics")
+      .where("id", id)
+      .update({ total_quiz: n, updated_at: trx.fn.now() });
   }
 }
