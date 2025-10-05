@@ -33,8 +33,8 @@ exports.storeMaterialValidator = [
     return true;
   }),
 
-  // === materialTypes (wajib) + normalisasi ===
-  body("materialTypes")
+  // === materialType (wajib) + normalisasi ===
+  body("materialType")
     .notEmpty()
     .withMessage("Tipe materi wajib diisi.")
     .bail()
@@ -89,20 +89,20 @@ exports.storeMaterialValidator = [
       }
     }),
 
-  // === materialData (wajib untuk video; opsional untuk lainnya) ===
-  body("materialData")
-    .if(body("materialTypes").equals("video"))
+  // === materialUrl (wajib untuk video; opsional untuk lainnya) ===
+  body("materialUrl")
+    .if(body("materialType").equals("video"))
     .notEmpty()
-    .withMessage("materialData wajib diisi untuk tipe video.")
+    .withMessage("materialUrl wajib diisi untuk tipe video.")
     .bail()
     .isString()
-    .withMessage("materialData harus berupa teks."),
+    .withMessage("materialUrl harus berupa teks."),
 
-  body("materialData")
-    .if(body("materialTypes").not().equals("video"))
+  body("materialUrl")
+    .if(body("materialType").not().equals("video"))
     .optional({ nullable: true, checkFalsy: true })
     .isString()
-    .withMessage("materialData harus berupa teks.")
+    .withMessage("materialUrl harus berupa teks.")
     .bail()
     .trim(),
 

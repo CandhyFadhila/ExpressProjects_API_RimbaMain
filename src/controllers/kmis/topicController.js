@@ -30,7 +30,7 @@ exports.index = async (req, res) => {
         "topic.kmis_categories_id",
         "category.id"
       )
-      .select("*")
+      .select("topic.*")
       .orderBy("topic.created_at", "desc");
 
     applyTrashedScope(query, req, "topic.deleted_at");

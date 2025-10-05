@@ -5,11 +5,11 @@ const {
   storeLearningAttemptValidator,
 } = require("../../validators/kmis/storeLearningAttemptValidator");
 const {
-  storeQuizAttemptValidator,
-} = require("../../validators/kmis/storeQuizAttemptValidator");
-const {
   updateProgressLearningAttemptValidator,
 } = require("../../validators/kmis/updateProgressLearningAttemptValidator");
+const {
+  updateFeedbackValidator,
+} = require("../../validators/kmis/updateFeedbackValidator");
 const validate = require("../../middlewares/validate");
 const authMiddleware = require("../../middlewares/authMiddleware");
 const rateLimiter = require("../../middlewares/rateLimitMiddleware");
@@ -39,14 +39,13 @@ router.post(
   studentLearningCourseController.updateProgressLearningAttempt
 );
 
-// Quiz Attempt
-router.post(
-  "/create",
-  requirePermission(["create.kmis_learning_course"]),
+router.patch(
+  "/feedback/:id",
+  requirePermission(["edit.kmis_learning_course"]),
   upload.none(),
-  storeQuizAttemptValidator,
+  updateFeedbackValidator,
   validate,
-  studentLearningCourseController.storeQuizAttempt
+  studentLearningCourseController.feedback
 );
 
 module.exports = router;

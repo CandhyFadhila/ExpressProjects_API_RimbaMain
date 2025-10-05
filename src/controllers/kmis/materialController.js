@@ -102,7 +102,7 @@ exports.index = async (req, res) => {
 
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
-  const { materialTypes, title, description, topicId, materialData, isPublic } =
+  const { materialType, title, description, topicId, materialUrl, isPublic } =
     req.body;
   const userId =
     req.auth?.userId ??
@@ -127,7 +127,7 @@ exports.store = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    const type = String(materialTypes || "").toLowerCase();
+    const type = String(materialType || "").toLowerCase();
 
     const coverFiles = req.files?.materialCovers || [];
     const materiFiles = req.files?.materialFiles || [];
@@ -295,7 +295,7 @@ exports.store = async (req, res) => {
         material_types: type,
         title,
         description,
-        material_data: materialData ?? null,
+        material_data: materialUrl ?? null,
         materials_file_ids: fileIds?.length ? asJsonb(fileIds) : null,
         materials_cover_ids: coverIds?.length ? asJsonb(coverIds) : null,
         is_public: typeof isPublic === "boolean" ? isPublic : undefined,
@@ -386,11 +386,11 @@ exports.show = async (req, res) => {
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
   const {
-    materialTypes,
+    materialType,
     title,
     description,
     topicId,
-    materialData,
+    materialUrl,
     isPublic,
     materialCovers,
     materialFiles,
@@ -427,7 +427,7 @@ exports.update = async (req, res) => {
     }
 
     const type = String(
-      materialTypes ?? existing.material_types ?? ""
+      materialType ?? existing.material_types ?? ""
     ).toLowerCase();
 
     const coverFiles = req.files?.materialCovers || [];
@@ -615,7 +615,7 @@ exports.update = async (req, res) => {
         material_types: type || existing.material_types,
         title: title ?? existing.title,
         description: description ?? existing.description,
-        material_data: materialData ?? existing.material_data,
+        material_data: materialUrl ?? existing.material_data,
         materials_cover_ids: asJsonb(newCoverIds),
         materials_file_ids: asJsonb(newFileIds),
         is_public:

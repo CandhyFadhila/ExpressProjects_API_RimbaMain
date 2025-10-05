@@ -11,6 +11,7 @@ const documentHelper = require("../../helpers/documentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const learningParticipantResource = require("../../resources/kmis/learningParticipantResource");
+const quizResource = require("../../resources/kmis/quizResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const QUIZ_STATUS = Object.freeze({ STARTED: 1, FINISHED: 2, ABANDONED: 3 });
 
@@ -431,13 +432,16 @@ exports.storeQuizAttempt = async (req, res) => {
 
       await trx.commit();
 
-      const response = new WithoutDataResource(
+      const dataPayload = await attemptExamResponse(learningAttemptId);
+
+      const response = new WithDataResource(
         201,
         isRevision ? "SUCCESS_REVISED_ANSWER" : "SUCCESS_ANSWERED_QUESTION",
         "Berhasil Menyimpan Data",
         isRevision
           ? `Revisi jawaban pada soal ${quizId} tersimpan (${answeredAfter}/${totalQuiz}).`
-          : `Jawaban berhasil tersimpan (${answeredAfter}/${totalQuiz}).`
+          : `Jawaban berhasil tersimpan (${answeredAfter}/${totalQuiz}).`,
+        dataPayload
       );
       return res.status(201).json(response.toResponse());
     } catch (err) {
@@ -612,6 +616,185 @@ exports.submitAllAttempt = async (req, res) => {
     res.status(500).json(response.toResponse());
   }
 };
+
+exports.feedback = async (req, res) => {
+  const trx = await knex.transaction();
+  const { feedback } = req.body;
+  const { id } = req.params;
+  const userId =
+    req.auth?.userId ??
+    req.auth?.user_id ??
+    req.auth?.id ??
+    req.userId ??
+    req.user?.id;
+
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const message = errors
+        .array()
+        .map((err) => err.msg)
+        .join(" ");
+      const response = new WithoutDataResource(
+        422,
+        "FAILED_VALIDATION",
+        "Format Data Tidak Sesuai Ketentuan",
+        message
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
+    const attempt = await trx("kmis_learning_attempts")
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!attempt) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Pembelajaran dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const attemptByBig = BigInt(String(attempt.attempt_by));
+    const userIdBig = BigInt(String(userId));
+    if (attemptByBig !== userIdBig) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        403,
+        "FORBIDDEN_QUIZ_ACCESS",
+        "Akses Ditolak",
+        "Anda tidak berhak submit feedback untuk kuis yang bukan milik anda."
+      );
+      return res.status(403).json(response.toResponse());
+    }
+
+    if ([QUIZ_STATUS.STARTED].includes(Number(attempt.quiz_attempt_status))) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        409,
+        "FEEDBACK_NOT_ALLOWED",
+        "Feedback Tidak Diperbolehkan",
+        "Kuis sedang berjalan, tidak dapat mengirim feedback."
+      );
+      return res.status(409).json(response.toResponse());
+    }
+
+    await trx("kmis_learning_attempts").where("id", id).update({
+      feedback, // integer 0–5
+      updated_at: trx.fn.now(),
+    });
+
+    await trx.commit();
+    const response = new WithoutDataResource(
+      200,
+      "SUCCESS_UPDATE_DATA",
+      "Feedback Berhasil Diperbarui",
+      `Feedback untuk pembelajaran ID '${id}' diperbarui menjadi ${feedback}.`
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    await trx.rollback();
+    logger.error(
+      `| Learning Attempt KMIS | - Error function feedback : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem. Silakan coba lagi nanti."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+async function attemptExamResponse(learningAttemptId) {
+  // 1) Ambil attempt minimal
+  const attempt = await knex("kmis_learning_attempts")
+    .where("id", learningAttemptId)
+    .select(["id", "attempt_by", "kmis_topic_id"])
+    .whereNull("deleted_at")
+    .first();
+
+  if (!attempt) {
+    return { learningParticipant: null, exam: [] };
+  }
+
+  // 2) Participant (rename attemptUser -> attemptBy)
+  const lp = await learningParticipantResource(attempt);
+  const learningParticipant = {
+    id: lp.id,
+    attemptUser: lp.attemptUser || null,
+    topic: lp.topic || null,
+  };
+
+  // 3) Ambil total_quiz dari topik untuk target panjang array
+  const topicRow = await knex("kmis_topics")
+    .where("id", attempt.kmis_topic_id)
+    .whereNull("deleted_at")
+    .select(["id", "total_quiz"])
+    .first();
+  const totalTarget = Number(topicRow?.total_quiz ?? 0);
+
+  // 4) Semua quiz pada topik (urut konsisten)
+  const quizzes = await knex("kmis_quiz")
+    .where("kmis_topic_id", attempt.kmis_topic_id)
+    .whereNull("deleted_at")
+    .select(["id", "question", "answer_a", "answer_b", "answer_c", "answer_d"])
+    .orderBy("id", "asc");
+
+  // 5) Jawaban aktif untuk attempt ini
+  const responses = await knex("kmis_quiz_responses as r")
+    .select([
+      "r.id",
+      "r.kmis_quiz_id",
+      "r.selected_option",
+      "r.is_marker",
+      "r.answered_at",
+    ])
+    .where("r.kmis_learning_attempt_id", learningAttemptId)
+    .whereNull("r.deleted_at");
+
+  // 6) Index jawaban by quiz_id (ambil yang terbaru jika ada duplikat)
+  const respByQuizId = new Map();
+  for (const r of responses) {
+    const prev = respByQuizId.get(r.kmis_quiz_id);
+    if (!prev || new Date(r.answered_at) > new Date(prev.answered_at)) {
+      respByQuizId.set(r.kmis_quiz_id, r);
+    }
+  }
+
+  // 7) Susun exam dari kuis yang ada
+  const exam = quizzes.map((q) => {
+    const resp = respByQuizId.get(q.id) || null;
+    const quizPayload = {
+      id: q.id,
+      question: q.question,
+      answerA: q.answer_a,
+      answerB: q.answer_b,
+      answerC: q.answer_c,
+      answerD: q.answer_d,
+    };
+    return {
+      // id: resp ? resp.id : null,
+      quiz: quizPayload, // selalu ada untuk kuis yang eksis
+      selectedOption: resp ? resp.selected_option : null,
+      isMarker: resp ? !!resp.is_marker : null,
+      answeredAt: resp ? resp.answered_at : null,
+    };
+  });
+
+  // 8) Pad dengan null sampai panjang == total_quiz (jika total_quiz > jumlah kuis aktual)
+  if (Number.isFinite(totalTarget) && totalTarget > exam.length) {
+    const toPad = totalTarget - exam.length;
+    for (let i = 0; i < toPad; i++) exam.push(null);
+  }
+
+  return { learningParticipant, exam };
+}
 
 async function handleFinalQuestion(trx, { learningAttemptId, topicId, req }) {
   const aggActive = await trx("kmis_quiz_responses")
@@ -910,3 +1093,13 @@ async function sendCertificateEmail({ attemptId, certFile, summary }) {
     return false;
   }
 }
+
+
+// "data": {
+//   "material": [
+//     // material interface
+//   ],
+//   "quiz": [
+//     // quiz interface (hanya ambil id, top)
+//   ]
+// }
