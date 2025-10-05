@@ -41,10 +41,6 @@ exports.index = async (req, res) => {
         "material.created_at",
         "material.updated_at",
 
-        // kolom kategori
-        "category.id as category_id",
-        "category.title as category_title",
-
         // kolom topik
         "topic.id as topic_id",
         "topic.title as topic_title",
@@ -56,7 +52,6 @@ exports.index = async (req, res) => {
 
     applySearch(query, search, [
       "material.title",
-      "category.title",
       "topic.title",
     ]);
 
