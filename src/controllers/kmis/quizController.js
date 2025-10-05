@@ -17,6 +17,12 @@ const {
 const quizResource = require("../../resources/kmis/quizResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
+const normalizeAnswer = (v) =>
+  String(v ?? "")
+    .toLowerCase()
+    .normalize("NFKC")
+    .replace(/\s+/g, " ")
+    .trim();
 
 exports.index = async (req, res) => {
   const { search, topicId } = req.query;
@@ -108,11 +114,35 @@ exports.store = async (req, res) => {
     if (exists) {
       const response = new WithoutDataResource(
         422,
-        "DUPLICATE_TITLE",
+        "DUPLICATE_QUESTION",
         "Duplikat Data",
         "Ada soal pertanyaan yang sama dengan yang anda buat. Silakan buat soal yang lain."
       );
       return res.status(422).json(response.toResponse());
+    }
+
+    {
+      const pairs = [
+        ["A", answerA],
+        ["B", answerB],
+        ["C", answerC],
+        ["D", answerD],
+      ];
+      const seen = new Map(); // norm -> label
+      for (const [label, text] of pairs) {
+        const norm = normalizeAnswer(text);
+        if (seen.has(norm)) {
+          const dupWith = seen.get(norm);
+          const response = new WithoutDataResource(
+            422,
+            "DUPLICATE_ANSWERS",
+            "Duplikat Opsi Jawaban",
+            `Jawaban pilihan ${label} sama dengan pilihan ${dupWith}. Setiap opsi A sampai D harus unik.`
+          );
+          return res.status(422).json(response.toResponse());
+        }
+        seen.set(norm, label);
+      }
     }
 
     await validateTopicTotalQuizQuota([{ topicId }], trx);
@@ -265,11 +295,35 @@ exports.update = async (req, res) => {
     if (duplicate) {
       const response = new WithoutDataResource(
         422,
-        "DUPLICATE_TITLE",
+        "DUPLICATE_QUESTION",
         "Duplikat Data",
         "Ada soal pertanyaan yang sama dengan yang anda perbarui. Silakan buat soal yang lain."
       );
       return res.status(422).json(response.toResponse());
+    }
+
+    {
+      const pairs = [
+        ["A", answerA],
+        ["B", answerB],
+        ["C", answerC],
+        ["D", answerD],
+      ];
+      const seen = new Map(); // norm -> label
+      for (const [label, text] of pairs) {
+        const norm = normalizeAnswer(text);
+        if (seen.has(norm)) {
+          const dupWith = seen.get(norm);
+          const response = new WithoutDataResource(
+            422,
+            "DUPLICATE_ANSWERS",
+            "Duplikat Opsi Jawaban",
+            `Jawaban pilihan ${label} sama dengan pilihan ${dupWith}. Setiap opsi A sampai D harus unik.`
+          );
+          return res.status(422).json(response.toResponse());
+        }
+        seen.set(norm, label);
+      }
     }
 
     await trx("kmis_quiz")
@@ -818,7 +872,33 @@ exports.importTemplate = async (req, res) => {
         })(),
       };
 
-      // --- 4) Jalankan validator route secara programatik per baris
+      // --- 4) Jalankan validator cek jawaban unik dan route secara programatik per baris
+      {
+        const pairs = [
+          ["A", obj.answerA],
+          ["B", obj.answerB],
+          ["C", obj.answerC],
+          ["D", obj.answerD],
+        ];
+        const seen = new Map();
+        let dupWithMsg = null;
+
+        for (const [label, text] of pairs) {
+          const norm = normalizeAnswer(text);
+          if (seen.has(norm)) {
+            const dupWith = seen.get(norm);
+            dupWithMsg = `Baris ${excelRowNum}: Jawaban pilihan ${label} sama dengan pilihan ${dupWith}. Setiap opsi A sampai D harus unik.`;
+            break;
+          }
+          seen.set(norm, label);
+        }
+
+        if (dupWithMsg) {
+          perRowErrors.push(dupWithMsg);
+          continue;
+        }
+      }
+
       const fakeReq = { body: obj };
       await Promise.all(storeQuizValidator.map((v) => v.run(fakeReq)));
       const result = validationResult(fakeReq);

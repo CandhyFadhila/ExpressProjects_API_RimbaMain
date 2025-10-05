@@ -16,21 +16,13 @@ const WithoutDataResource = require("../../resources/WithoutDataResource");
 const animalCategoryResource = require("../../resources/masterData/animalCategoryResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
+const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
 exports.index = async (req, res) => {
   const { search } = req.query;
 
   try {
-    let query = knex("cms_animal_categories as category")
-      .select(
-        "category.id",
-        "category.name",
-        "category.description",
-        "category.deleted_at",
-        "category.created_at",
-        "category.updated_at"
-      )
-      .orderBy("category.created_at", "desc");
+    let query = knex("cms_animal_categories as category").select("category.*");
 
     applyTrashedScope(query, req, "category.deleted_at");
 
@@ -48,6 +40,8 @@ exports.index = async (req, res) => {
         split: true,
       }
     );
+
+    applyLatestThenTrashed(query, "category.deleted_at", "category.created_at");
 
     const paginationInfo = applyPagination(req.query);
 
