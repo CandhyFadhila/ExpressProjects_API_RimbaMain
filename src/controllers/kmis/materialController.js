@@ -1,7 +1,11 @@
 const { validationResult } = require("express-validator");
 const knex = require("../../config/database");
 const logger = require("../../utils/logger");
-const { normJsonbArray, normIdArray } = require("../../helpers/inputNorm");
+const {
+  toArray,
+  normJsonbArray,
+  normIdArray,
+} = require("../../helpers/inputNorm");
 const { asJsonb } = require("../../helpers/dbJson");
 const {
   applyRelationIn,
@@ -50,10 +54,7 @@ exports.index = async (req, res) => {
 
     applyRelationIn(query, "material.kmis_topic_id", topicId, { as: "number" });
 
-    applySearch(query, search, [
-      "material.title",
-      "topic.title",
-    ]);
+    applySearch(query, search, ["material.title", "topic.title"]);
 
     applyLatestThenTrashed(query, "material.deleted_at", "material.created_at");
 
@@ -216,12 +217,12 @@ exports.store = async (req, res) => {
         );
         return res.status(422).json(r.toResponse());
       }
-      if (coverFiles.length > 1) {
+      if (coverFiles.length > 5) {
         const r = new WithoutDataResource(
           422,
           "MAX_FILES",
           "Terlalu Banyak File",
-          "Maksimal upload cover adalah 1 file."
+          "Maksimal upload cover adalah 5 file."
         );
         return res.status(422).json(r.toResponse());
       }
@@ -381,7 +382,6 @@ exports.show = async (req, res) => {
   }
 };
 
-// TODO: tambah validasi Gak boleh 0 gambar, minimal 1 gambar
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
   const {
@@ -446,9 +446,10 @@ exports.update = async (req, res) => {
       "image/jpeg": "JPG/JPEG",
       "image/jpg": "JPG",
       "image/png": "PNG",
+      "image/webp": "WEBP",
     };
 
-    const IMAGE_TYPES = ["image/jpeg", "image/png", "image/jpg"];
+    const IMAGE_TYPES = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
     const DOC_TYPES = [
       "application/pdf",
       "application/msword",
@@ -493,7 +494,7 @@ exports.update = async (req, res) => {
         "File cover (materialCovers)"
       );
       if (err) return res.status(422).json(err.toResponse());
-      if (coverFiles.length > 1) {
+      if (coverFiles.length > 5) {
         return res
           .status(422)
           .json(
@@ -501,7 +502,7 @@ exports.update = async (req, res) => {
               422,
               "MAX_FILES",
               "Terlalu Banyak File",
-              "Maksimal upload cover per request adalah 1 file."
+              "Maksimal upload cover per request adalah 5 file."
             ).toResponse()
           );
       }
@@ -561,35 +562,44 @@ exports.update = async (req, res) => {
     ]);
     newFileIds = uniq([...newFileIds, ...addFileFromBody, ...uploadedFileIds]);
 
-    if (type === "gambar") {
-      if (newFileIds.length === 0) {
-        const response = new WithoutDataResource(
-          422,
-          "FILES_REQUIRED",
-          "File Wajib",
-          "Untuk tipe 'gambar', minimal harus ada 1 berkas pada materialFiles."
-        );
-        return res.status(422).json(response.toResponse());
-      }
-    } else if (type === "dokumen") {
-      if (newFileIds.length === 0) {
-        const response = new WithoutDataResource(
-          422,
-          "FILES_REQUIRED",
-          "File Wajib",
-          "Untuk tipe 'dokumen', minimal harus ada 1 berkas pada materialFiles."
-        );
-        return res.status(422).json(response.toResponse());
-      }
-      if (newCoverIds.length === 0) {
-        const response = new WithoutDataResource(
-          422,
-          "COVERS_REQUIRED",
-          "Cover Wajib",
-          "Untuk tipe 'dokumen', minimal harus ada 1 cover pada materialCovers."
-        );
-        return res.status(422).json(response.toResponse());
-      }
+    const validationCover = await validateFilesQuotaAndTypesOnUpdate({
+      existingRow: existing,
+      deleteDocumentIds: delCover,
+      files: coverFiles,
+      dbColumn: "materials_cover_ids",
+      maxFilesAllowed: 1,
+      allowedTypes: IMAGE_TYPES,
+      sizeLimitBytes: 10 * 1024 * 1024,
+    });
+
+    const validationFile = await validateFilesQuotaAndTypesOnUpdate({
+      existingRow: existing,
+      deleteDocumentIds: delFile,
+      files: materiFiles,
+      dbColumn: "materials_file_ids",
+      maxFilesAllowed: 5,
+      allowedTypes: DOC_TYPES.concat(IMAGE_TYPES),
+      sizeLimitBytes: 10 * 1024 * 1024,
+    });
+
+    if (!validationCover.ok) {
+      const response = new WithoutDataResource(
+        validationCover.http,
+        validationCover.code,
+        validationCover.title,
+        validationCover.desc
+      );
+      return res.status(validationCover.http).json(response.toResponse());
+    }
+
+    if (!validationFile.ok) {
+      const response = new WithoutDataResource(
+        validationFile.http,
+        validationFile.code,
+        validationFile.title,
+        validationFile.desc
+      );
+      return res.status(validationFile.http).json(response.toResponse());
     }
 
     const duplicate = await trx("kmis_materials")
@@ -903,3 +913,106 @@ exports.restore = async (req, res) => {
     res.status(500).json(response.toResponse());
   }
 };
+
+async function validateFilesQuotaAndTypesOnUpdate({
+  existingRow,
+  deleteDocumentIds,
+  files,
+  dbColumn = "materials_file_ids",
+  maxFilesAllowed = 5,
+  allowedTypes = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ],
+  sizeLimitBytes = 10 * 1024 * 1024,
+}) {
+  // Normalisasi array dokumen yang saat ini tersimpan
+  const currentIds = normIdArray(normJsonbArray(existingRow?.[dbColumn]), {
+    as: "string",
+  });
+
+  // Normalisasi daftar yang minta dihapus (kalau ada), lalu "simulasikan" state setelah dihapus
+  const toDelete = toArray(deleteDocumentIds).map(String);
+  const currentAfterDelete = currentIds.filter(
+    (id) => !toDelete.includes(String(id))
+  );
+
+  // Hitung sisa slot setelah penghapusan
+  const currentCount = currentAfterDelete.length;
+  const remaining = Math.max(maxFilesAllowed - currentCount, 0);
+
+  const incomingCount = Array.isArray(files) ? files.length : 0;
+
+  if (currentCount === 0 && incomingCount === 0) {
+    return {
+      ok: false,
+      http: 422,
+      code: "MINIMUM_FILE_REQUIRED",
+      title: "Minimal 1 File Harus Ada",
+      desc: "Minimal harus ada 1 file di dalam database.",
+    };
+  }
+
+  // Tidak upload file → boleh lanjut (validator hanya mengembalikan info remaining)
+  if (incomingCount === 0) {
+    return { ok: true, remaining };
+  }
+
+  // Sudah penuh tapi masih ada file yang dikirim
+  if (remaining === 0) {
+    return {
+      ok: false,
+      http: 422,
+      code: "MAX_CAPACITY",
+      title: "Kapasitas Sudah Penuh",
+      desc: "Kapasitas file untuk data ini sudah terpenuhi. Tidak ada slot tersisa.",
+    };
+  }
+
+  // Jika payload melebihi sisa slot → kembalikan info berapa yang boleh
+  if (incomingCount > remaining) {
+    const s = remaining;
+    return {
+      ok: false,
+      http: 422,
+      code: "UPLOAD_LIMIT_EXCEEDED",
+      title: "Terlalu Banyak File",
+      desc: `File yang diperbolehkan di upload adalah ${s} file.`,
+    };
+  }
+
+  // Validasi tipe & ukuran per file
+  for (const f of files) {
+    if (!allowedTypes.includes(f.mimetype)) {
+      return {
+        ok: false,
+        http: 422,
+        code: "INVALID_FILE_TYPE",
+        title: "Tipe File Salah",
+        desc: `File hanya boleh bertipe: JPG, JPEG, PNG, WebP, PDF, DOC, DOCX, XLS, XLSX, PPT, dan PPTX.`,
+      };
+    }
+    if (f.size > sizeLimitBytes) {
+      return {
+        ok: false,
+        http: 422,
+        code: "FILE_TOO_LARGE",
+        title: "Ukuran File Terlalu Besar",
+        desc: `Ukuran maksimal tiap file adalah ${Math.floor(
+          sizeLimitBytes / (1024 * 1024)
+        )}MB.`,
+      };
+    }
+  }
+
+  return { ok: true, remaining };
+}

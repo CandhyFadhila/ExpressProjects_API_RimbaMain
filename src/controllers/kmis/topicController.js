@@ -88,6 +88,16 @@ exports.store = async (req, res) => {
   const { title, description, totalQuiz, quizDuration, categoryId } = req.body;
 
   try {
+    if (quizDuration < 300) {
+      const response = new WithoutDataResource(
+        422,
+        "INVALID_QUIZ_DURATION",
+        "Durasi Quiz Terlalu Pendek",
+        "Durasi quiz minimal adalah 5 menit (300 detik)."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       const message = errors
@@ -252,11 +262,27 @@ exports.show = async (req, res) => {
 
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
-  const { title, description, categoryId, totalQuiz, quizDuration, deleteDocumentIds } =
-    req.body;
+  const {
+    title,
+    description,
+    categoryId,
+    totalQuiz,
+    quizDuration,
+    deleteDocumentIds,
+  } = req.body;
   const id = req.params.id;
 
   try {
+    if (quizDuration < 300) {
+      const response = new WithoutDataResource(
+        422,
+        "INVALID_QUIZ_DURATION",
+        "Durasi Quiz Terlalu Pendek",
+        "Durasi quiz minimal adalah 5 menit (300 detik)."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       const message = errors
@@ -635,6 +661,16 @@ async function validateFilesQuotaAndTypesOnUpdate({
   const remaining = Math.max(maxFilesAllowed - currentCount, 0);
 
   const incomingCount = Array.isArray(files) ? files.length : 0;
+
+  if (currentCount === 0 && incomingCount === 0) {
+    return {
+      ok: false,
+      http: 422,
+      code: "MINIMUM_FILE_REQUIRED",
+      title: "Minimal 1 File Harus Ada",
+      desc: "Minimal harus ada 1 file di dalam database.",
+    };
+  }
 
   // Tidak upload file → boleh lanjut (validator hanya mengembalikan info remaining)
   if (incomingCount === 0) {

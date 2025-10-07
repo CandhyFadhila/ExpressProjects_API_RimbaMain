@@ -11,9 +11,21 @@ const documentHelper = require("../../helpers/documentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const learningParticipantResource = require("../../resources/kmis/learningParticipantResource");
-const quizResource = require("../../resources/kmis/quizResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const QUIZ_STATUS = Object.freeze({ STARTED: 1, FINISHED: 2, ABANDONED: 3 });
+
+// TODO: Buat get list materi dan quiz berdasarkan topicId (response sesuai template dibawah)
+// "data": {
+//   "topic": {
+//     // topic interface
+//   }
+//   "material": [
+//     // material interface
+//   ],
+//   "quiz": [
+//     // quiz interface (hanya ambil id, top)
+//   ]
+// }
 
 exports.storeLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
@@ -1163,15 +1175,3 @@ async function sendCertificateEmail({ attemptId, certFile, summary }) {
     return false;
   }
 }
-
-// "data": {
-//   "topic": {
-//     // topic interface
-//   }
-//   "material": [
-//     // material interface
-//   ],
-//   "quiz": [
-//     // quiz interface (hanya ambil id, top)
-//   ]
-// }
