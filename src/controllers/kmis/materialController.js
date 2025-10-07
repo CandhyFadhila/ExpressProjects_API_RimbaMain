@@ -14,7 +14,7 @@ const documentHelper = require("../../helpers/documentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
-// const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
+const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 const materialResource = require("../../resources/kmis/materialResource");
 
@@ -46,7 +46,7 @@ exports.index = async (req, res) => {
         "topic.title as topic_title",
       ]);
 
-    // applyTrashedScope(query, req, "material.deleted_at");
+    applyTrashedScope(query, req, "material.deleted_at");
 
     applyRelationIn(query, "material.kmis_topic_id", topicId, { as: "number" });
 
@@ -287,7 +287,8 @@ exports.store = async (req, res) => {
     await trx("kmis_materials")
       .insert({
         created_by: userId,
-        uploaded_by: uploadedBy,
+        // uploaded_by: uploadedBy,
+        uploaded_by: userId,
         kmis_topic_id: topicId ?? null,
         material_types: type,
         title,
@@ -380,6 +381,7 @@ exports.show = async (req, res) => {
   }
 };
 
+// TODO: tambah validasi Gak boleh 0 gambar, minimal 1 gambar
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
   const {

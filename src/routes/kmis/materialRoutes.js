@@ -15,7 +15,7 @@ const multer = require("multer");
 const upload = multer();
 const uploadMaterialFields = upload.fields([
   { name: "materialCovers", maxCount: 1 },
-  { name: "materialFiles", maxCount: 10 },
+  { name: "materialFiles", maxCount: 5 },
 ]);
 
 router.use(

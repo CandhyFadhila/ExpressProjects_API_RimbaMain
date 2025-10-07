@@ -1,5 +1,6 @@
 const knex = require("../../config/database");
 const logger = require("../../utils/logger");
+const { toArray } = require("../../helpers/inputNorm");
 const {
   applySearch,
   applyPagination,
@@ -10,10 +11,10 @@ const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const learningParticipantResource = require("../../resources/kmis/learningParticipantResource");
 const quizResponseResource = require("../../resources/kmis/quizResponseResource");
-// const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
+const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 
 exports.index = async (req, res) => {
-  const { search, topicId } = req.query;
+  const { search, topicId, status } = req.query;
 
   try {
     let query = knex("kmis_learning_attempts as quizParticipant")
@@ -23,14 +24,22 @@ exports.index = async (req, res) => {
         "quizParticipant.kmis_topic_id",
         "topic.id"
       )
-      .select("*")
+      .select("quizParticipant.*")
       .orderBy("quizParticipant.created_at", "desc");
 
-    // applyTrashedScope(query, req, "quizParticipant.deleted_at");
+    applyTrashedScope(query, req, "quizParticipant.deleted_at");
 
     applyRelationIn(query, "quiz.kmis_topic_id", topicId, {
       as: "number",
     });
+
+    if (status) {
+      const statusArray = toArray(status).map(Number);
+      const validStatus = statusArray.filter((s) => [1, 2, 3].includes(s));
+      if (validStatus.length > 0) {
+        query = query.whereIn("quizParticipant.quiz_attempt_status", validStatus);
+      }
+    }
 
     applySearch(query, search, ["user.name", "topic.title"]);
 

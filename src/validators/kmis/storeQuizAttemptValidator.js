@@ -1,6 +1,5 @@
 const { body } = require("express-validator");
 const knex = require("../../config/database");
-const dateHelper = require("../../helpers/dateHelper");
 const QUIZ_ALLOWED_ANSWER_TYPES = Object.freeze(["A", "B", "C", "D"]);
 
 exports.storeQuizAttemptValidator = [
@@ -59,25 +58,4 @@ exports.storeQuizAttemptValidator = [
     .isBoolean()
     .withMessage("Penanda soal harus berupa boolean.")
     .toBoolean(),
-
-  body("answeredAt")
-    .notEmpty()
-    .withMessage("Tanggal ujian tidak boleh kosong.")
-    .bail()
-    .if((value) => isProvided(value))
-    .custom((v) => {
-      if (!dateHelper.isIso8601Z(v)) {
-        throw new Error(
-          "Tanggal ujian harus ISO 8601 dengan Z/offset, contoh: 2025-10-02T10:00:00+07:00 atau 2025-10-02T03:00:00Z."
-        );
-      }
-      const dUTC = dateHelper.toUTC(v);
-      if (!dUTC) throw new Error("Tanggal ujian tidak valid.");
-      const now = new Date();
-      if (dUTC > now)
-        throw new Error("Tanggal ujian tidak boleh di masa depan.");
-      const min = new Date("1900-01-01T00:00:00.000Z");
-      if (dUTC < min) throw new Error("Tanggal ujian tidak masuk akal.");
-      return true;
-    }),
 ];

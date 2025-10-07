@@ -575,7 +575,7 @@ exports.restore = async (req, res) => {
     if (restoredCount === 0) {
       const response = new WithoutDataResource(
         422,
-        "DUPLICATE_NAME",
+        "DUPLICATE_QUESTION",
         "Restore Gagal",
         "Semua ID gagal direstore karena duplikat data dengan entri aktif atau duplikat data di dalam batch."
       );

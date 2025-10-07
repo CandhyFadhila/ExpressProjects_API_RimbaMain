@@ -44,4 +44,14 @@ exports.storeTopicValidator = [
     .bail()
     .isInt()
     .withMessage("Jumlah soal pertanyaan harus berupa angka."),
+
+  body("quizDuration")
+    .trim()
+    .notEmpty()
+    .withMessage("Waktu penyelesaian pertanyaan tidak boleh kosong.")
+    .bail()
+    .isInt()
+    .withMessage(
+      "Waktu penyelesaian pertanyaan harus berupa angka dan satuan detik."
+    ),
 ];

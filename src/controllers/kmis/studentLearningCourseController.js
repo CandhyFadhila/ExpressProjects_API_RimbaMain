@@ -260,7 +260,6 @@ exports.storeQuizAttempt = async (req, res) => {
     .trim()
     .toUpperCase();
   const isMarker = !!req.body.isMarker;
-  const answeredAt = req.body.answeredAt;
 
   const userId =
     req.auth?.userId ??
@@ -270,6 +269,25 @@ exports.storeQuizAttempt = async (req, res) => {
     req.user?.id;
 
   try {
+    // Validasi progress belajar
+    const isProgressValid = await validateLearningProgress(learningAttemptId);
+    if (!isProgressValid) {
+      const response = new WithoutDataResource(
+        422,
+        "LEARNING_PROGRESS_INCOMPLETE",
+        "Progress Belajar Belum Tercapai",
+        "Anda belum menyelesaikan seluruh materi pada topik ini. Silahkan selesaikan materi terlebih dahulu."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
+    // Validasi durasi
+    const isValidTime = await validateQuizDuration(learningAttemptId);
+    if (!isValidTime) {
+      // Jika waktu sudah habis, langsung panggil submitAllAttempt
+      return exports.submitAllAttempt(req, res);
+    }
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       const message = errors
@@ -392,7 +410,7 @@ exports.storeQuizAttempt = async (req, res) => {
         });
       }
 
-      const answeredAtDb = dateHelper.toDatabaseUTC(answeredAt);
+      const answeredAtDb = dateHelper.toUTC(new Date().toISOString());
       const isCorrect =
         selectedOption === String(quiz.correct_option || "").toUpperCase();
 
@@ -592,9 +610,9 @@ exports.submitAllAttempt = async (req, res) => {
       const { answeredCount, totalQuiz, correctCount, score } = summary;
       const response = new WithDataResource(
         201,
-        "SUCCESS_CREATE_DATA",
+        "SUCCESS_FINISH_QUIZ",
         "Berhasil Menyimpan Data",
-        `Submit berhasil. Terjawab: ${answeredCount}/${totalQuiz}, benar: ${correctCount}, skor: ${score}.`,
+        `Semua jawaban yang dipilih berhasil disubmit. Terjawab: ${answeredCount}/${totalQuiz}, benar: ${correctCount}, skor: ${score}.`,
         resourcePayload
       );
       return res.status(201).json(response.toResponse());
@@ -710,6 +728,53 @@ exports.feedback = async (req, res) => {
     return res.status(500).json(response.toResponse());
   }
 };
+
+async function validateLearningProgress(learningAttemptId) {
+  const attempt = await knex("kmis_learning_attempts as a")
+    .where("a.id", learningAttemptId)
+    .select(["a.kmis_topic_id", "a.completed_material"])
+    .first();
+  if (!attempt) {
+    throw new Error("Topik atau pembelajaran tidak ditemukan");
+  }
+
+  const [{ total: totalStr }] = await knex("kmis_materials")
+    .where("kmis_topic_id", attempt.kmis_topic_id)
+    .whereNull("deleted_at")
+    .count("* as total");
+
+  const totalMaterial = Number(totalStr ?? 0);
+  const completedMaterial = Number(attempt.completed_material ?? 0);
+
+  return completedMaterial === totalMaterial;
+}
+
+async function validateQuizDuration(learningAttemptId) {
+  const row = await knex("kmis_learning_attempts as a")
+    .join("kmis_topics as t", "a.kmis_topic_id", "t.id")
+    .where("a.id", learningAttemptId)
+    .select("t.quiz_duration", "a.quiz_started")
+    .first();
+
+  if (!row) throw new Error("Topik atau pembelajaran tidak ditemukan.");
+
+  const limitSec = Number(row.quiz_duration ?? 0);
+
+  // Tanpa limit → selalu boleh lanjut
+  if (!Number.isFinite(limitSec) || limitSec <= 0) return true;
+
+  // Belum mulai (quiz_started null) → timer belum jalan → boleh lanjut
+  if (!row.quiz_started) return true;
+
+  const startUTC = dateHelper.toUTC(row.quiz_started);
+  const nowUTC = dateHelper.toUTC(new Date());
+
+  if (!startUTC || !nowUTC) return true;
+  const elapsedSec = Math.max(0, Math.floor((nowUTC - startUTC) / 1000));
+
+  // Masih dalam durasi → true; lewat → false
+  return elapsedSec <= limitSec;
+}
 
 async function attemptExamResponse(learningAttemptId) {
   // 1) Ambil attempt minimal
@@ -828,6 +893,11 @@ async function handleFinalQuestion(trx, { learningAttemptId, topicId, req }) {
 
   const score = computeScorePercent(correctCount, totalQuiz, 2);
 
+  let quizAttemptStatus = QUIZ_STATUS.FINISHED;
+  if (answeredCount !== totalQuiz) {
+    quizAttemptStatus = QUIZ_STATUS.ABANDONED;
+  }
+
   await trx("kmis_learning_attempts").where("id", learningAttemptId).update({
     quiz_assessment_status: true,
     quiz_finished: finishedAtDb,
@@ -840,7 +910,7 @@ async function handleFinalQuestion(trx, { learningAttemptId, topicId, req }) {
     empty_count: emptyCount,
     score_total: score,
 
-    quiz_attempt_status: QUIZ_STATUS.FINISHED,
+    quiz_attempt_status: quizAttemptStatus,
     updated_at: trx.fn.now(),
   });
 
@@ -1093,7 +1163,6 @@ async function sendCertificateEmail({ attemptId, certFile, summary }) {
     return false;
   }
 }
-
 
 // "data": {
 //   "topic": {

@@ -85,7 +85,7 @@ exports.index = async (req, res) => {
 
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
-  const { title, description, totalQuiz, categoryId } = req.body;
+  const { title, description, totalQuiz, quizDuration, categoryId } = req.body;
 
   try {
     const errors = validationResult(req);
@@ -177,6 +177,7 @@ exports.store = async (req, res) => {
         title,
         description,
         total_quiz: totalQuiz,
+        quiz_duration: quizDuration,
       })
       .returning("*");
 
@@ -251,7 +252,7 @@ exports.show = async (req, res) => {
 
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
-  const { title, description, categoryId, totalQuiz, deleteDocumentIds } =
+  const { title, description, categoryId, totalQuiz, quizDuration, deleteDocumentIds } =
     req.body;
   const id = req.params.id;
 
@@ -344,6 +345,7 @@ exports.update = async (req, res) => {
         title,
         description,
         total_quiz: totalQuiz,
+        quiz_duration: quizDuration,
         updated_at: trx.fn.now(),
       });
 

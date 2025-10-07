@@ -30,8 +30,8 @@ router.post(
   studentLearningCourseController.storeLearningAttempt
 );
 
-router.post(
-  "/progress-update/:id",
+router.patch(
+  "/update/:id",
   requirePermission(["edit.kmis_learning_course"]),
   upload.none(),
   updateProgressLearningAttemptValidator,
