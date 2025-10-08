@@ -196,8 +196,6 @@ exports.store = async (req, res) => {
         return res.status(422).json(r.toResponse());
       }
       checkFiles(materiFiles, IMAGE_TYPES, "Berkas materi (materialFiles)");
-      if (coverFiles.length > 0)
-        checkFiles(coverFiles, IMAGE_TYPES, "File cover (materialCovers)");
     } else if (type === "dokumen") {
       if (materiFiles.length === 0) {
         const r = new WithoutDataResource(
@@ -208,31 +206,10 @@ exports.store = async (req, res) => {
         );
         return res.status(422).json(r.toResponse());
       }
-      if (coverFiles.length === 0) {
-        const r = new WithoutDataResource(
-          422,
-          "FILES_NOT_FOUND",
-          "File Tidak Ditemukan",
-          "File cover (materialCovers) wajib diunggah untuk tipe dokumen."
-        );
-        return res.status(422).json(r.toResponse());
-      }
-      if (coverFiles.length > 5) {
-        const r = new WithoutDataResource(
-          422,
-          "MAX_FILES",
-          "Terlalu Banyak File",
-          "Maksimal upload cover adalah 5 file."
-        );
-        return res.status(422).json(r.toResponse());
-      }
-      checkFiles(coverFiles, IMAGE_TYPES, "File cover (materialCovers)");
       checkFiles(materiFiles, DOC_TYPES, "Berkas materi (materialFiles)");
     } else {
       // text / video: tidak wajib file
       // Jika user mengirim file, validasi sewajarnya: cover harus gambar; materiFiles bebas (ikut DOC_TYPES)
-      if (coverFiles.length > 0)
-        checkFiles(coverFiles, IMAGE_TYPES, "File cover (materialCovers)");
       if (materiFiles.length > 0)
         checkFiles(materiFiles, DOC_TYPES, "Berkas materi (materialFiles)");
     }
