@@ -662,16 +662,6 @@ async function validateFilesQuotaAndTypesOnUpdate({
 
   const incomingCount = Array.isArray(files) ? files.length : 0;
 
-  if (currentCount === 0 && incomingCount === 0) {
-    return {
-      ok: false,
-      http: 422,
-      code: "MINIMUM_FILE_REQUIRED",
-      title: "Minimal 1 File Harus Ada",
-      desc: "Minimal harus ada 1 file di dalam database.",
-    };
-  }
-
   // Tidak upload file → boleh lanjut (validator hanya mengembalikan info remaining)
   if (incomingCount === 0) {
     return { ok: true, remaining };
