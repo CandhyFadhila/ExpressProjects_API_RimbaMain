@@ -89,8 +89,8 @@ exports.getAllCategory = async (req, res) => {
   try {
     let query = knex("kmis_categories as category")
       .select([
+        "category.id",
         "category.title",
-        "category.category_cover_ids",
         "category.description",
       ])
       .whereNull("category.deleted_at")
@@ -145,7 +145,7 @@ exports.getCategorybyId = async (req, res) => {
 
   try {
     const category = await knex("kmis_categories")
-      .select(["title", "category_cover_ids", "description"])
+      .select(["id", "title", "description"])
       .where("id", id)
       .whereNull("deleted_at")
       .first();
@@ -189,11 +189,12 @@ exports.getAllTopic = async (req, res) => {
   try {
     let query = knex("kmis_topics as topic")
       .select([
+        "topic.id",
         "topic.kmis_categories_id",
-        "topic.topic_cover_ids",
         "topic.title",
         "topic.description",
         "topic.total_quiz",
+        "topic.quiz_duration",
       ])
       .leftJoin(
         "kmis_categories as category",
@@ -257,11 +258,12 @@ exports.getTopicbyId = async (req, res) => {
   try {
     const topic = await knex("kmis_topics")
       .select([
+        "id",
         "kmis_categories_id",
-        "topic_cover_ids",
         "title",
         "description",
         "total_quiz",
+        "quiz_duration",
       ])
       .where("id", id)
       .whereNull("deleted_at")
@@ -306,11 +308,12 @@ exports.getTopicbyCategoryId = async (req, res) => {
   try {
     let query = knex("kmis_topics as topic")
       .select([
+        "topic.id",
         "topic.kmis_categories_id",
-        "topic.topic_cover_ids",
         "topic.title",
         "topic.description",
         "topic.total_quiz",
+        "topic.quiz_duration",
       ])
       .where("topic.kmis_categories_id", id)
       .leftJoin(
@@ -669,6 +672,7 @@ exports.getAllMaterial = async (req, res) => {
       )
       .leftJoin("kmis_topics as topic", "topic.id", "material.kmis_topic_id")
       .select([
+        "material.id",
         "material.title",
         "material.description",
         "material.material_types",
@@ -741,6 +745,7 @@ exports.getMaterialbyId = async (req, res) => {
   try {
     const material = await knex("kmis_materials")
       .select([
+        "id",
         "title",
         "description",
         "material_types",
@@ -869,6 +874,7 @@ exports.getMaterialbyTopicIdorCategoryId = async (req, res) => {
       )
       .leftJoin("kmis_topics as topic", "topic.id", "material.kmis_topic_id")
       .select([
+        "material.id",
         "material.title",
         "material.description",
         "material.material_types",
@@ -945,6 +951,7 @@ exports.getMaterialbyCreatedId = async (req, res) => {
       )
       .leftJoin("kmis_topics as topic", "topic.id", "material.kmis_topic_id")
       .select([
+        "material.id",
         "material.title",
         "material.description",
         "material.material_types",
@@ -1018,6 +1025,7 @@ exports.getMaterialbyUploadedId = async (req, res) => {
       )
       .leftJoin("kmis_topics as topic", "topic.id", "material.kmis_topic_id")
       .select([
+        "material.id",
         "material.title",
         "material.description",
         "material.material_types",
@@ -1129,6 +1137,7 @@ exports.getMaterialbyMaterialTypes = async (req, res) => {
       )
       .leftJoin("kmis_topics as topic", "topic.id", "material.kmis_topic_id")
       .select([
+        "material.id",
         "material.title",
         "material.description",
         "material.material_types",
@@ -1224,6 +1233,7 @@ exports.getMaterialbyIsPublic = async (req, res) => {
       )
       .leftJoin("kmis_topics as topic", "topic.id", "material.kmis_topic_id")
       .select([
+        "material.id",
         "material.title",
         "material.description",
         "material.material_types",
@@ -1359,6 +1369,7 @@ exports.getQuizbyId = async (req, res) => {
   try {
     const quiz = await knex("kmis_quiz")
       .select(
+        "id",
         "kmis_topic_id",
         "question",
         "answer_a",
@@ -1450,6 +1461,7 @@ exports.getQuizbytopicId = async (req, res) => {
     let query = knex("kmis_quiz as quiz")
       .leftJoin("kmis_topics as topic", "topic.id", "quiz.kmis_topic_id")
       .select(
+        "quiz.id",
         "quiz.kmis_topic_id",
         "quiz.question",
         "quiz.answer_a",
@@ -1516,7 +1528,7 @@ exports.getAllNewsCategory = async (req, res) => {
 
   try {
     let query = knex("cms_news_categories as category")
-      .select(["category.name", "category.description"])
+      .select(["category.id", "category.name", "category.description"])
       .whereNull("category.deleted_at")
       .orderBy("category.created_at", "desc");
 
@@ -1582,7 +1594,7 @@ exports.getNewsCategorybyId = async (req, res) => {
 
   try {
     const category = await knex("cms_news_categories")
-      .select(["name", "description"])
+      .select(["id", "name", "description"])
       .where("id", id)
       .whereNull("deleted_at")
       .first();
@@ -1630,7 +1642,7 @@ exports.getAllEventCategory = async (req, res) => {
 
   try {
     let query = knex("cms_events_categories as category")
-      .select(["category.name", "category.description"])
+      .select(["category.id", "category.name", "category.description"])
       .whereNull("category.deleted_at")
       .orderBy("category.created_at", "desc");
 
@@ -1696,7 +1708,7 @@ exports.getEventCategorybyId = async (req, res) => {
 
   try {
     const category = await knex("cms_events_categories")
-      .select(["name", "description"])
+      .select(["id", "name", "description"])
       .where("id", id)
       .whereNull("deleted_at")
       .first();
@@ -1744,7 +1756,7 @@ exports.getAllAnimalCategory = async (req, res) => {
 
   try {
     let query = knex("cms_animal_categories as category")
-      .select(["category.name", "category.description"])
+      .select(["category.id", "category.name", "category.description"])
       .whereNull("category.deleted_at")
       .orderBy("category.created_at", "desc");
 
@@ -1810,7 +1822,7 @@ exports.getAnimalCategorybyId = async (req, res) => {
 
   try {
     const category = await knex("cms_animal_categories")
-      .select(["name", "description"])
+      .select(["id", "name", "description"])
       .where("id", id)
       .whereNull("deleted_at")
       .first();
@@ -1859,6 +1871,7 @@ exports.getAllEvent = async (req, res) => {
   try {
     let query = knex("cms_events as event")
       .select([
+        "event.id",
         "event.cms_event_category_id",
         "event.title",
         "event.description",
@@ -1931,6 +1944,7 @@ exports.getEventbyId = async (req, res) => {
   try {
     const event = await knex("cms_events")
       .select([
+        "id",
         "cms_event_category_id",
         "title",
         "description",
@@ -1991,6 +2005,7 @@ exports.getEventbyEventCategoryId = async (req, res) => {
         "event.cms_event_category_id"
       )
       .select([
+        "event.id",
         "event.cms_event_category_id",
         "event.title",
         "event.description",
@@ -2053,6 +2068,7 @@ exports.getAllNews = async (req, res) => {
   try {
     let query = knex("cms_news as news")
       .select([
+        "news.id",
         "news.cms_news_category_id",
         "news.thumbnail_ids",
         "news.title",
@@ -2126,6 +2142,7 @@ exports.getNewsbyId = async (req, res) => {
   try {
     const news = await knex("cms_news")
       .select([
+        "id",
         "thumbnail_ids",
         "cms_news_category_id",
         "title",
@@ -2187,6 +2204,7 @@ exports.getNewsbyNewsCategoryId = async (req, res) => {
         "news.cms_news_category_id"
       )
       .select([
+        "news.id",
         "news.cms_news_category_id",
         "news.title",
         "news.slug",
@@ -2249,6 +2267,7 @@ exports.getNewsbySlug = async (req, res) => {
   try {
     const news = await knex("cms_news")
       .select([
+        "id",
         "thumbnail_ids",
         "cms_news_category_id",
         "title",
@@ -2308,6 +2327,7 @@ exports.getAllAnimalComposition = async (req, res) => {
   try {
     let query = knex("cms_animal_composition as animal")
       .select([
+        "animal.id",
         "animal.cms_animal_category_id",
         "animal.species_image_ids",
         "animal.name",
@@ -2379,6 +2399,7 @@ exports.getAnimalCompositionbyId = async (req, res) => {
   try {
     const animal = await knex("cms_animal_composition")
       .select([
+        "id",
         "cms_animal_category_id",
         "species_image_ids",
         "name",
@@ -2438,6 +2459,7 @@ exports.getAnimalCompositionbyAnimalCategoryId = async (req, res) => {
         "animal.cms_animal_category_id"
       )
       .select([
+        "animal.id",
         "animal.cms_animal_category_id",
         "animal.name",
         "animal.description",
