@@ -216,6 +216,7 @@ exports.store = async (req, res) => {
 
     const exists = await trx("kmis_materials")
       .whereRaw("lower(title) = lower(?)", [title])
+      .where("kmis_topic_id", topicId)
       .whereNull("deleted_at")
       .first();
     if (exists) {
@@ -223,7 +224,7 @@ exports.store = async (req, res) => {
         422,
         "DUPLICATE_TITLE",
         "Duplikat Data",
-        `Judul materi '${title}' sudah digunakan. Silakan gunakan judul lain.`
+        `Judul materi '${title}' sudah digunakan oleh topik ini. Silakan gunakan judul lain atau topik lain.`
       );
       return res.status(422).json(response.toResponse());
     }

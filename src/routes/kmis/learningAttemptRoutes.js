@@ -21,6 +21,18 @@ const upload = multer();
 router.use(rateLimiter, authMiddleware, requireAbility("student"));
 
 // Learning Attempt
+router.get(
+  "/get-all-learning-attempt",
+  requirePermission(["view.kmis_learning_course"]),
+  studentLearningCourseController.getListLearningAttempt
+);
+
+router.get(
+  "/show/:id",
+  requirePermission(["view.kmis_learning_course"]),
+  studentLearningCourseController.getDetailLearningAttemptbyTopicId
+);
+
 router.post(
   "/create",
   requirePermission(["create.kmis_learning_course"]),

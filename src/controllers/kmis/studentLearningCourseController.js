@@ -5,27 +5,174 @@ const PDFDocument = require("pdfkit");
 const nodemailer = require("nodemailer");
 const { asJsonb } = require("../../helpers/dbJson");
 const renderEmailTemplate = require("../../utils/emailOTP/renderEmailTemplate");
+const {
+  applySearch,
+  applyPagination,
+  applyRelationIn,
+  formatPaginationResult,
+} = require("../../helpers/queryHelper");
 const dateHelper = require("../../helpers/dateHelper");
 const { stripTitlesOnly } = require("../../helpers/credentialHelper");
+const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 const documentHelper = require("../../helpers/documentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
-const learningParticipantResource = require("../../resources/kmis/learningParticipantResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
+const learningParticipantResource = require("../../resources/kmis/learningParticipantResource");
+const topicResource = require("../../resources/kmis/topicResource");
 const QUIZ_STATUS = Object.freeze({ STARTED: 1, FINISHED: 2, ABANDONED: 3 });
 
-// TODO: Buat get list materi dan quiz berdasarkan topicId (response sesuai template dibawah)
-// "data": {
-//   "topic": {
-//     // topic interface
-//   }
-//   "material": [
-//     // material interface
-//   ],
-//   "quiz": [
-//     // quiz interface (hanya ambil id, top)
-//   ]
-// }
+// Untuk melihat daftar pembelajaran (topic) yang diambil
+exports.getListLearningAttempt = async (req, res) => {
+  const { search, categoryId } = req.query;
+  const userId =
+    req.auth?.userId ??
+    req.auth?.user_id ??
+    req.auth?.id ??
+    req.userId ??
+    req.user?.id;
+
+  try {
+    let query = knex("kmis_learning_attempts as quizParticipant")
+      .leftJoin("users as user", "quizParticipant.attempt_by", "user.id")
+      .leftJoin(
+        "kmis_topics as topic",
+        "quizParticipant.kmis_topic_id",
+        "topic.id"
+      )
+      .select("quizParticipant.*")
+      .where("quizParticipant.attempt_by", userId);
+
+    applyTrashedScope(query, req, "quizParticipant.deleted_at");
+
+    applyRelationIn(query, "topic.kmis_categories_id", categoryId, {
+      as: "number",
+    });
+
+    applySearch(query, search, ["user.name", "topic.title"]);
+
+    query.orderByRaw(`
+      CASE "quizParticipant"."quiz_attempt_status"
+        WHEN 2 THEN 0
+        WHEN 1 THEN 1
+        WHEN 3 THEN 2
+        ELSE 3
+      END ASC,
+      "quizParticipant"."created_at" DESC
+    `);
+
+    const paginationInfo = applyPagination(req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((quizParticipant) =>
+        learningParticipantResource(quizParticipant)
+      )
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data partisipan ujian berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Learning Attempt KMIS | - Error function getListLearningAttempt : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const topic = await knex("kmis_topics")
+      .select([
+        "id",
+        "topic_cover_ids",
+        "kmis_categories_id",
+        "title",
+        "description",
+        "total_quiz",
+        "quiz_duration",
+      ])
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!topic) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data topik dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const [materials, materialCountRow] = await Promise.all([
+      knex("kmis_materials")
+        .select(["id", "title"])
+        .where("kmis_topic_id", id)
+        .whereNull("deleted_at")
+        .orderBy("created_at", "asc"),
+      knex("kmis_materials")
+        .where("kmis_topic_id", id)
+        .whereNull("deleted_at")
+        .count("* as total")
+        .first(),
+    ]);
+
+    const totalMaterial = Number(materialCountRow?.total || 0);
+    const data = {
+      topic: await topicResource(topic),
+      material: materials.map((m) => ({ id: m.id, title: m.title })),
+      totalMaterial,
+    };
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      `Detail data topik '${topic.title}' berhasil didapatkan.`,
+      data
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Learning Attempt KMIS | - Error function getDetailLearningAttemptbyTopicId : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
 
 exports.storeLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
@@ -83,16 +230,16 @@ exports.storeLearningAttempt = async (req, res) => {
     const totalMaterial = Number(materialsAgg?.total ?? 0);
     const totalQuiz = Number(quizAgg?.total ?? 0);
 
-    if (totalMaterial < 1 || totalQuiz < 1) {
-      await trx.rollback();
-      const response = new WithoutDataResource(
-        422,
-        "FAILED_VALIDATION",
-        "Topik Belum Siap Dipelajari",
-        `Topik '${topicId}' membutuhkan minimal 1 materi dan 1 soal kuis. Saat ini: ${totalMaterial} materi dan ${totalQuiz} kuis.`
-      );
-      return res.status(422).json(response.toResponse());
-    }
+    // if (totalMaterial < 1 || totalQuiz < 1) {
+    //   await trx.rollback();
+    //   const response = new WithoutDataResource(
+    //     422,
+    //     "FAILED_VALIDATION",
+    //     "Topik Belum Siap Dipelajari",
+    //     `Topik '${topicId}' membutuhkan minimal 1 materi dan 1 soal kuis. Saat ini: ${totalMaterial} materi dan ${totalQuiz} kuis.`
+    //   );
+    //   return res.status(422).json(response.toResponse());
+    // }
 
     const already = await trx("kmis_learning_attempts")
       .where({ attempt_by: userId, kmis_topic_id: topicId })
@@ -153,6 +300,8 @@ exports.storeLearningAttempt = async (req, res) => {
   }
 };
 
+// TODO: Revisi, auto update dari BE kasih validasi.
+// jika materi bertipe text, minimal belajar adalah 15 menit
 exports.updateProgressLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { completedMaterial } = req.body;

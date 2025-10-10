@@ -190,6 +190,7 @@ exports.getAllTopic = async (req, res) => {
     let query = knex("kmis_topics as topic")
       .select([
         "topic.id",
+        "topic.topic_cover_ids",
         "topic.kmis_categories_id",
         "topic.title",
         "topic.description",
@@ -259,6 +260,7 @@ exports.getTopicbyId = async (req, res) => {
     const topic = await knex("kmis_topics")
       .select([
         "id",
+        "topic_cover_ids",
         "kmis_categories_id",
         "title",
         "description",
@@ -309,6 +311,7 @@ exports.getTopicbyCategoryId = async (req, res) => {
     let query = knex("kmis_topics as topic")
       .select([
         "topic.id",
+        "topic.topic_cover_ids",
         "topic.kmis_categories_id",
         "topic.title",
         "topic.description",
