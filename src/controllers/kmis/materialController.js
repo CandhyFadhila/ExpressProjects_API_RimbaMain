@@ -582,6 +582,7 @@ exports.update = async (req, res) => {
 
     const duplicate = await trx("kmis_materials")
       .whereRaw("lower(title) = lower(?)", [title])
+      .where("kmis_topic_id", topicId)
       .whereNull("deleted_at")
       .whereNot("id", id)
       .first();

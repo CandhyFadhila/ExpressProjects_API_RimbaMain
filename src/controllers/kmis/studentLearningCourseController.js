@@ -301,7 +301,6 @@ exports.storeLearningAttempt = async (req, res) => {
 };
 
 // TODO: Revisi, auto update dari BE kasih validasi.
-// jika materi bertipe text, minimal belajar adalah 15 menit
 exports.updateProgressLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { completedMaterial } = req.body;
