@@ -263,7 +263,7 @@ exports.store = async (req, res) => {
       notes = `Materi diunggah oleh akun super admin yang mengatasnamakan akun pengajar.`;
     }
 
-    await trx("kmis_materials")
+    const [newMaterial] = await trx("kmis_materials")
       .insert({
         created_by: userId,
         // uploaded_by: uploadedBy,
@@ -290,6 +290,8 @@ exports.store = async (req, res) => {
     );
 
     await trx.commit();
+
+    await syncMaterialOrder();
 
     const response = new WithoutDataResource(
       201,
@@ -540,44 +542,26 @@ exports.update = async (req, res) => {
     ]);
     newFileIds = uniq([...newFileIds, ...addFileFromBody, ...uploadedFileIds]);
 
-    const validationCover = await validateFilesQuotaAndTypesOnUpdate({
-      existingRow: existing,
-      deleteDocumentIds: delCover,
-      files: coverFiles,
-      dbColumn: "materials_cover_ids",
-      maxFilesAllowed: 1,
-      allowedTypes: IMAGE_TYPES,
-      sizeLimitBytes: 10 * 1024 * 1024,
-    });
-
-    const validationFile = await validateFilesQuotaAndTypesOnUpdate({
-      existingRow: existing,
-      deleteDocumentIds: delFile,
-      files: materiFiles,
-      dbColumn: "materials_file_ids",
-      maxFilesAllowed: 5,
-      allowedTypes: DOC_TYPES.concat(IMAGE_TYPES),
-      sizeLimitBytes: 10 * 1024 * 1024,
-    });
-
-    if (!validationCover.ok) {
-      const response = new WithoutDataResource(
-        validationCover.http,
-        validationCover.code,
-        validationCover.title,
-        validationCover.desc
-      );
-      return res.status(validationCover.http).json(response.toResponse());
-    }
-
-    if (!validationFile.ok) {
-      const response = new WithoutDataResource(
-        validationFile.http,
-        validationFile.code,
-        validationFile.title,
-        validationFile.desc
-      );
-      return res.status(validationFile.http).json(response.toResponse());
+    if (type === "gambar") {
+      if (newFileIds.length === 0) {
+        const response = new WithoutDataResource(
+          422,
+          "FILES_REQUIRED",
+          "File Wajib",
+          "Untuk tipe 'gambar', minimal harus ada 1 berkas pada materialFiles."
+        );
+        return res.status(422).json(response.toResponse());
+      }
+    } else if (type === "dokumen") {
+      if (newFileIds.length === 0) {
+        const response = new WithoutDataResource(
+          422,
+          "FILES_REQUIRED",
+          "File Wajib",
+          "Untuk tipe 'dokumen', minimal harus ada 1 berkas pada materialFiles."
+        );
+        return res.status(422).json(response.toResponse());
+      }
     }
 
     const duplicate = await trx("kmis_materials")
@@ -621,6 +605,8 @@ exports.update = async (req, res) => {
     );
 
     await trx.commit();
+
+    await syncMaterialOrder();
 
     const willDelete = [...delCover, ...delFile].filter((n) =>
       Number.isFinite(n)
@@ -724,6 +710,8 @@ exports.destroy = async (req, res) => {
     );
 
     await trx.commit();
+
+    await syncMaterialOrder();
 
     const response = new WithoutDataResource(
       200,
@@ -853,6 +841,8 @@ exports.restore = async (req, res) => {
 
     await trx.commit();
 
+    await syncMaterialOrder();
+
     if (restoredCount === 0) {
       const response = new WithoutDataResource(
         422,
@@ -893,105 +883,35 @@ exports.restore = async (req, res) => {
   }
 };
 
-async function validateFilesQuotaAndTypesOnUpdate({
-  existingRow,
-  deleteDocumentIds,
-  files,
-  dbColumn = "materials_file_ids",
-  maxFilesAllowed = 5,
-  allowedTypes = [
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
-    "image/webp",
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/vnd.ms-powerpoint",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  ],
-  sizeLimitBytes = 10 * 1024 * 1024,
-}) {
-  // Normalisasi array dokumen yang saat ini tersimpan
-  const currentIds = normIdArray(normJsonbArray(existingRow?.[dbColumn]), {
-    as: "string",
-  });
+async function syncMaterialOrder() {
+  const trx = await knex.transaction();
 
-  // Normalisasi daftar yang minta dihapus (kalau ada), lalu "simulasikan" state setelah dihapus
-  const toDelete = toArray(deleteDocumentIds).map(String);
-  const currentAfterDelete = currentIds.filter(
-    (id) => !toDelete.includes(String(id))
-  );
+  try {
+    const topics = await trx("kmis_topics")
+      .select("id", "material_order_ids")
+      .whereNull("deleted_at");
 
-  // Hitung sisa slot setelah penghapusan
-  const currentCount = currentAfterDelete.length;
-  const remaining = Math.max(maxFilesAllowed - currentCount, 0);
+    for (const topic of topics) {
+      // 2. Ambil materi yang terkait dengan topicId
+      const materials = await trx("kmis_materials")
+        .select("id")
+        .where("kmis_topic_id", topic.id)
+        .whereNull("deleted_at");
 
-  const incomingCount = Array.isArray(files) ? files.length : 0;
+      const materialIds = materials.map((material) => Number(material.id));
 
-  if (currentCount === 0 && incomingCount === 0) {
-    return {
-      ok: false,
-      http: 422,
-      code: "MINIMUM_FILE_REQUIRED",
-      title: "Minimal 1 File Harus Ada",
-      desc: "Minimal harus ada 1 file di dalam database.",
-    };
-  }
-
-  // Tidak upload file → boleh lanjut (validator hanya mengembalikan info remaining)
-  if (incomingCount === 0) {
-    return { ok: true, remaining };
-  }
-
-  // Sudah penuh tapi masih ada file yang dikirim
-  if (remaining === 0) {
-    return {
-      ok: false,
-      http: 422,
-      code: "MAX_CAPACITY",
-      title: "Kapasitas Sudah Penuh",
-      desc: "Kapasitas file untuk data ini sudah terpenuhi. Tidak ada slot tersisa.",
-    };
-  }
-
-  // Jika payload melebihi sisa slot → kembalikan info berapa yang boleh
-  if (incomingCount > remaining) {
-    const s = remaining;
-    return {
-      ok: false,
-      http: 422,
-      code: "UPLOAD_LIMIT_EXCEEDED",
-      title: "Terlalu Banyak File",
-      desc: `File yang diperbolehkan di upload adalah ${s} file.`,
-    };
-  }
-
-  // Validasi tipe & ukuran per file
-  for (const f of files) {
-    if (!allowedTypes.includes(f.mimetype)) {
-      return {
-        ok: false,
-        http: 422,
-        code: "INVALID_FILE_TYPE",
-        title: "Tipe File Salah",
-        desc: `File hanya boleh bertipe: JPG, JPEG, PNG, WebP, PDF, DOC, DOCX, XLS, XLSX, PPT, dan PPTX.`,
-      };
+      await trx("kmis_topics")
+        .where("id", topic.id)
+        .update({
+          material_order_ids: asJsonb(materialIds),
+          updated_at: trx.fn.now(),
+        });
     }
-    if (f.size > sizeLimitBytes) {
-      return {
-        ok: false,
-        http: 422,
-        code: "FILE_TOO_LARGE",
-        title: "Ukuran File Terlalu Besar",
-        desc: `Ukuran maksimal tiap file adalah ${Math.floor(
-          sizeLimitBytes / (1024 * 1024)
-        )}MB.`,
-      };
-    }
-  }
 
-  return { ok: true, remaining };
+    await trx.commit();
+  } catch (error) {
+    await trx.rollback();
+    logger.error(`| Material KMIS | - Error function syncMaterialOrder: ${error.message}`);
+    throw new Error(`Error syncing material order: ${error.message}`);
+  }
 }

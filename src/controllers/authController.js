@@ -423,7 +423,7 @@ exports.sendOTP = async (req, res) => {
 
   try {
     const user = await knex("users")
-      .select("id", "name")
+      .select("id", "name", "role_id")
       .where({ email })
       .first();
     if (!user) {
@@ -434,6 +434,16 @@ exports.sendOTP = async (req, res) => {
         `Akun dengan email '${email}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
+    }
+
+    if (user.role_id !== 3) {
+      const response = new WithoutDataResource(
+        403,
+        "FORBIDDEN_ROLE",
+        "Akses Ditolak",
+        "Hanya akun dengan role 'Peserta' yang diperbolehkan untuk reset password."
+      );
+      return res.status(403).json(response.toResponse());
     }
 
     const status = Number(user.account_status);
@@ -509,7 +519,7 @@ exports.verifyOTP = async (req, res) => {
 
   try {
     const user = await knex("users")
-      .select("id", "email")
+      .select("id", "email", "role_id")
       .where({ email })
       .first();
     if (!user) {
@@ -520,6 +530,16 @@ exports.verifyOTP = async (req, res) => {
         `Akun dengan email '${email}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
+    }
+
+    if (user.role_id !== 3) {
+      const response = new WithoutDataResource(
+        403,
+        "FORBIDDEN_ROLE",
+        "Akses Ditolak",
+        "Hanya akun dengan role 'Peserta' yang diperbolehkan untuk reset password."
+      );
+      return res.status(403).json(response.toResponse());
     }
 
     const key = `otp:${user.id}`;
@@ -577,7 +597,7 @@ exports.resetPassword = async (req, res) => {
   try {
     // Cari user
     const user = await knex("users")
-      .select("id", "email")
+      .select("id", "email", "role_id")
       .where({ email })
       .first();
     if (!user) {
@@ -588,6 +608,16 @@ exports.resetPassword = async (req, res) => {
         `Akun dengan email '${email}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
+    }
+
+    if (user.role_id !== 3) {
+      const response = new WithoutDataResource(
+        403,
+        "FORBIDDEN_ROLE",
+        "Akses Ditolak",
+        "Hanya akun dengan role 'Peserta' yang diperbolehkan untuk reset password."
+      );
+      return res.status(403).json(response.toResponse());
     }
 
     const status = Number(user.account_status);

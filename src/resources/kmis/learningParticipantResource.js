@@ -2,9 +2,10 @@ const knex = require("../../config/database");
 const {
   resolveArrayRelations,
 } = require("../../helpers/resolveArrayRelations");
-const documentResource = require("../doc/documentResource");
-const UserResource = require("../auth/UserResource");
-const topicResource = require("./topicResource");
+const documentResource = require("../../resources/doc/documentResource");
+const materialResource = require("../../resources/kmis/materialResource");
+const UserResource = require("../../resources/auth/UserResource");
+const topicResource = require("../../resources/kmis/topicResource");
 
 async function learningParticipantResource(quizParticipant) {
   const [user, topic] = await Promise.all([
@@ -22,14 +23,34 @@ async function learningParticipantResource(quizParticipant) {
     documentResource
   );
 
+  const materials = await knex("kmis_materials")
+    .whereIn("id", topic.material_order_ids || [])
+    .select(
+      "id",
+      "kmis_topic_id",
+      "materials_file_ids",
+      "materials_cover_ids",
+      "title",
+      "material_types",
+      "material_data",
+      "description",
+      "is_public"
+    )
+    .orderByRaw(`array_position(?, id)`, [topic.material_order_ids]);
+
+  const materialResources = await Promise.all(
+    materials.map((material) => materialResource(material))
+  );
+
   return {
     id: quizParticipant.id,
     attemptUser: user ? await UserResource(user) : null,
     topic: topic ? await topicResource(topic) : null,
+    completedMaterial: materialResources,
     attemptStatus: quizParticipant.quiz_attempt_status,
     assessmentStatus: quizParticipant.quiz_assessment_status,
     totalMaterial: quizParticipant.total_material,
-    completedMaterial: quizParticipant.completed_material,
+    learningStarted: quizParticipant.learning_started,
     completedQuiz: quizParticipant.completed_quiz,
     quizStarted: quizParticipant.quiz_started,
     quizFinished: quizParticipant.quiz_finished,
@@ -40,6 +61,7 @@ async function learningParticipantResource(quizParticipant) {
     emptyCount: quizParticipant.empty_count,
     scoreTotal: quizParticipant.score_total,
     feedback: quizParticipant.feedback,
+    feedbackComment: quizParticipant.feedback_comment,
     certificate: certificates,
     createdAt: quizParticipant.created_at,
     updatedAt: quizParticipant.updated_at,

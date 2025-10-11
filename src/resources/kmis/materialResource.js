@@ -2,7 +2,6 @@ const {
   resolveArrayRelations,
 } = require("../../helpers/resolveArrayRelations");
 const knex = require("../../config/database");
-const topicResource = require("../../resources/kmis/topicResource");
 const UserResource = require("../../resources/auth/UserResource");
 const documentResource = require("../../resources/doc/documentResource");
 
@@ -35,7 +34,18 @@ async function materialResource(material) {
     id: material.id,
     createdUser: createdUser ? await UserResource(createdUser) : null,
     uploadedUser: uploadedUser ? await UserResource(uploadedUser) : null,
-    topic: topic ? await topicResource(topic) : null,
+    topic: topic
+      ? {
+          id: topic.id,
+          title: topic.title,
+          description: topic.description,
+          totalQuiz: topic.total_quiz,
+          quizDuration: topic.quiz_duration,
+          createdAt: topic.created_at,
+          updatedAt: topic.updated_at,
+          deletedAt: topic.deleted_at,
+        }
+      : null,
     materialFile: file,
     materialCover: cover,
     title: material.title,

@@ -4,6 +4,7 @@ const {
 const knex = require("../../config/database");
 const categoryResource = require("../../resources/kmis/categoryResource");
 const documentResource = require("../../resources/doc/documentResource");
+const materialResource = require("../../resources/kmis/materialResource");
 
 async function topicResource(topic) {
   const category = topic.kmis_categories_id
@@ -18,10 +19,34 @@ async function topicResource(topic) {
     documentResource
   );
 
+  const materials = await knex("kmis_materials")
+    .whereIn("id", topic.material_order_ids || [])
+    .select(
+      "id",
+      "kmis_topic_id",
+      "materials_file_ids",
+      "materials_cover_ids",
+      "title",
+      "material_types",
+      "material_data",
+      "description",
+      "is_public"
+    )
+    .orderByRaw(
+      `array_position(?, id)`,
+      [topic.material_order_ids]
+    );
+
+  // Map hasil query menjadi resource material
+  const materialResources = await Promise.all(
+    materials.map((material) => materialResource(material)) // Apply materialResource here for each material
+  );
+
   return {
     id: topic.id,
     category: category ? await categoryResource(category) : null,
     topicCover: photos,
+    materialOrder: materialResources,
     title: topic.title,
     description: topic.description,
     totalQuiz: topic.total_quiz,

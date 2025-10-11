@@ -1,18 +1,12 @@
 const { validationResult } = require("express-validator");
 const knex = require("../../config/database");
 const logger = require("../../utils/logger");
-const {
-  toArray,
-  normJsonbArray,
-  normIdArray,
-} = require("../../helpers/inputNorm");
-const { asJsonb } = require("../../helpers/dbJson");
+const { normIdArray } = require("../../helpers/inputNorm");
 const {
   applySearch,
   applyPagination,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
-const documentHelper = require("../../helpers/documentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const categoryResource = require("../../resources/kmis/categoryResource");
@@ -106,62 +100,8 @@ exports.store = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    if (!req.files || req.files.length === 0) {
-      const response = new WithoutDataResource(
-        422,
-        "FILES_NOT_FOUND",
-        "File Tidak Ditemukan",
-        "File cover wajib diunggah."
-      );
-      return res.status(422).json(response.toResponse());
-    }
-    if (req.files.length > 1) {
-      const response = new WithoutDataResource(
-        422,
-        "MAX_FILES",
-        "Terlalu Banyak File",
-        "Maksimal upload adalah 1 file."
-      );
-      return res.status(422).json(response.toResponse());
-    }
-
-    for (const file of req.files) {
-      const allowedTypes = [
-        "image/jpeg",
-        "image/jpg",
-        "image/png",
-        "image/webp",
-      ];
-      if (!allowedTypes.includes(file.mimetype)) {
-        const response = new WithoutDataResource(
-          422,
-          "INVALID_FILE_TYPE",
-          "Tipe File Salah",
-          "File File hanya boleh JPG, JPEG, PNG, dan WebP."
-        );
-        return res.status(422).json(response.toResponse());
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        const response = new WithoutDataResource(
-          422,
-          "FILE_TOO_LARGE",
-          "Ukuran File Terlalu Besar",
-          "Ukuran maksimal tiap file adalah 10MB."
-        );
-        return res.status(422).json(response.toResponse());
-      }
-    }
-
-    const uploadedDocuments = await documentHelper.uploadDocuments(
-      req.files,
-      req
-    );
-    const firstId = uploadedDocuments?.[0];
-    const coverId = Number(firstId);
-
     await trx("kmis_categories")
       .insert({
-        category_cover_ids: asJsonb([coverId]),
         title,
         description,
       })
@@ -241,7 +181,7 @@ exports.show = async (req, res) => {
 
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
-  const { title, description, deleteDocumentIds } = req.body;
+  const { title, description } = req.body;
   const id = req.params.id;
 
   try {
@@ -286,52 +226,11 @@ exports.update = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    const deletedIds = toArray(deleteDocumentIds).map(String);
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-    const validation = await validateFilesQuotaAndTypesOnUpdate({
-      existingRow: existing,
-      deleteDocumentIds: deletedIds,
-      files: Array.isArray(req.files) ? req.files : [],
-      dbColumn: "category_cover_ids",
-      maxFilesAllowed: 1,
-      allowedTypes,
-      sizeLimitBytes: 10 * 1024 * 1024,
+    await trx("kmis_categories").where("id", id).update({
+      title,
+      description,
+      updated_at: trx.fn.now(),
     });
-    if (!validation.ok) {
-      const response = new WithoutDataResource(
-        validation.http,
-        validation.code,
-        validation.title,
-        validation.desc
-      );
-      return res.status(validation.http).json(response.toResponse());
-    }
-
-    const oldCoverIds = normJsonbArray(existing.category_cover_ids);
-    const oldDocId = normIdArray(oldCoverIds, { as: "number" })[0] ?? null;
-
-    let finalDocId = oldDocId;
-    if (finalDocId != null && deletedIds.includes(String(finalDocId))) {
-      await documentHelper.deleteDocuments([finalDocId]);
-      finalDocId = null;
-    }
-
-    let uploadIds = null;
-    if (Array.isArray(req.files) && req.files.length > 0) {
-      uploadIds = await documentHelper.uploadDocuments(req.files, req);
-    }
-
-    const coverId = uploadIds?.[0] ?? finalDocId ?? null;
-    const coverArr = coverId != null ? [Number(coverId)] : [];
-
-    await trx("kmis_categories")
-      .where("id", id)
-      .update({
-        category_cover_ids: asJsonb(coverArr),
-        title,
-        description,
-        updated_at: trx.fn.now(),
-      });
 
     await activityLogHelper.logUpdate(
       {
@@ -599,84 +498,3 @@ exports.restore = async (req, res) => {
     res.status(500).json(response.toResponse());
   }
 };
-
-async function validateFilesQuotaAndTypesOnUpdate({
-  existingRow,
-  deleteDocumentIds,
-  files,
-  dbColumn = "category_cover_ids",
-  maxFilesAllowed = 1,
-  allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
-  sizeLimitBytes = 10 * 1024 * 1024,
-}) {
-  // Normalisasi array dokumen yang saat ini tersimpan
-  const currentIds = normIdArray(normJsonbArray(existingRow?.[dbColumn]), {
-    as: "string",
-  });
-
-  // Normalisasi daftar yang minta dihapus (kalau ada), lalu "simulasikan" state setelah dihapus
-  const toDelete = toArray(deleteDocumentIds).map(String);
-  const currentAfterDelete = currentIds.filter(
-    (id) => !toDelete.includes(String(id))
-  );
-
-  // Hitung sisa slot setelah penghapusan
-  const currentCount = currentAfterDelete.length;
-  const remaining = Math.max(maxFilesAllowed - currentCount, 0);
-
-  const incomingCount = Array.isArray(files) ? files.length : 0;
-
-  // Tidak upload file → boleh lanjut (validator hanya mengembalikan info remaining)
-  if (incomingCount === 0) {
-    return { ok: true, remaining };
-  }
-
-  // Sudah penuh tapi masih ada file yang dikirim
-  if (remaining === 0) {
-    return {
-      ok: false,
-      http: 422,
-      code: "MAX_CAPACITY",
-      title: "Kapasitas Sudah Penuh",
-      desc: "Kapasitas file untuk data ini sudah terpenuhi. Tidak ada slot tersisa.",
-    };
-  }
-
-  // Jika payload melebihi sisa slot → kembalikan info berapa yang boleh
-  if (incomingCount > remaining) {
-    const s = remaining;
-    return {
-      ok: false,
-      http: 422,
-      code: "UPLOAD_LIMIT_EXCEEDED",
-      title: "Terlalu Banyak File",
-      desc: `File yang diperbolehkan di upload adalah ${s} file.`,
-    };
-  }
-
-  // Validasi tipe & ukuran per file
-  for (const f of files) {
-    if (!allowedTypes.includes(f.mimetype)) {
-      return {
-        ok: false,
-        http: 422,
-        code: "INVALID_FILE_TYPE",
-        title: "Tipe File Salah",
-        desc: `File hanya boleh bertipe: JPG, JPEG, PNG, dan WebP.`,
-      };
-    }
-    if (f.size > sizeLimitBytes) {
-      return {
-        ok: false,
-        http: 422,
-        code: "FILE_TOO_LARGE",
-        title: "Ukuran File Terlalu Besar",
-        desc: `Ukuran maksimal tiap file adalah ${Math.floor(
-          sizeLimitBytes / (1024 * 1024)
-        )}MB.`,
-      };
-    }
-  }
-
-  return { ok: true, remaining };
-}

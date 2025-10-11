@@ -268,6 +268,7 @@ exports.update = async (req, res) => {
     categoryId,
     totalQuiz,
     quizDuration,
+    materialOrderIds,
     deleteDocumentIds,
   } = req.body;
   const id = req.params.id;
@@ -298,6 +299,29 @@ exports.update = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
+    const incomingMaterialOrderIds = toArray(materialOrderIds).map(String);
+    if (incomingMaterialOrderIds && incomingMaterialOrderIds.length > 0) {
+      const invalidMaterialIds = await trx("kmis_materials")
+        .whereIn("id", incomingMaterialOrderIds)
+        .select("id")
+        .then((materials) => {
+          const validIds = materials.map((m) => m.id);
+          return incomingMaterialOrderIds.filter((id) => !validIds.includes(id));
+        });
+
+      if (invalidMaterialIds.length > 0) {
+        const response = new WithoutDataResource(
+          422,
+          "INVALID_MATERIAL_IDS",
+          "ID Material Tidak Valid",
+          `ID material berikut tidak ditemukan di database: ${invalidMaterialIds.join(
+            ", "
+          )}.`
+        );
+        return res.status(422).json(response.toResponse());
+      }
+    }
+
     const existing = await trx("kmis_topics").where("id", id).first();
     if (!existing) {
       const response = new WithoutDataResource(
@@ -307,6 +331,25 @@ exports.update = async (req, res) => {
         `Data topik dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
+    }
+
+    const existingMaterialOrderIds = normJsonbArray(
+      existing.material_order_ids
+    ).map(String);
+
+    // Cek apakah keduanya memiliki ID yang sama
+    const areArraysEqual = (arr1, arr2) => {
+      return arr1.sort().join(",") === arr2.sort().join(",");
+    };
+
+    if (!areArraysEqual(existingMaterialOrderIds, incomingMaterialOrderIds)) {
+      const response = new WithoutDataResource(
+        422,
+        "MATERIAL_ORDER_IDS_MISMATCH",
+        "ID Material Tidak Sesuai",
+        `ID material dalam 'materialOrderIds' tidak sesuai dengan data yang ada sebelumnya.`
+      );
+      return res.status(422).json(response.toResponse());
     }
 
     const duplicate = await trx("kmis_topics")
@@ -363,17 +406,21 @@ exports.update = async (req, res) => {
     const coverId = uploadIds?.[0] ?? finalDocId ?? null;
     const coverArr = coverId != null ? [Number(coverId)] : [];
 
-    await trx("kmis_topics")
-      .where("id", id)
-      .update({
-        kmis_categories_id: categoryId,
-        topic_cover_ids: asJsonb(coverArr),
-        title,
-        description,
-        total_quiz: totalQuiz,
-        quiz_duration: quizDuration,
-        updated_at: trx.fn.now(),
-      });
+    const updateData = {
+      kmis_categories_id: categoryId,
+      topic_cover_ids: asJsonb(coverArr),
+      title,
+      description,
+      total_quiz: totalQuiz,
+      quiz_duration: quizDuration,
+      updated_at: trx.fn.now(),
+    };
+
+    if (materialOrderIds !== undefined) {
+      updateData.material_order_ids = knex.raw("?", [materialOrderIds]);
+    }
+
+    await trx("kmis_topics").where("id", id).update(updateData);
 
     await activityLogHelper.logUpdate(
       {

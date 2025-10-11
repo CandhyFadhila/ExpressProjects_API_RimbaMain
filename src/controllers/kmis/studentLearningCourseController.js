@@ -19,7 +19,9 @@ const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const learningParticipantResource = require("../../resources/kmis/learningParticipantResource");
+const UserResource = require("../../resources/auth/UserResource");
 const topicResource = require("../../resources/kmis/topicResource");
+const materialResource = require("../../resources/kmis/materialResource");
 const QUIZ_STATUS = Object.freeze({ STARTED: 1, FINISHED: 2, ABANDONED: 3 });
 
 // Untuk melihat daftar pembelajaran (topic) yang diambil
@@ -110,18 +112,7 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
 
   try {
     const topic = await knex("kmis_topics")
-      .select([
-        "id",
-        "topic_cover_ids",
-        "kmis_categories_id",
-        "title",
-        "description",
-        "total_quiz",
-        "quiz_duration",
-        "created_at",
-        "updated_at",
-        "deleted_at",
-      ])
+      .select("*")
       .where("id", id)
       .whereNull("deleted_at")
       .first();
@@ -135,9 +126,9 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const [materials, materialCountRow] = await Promise.all([
+    const [materials, materialCountRow, feedbackData] = await Promise.all([
       knex("kmis_materials")
-        .select(["id", "title"])
+        .select(["id", "title", "material_types"])
         .where("kmis_topic_id", id)
         .whereNull("deleted_at")
         .orderBy("created_at", "asc"),
@@ -146,13 +137,39 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
         .whereNull("deleted_at")
         .count("* as total")
         .first(),
+      knex("kmis_learning_attempts")
+        .select(["attempt_by", "feedback", "feedback_comment"])
+        .where("kmis_topic_id", id)
+        .where("quiz_attempt_status", 3) // Quiz status 3 = finished
+        .whereNull("deleted_at")
+        .distinct("attempt_by"),
     ]);
 
     const totalMaterial = Number(materialCountRow?.total || 0);
+
+    const feedback = await Promise.all(
+      feedbackData.map(async (feedbackItem) => {
+        const ratedByUser = await knex("users")
+          .select("*")
+          .where("id", feedbackItem.attempt_by)
+          .first();
+        return {
+          ratedBy: ratedByUser ? await UserResource(ratedByUser) : null,
+          rate: feedbackItem.feedback || null,
+          comment: feedbackItem.feedback_comment || null,
+        };
+      })
+    );
+
     const data = {
       topic: await topicResource(topic),
-      material: materials.map((m) => ({ id: m.id, title: m.title })),
+      material: materials.map((m) => ({
+        id: m.id,
+        title: m.title,
+        materialType: m.material_types,
+      })),
       totalMaterial,
+      feedback,
     };
 
     const response = new WithDataResource(
@@ -166,6 +183,90 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
   } catch (error) {
     logger.error(
       `| Learning Attempt KMIS | - Error function getDetailLearningAttemptbyTopicId : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
+  const { id } = req.params;
+  const userId =
+    req.auth?.userId ??
+    req.auth?.user_id ??
+    req.auth?.id ??
+    req.userId ??
+    req.user?.id;
+
+  try {
+    const learningAttempt = await knex("kmis_learning_attempts")
+      .select("*")
+      .where("kmis_topic_id", id)
+      .where("attempt_by", userId)
+      .first();
+    if (!learningAttempt) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Pembelajaran dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const topic = await knex("kmis_topics")
+      .select("id", "material_order_ids")
+      .where("id", learningAttempt.kmis_topic_id)
+      .first();
+    if (!topic || !topic.material_order_ids) {
+      const response = new WithoutDataResource(
+        422,
+        "TOPIC_INVALID",
+        "Topik Tidak Valid",
+        "Tidak ada urutan materi yang tersedia pada topik ini."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
+    const materialOrderIds = topic.material_order_ids;
+    const materials = await knex("kmis_materials")
+      .select("*")
+      .whereIn("id", materialOrderIds)
+      .whereNull("deleted_at")
+      .orderByRaw(`array_position(?, id)`, [materialOrderIds]);
+    const completedMaterialIds = learningAttempt.completed_material_ids || [];
+
+    const materialWithStatus = await Promise.all(
+      materials.map(async (material) => {
+        const materialDetails = await materialResource(material);
+        const isCompleted = completedMaterialIds.includes(Number(material.id));
+        return {
+          ...materialDetails,
+          isCompleted,
+        };
+      })
+    );
+
+    const learningParticipantData = await learningParticipantResource(
+      learningAttempt
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      `Detail materi berdasarkan urutan berhasil didapatkan.`,
+      { material: materialWithStatus, learningAttempt: learningParticipantData }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Learning Attempt KMIS | - Error function getOrderMaterialLearningAttemptbyTopicId : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -259,6 +360,8 @@ exports.storeLearningAttempt = async (req, res) => {
       return res.status(409).json(response.toResponse());
     }
 
+    const startedAtDb = dateHelper.toUTC(new Date().toISOString());
+
     await trx("kmis_learning_attempts")
       .insert({
         attempt_by: userId,
@@ -266,6 +369,7 @@ exports.storeLearningAttempt = async (req, res) => {
         quiz_attempt_status: 1,
         quiz_assessment_status: false,
         total_material: totalMaterial,
+        learning_started: startedAtDb,
       })
       .returning("*");
 
@@ -303,42 +407,13 @@ exports.storeLearningAttempt = async (req, res) => {
   }
 };
 
-// TODO: Revisi, auto update dari BE kasih validasi.
-// 0. Buat variabel untuk menampung waktu dalam detik
-// const text = 15 menit
-// const video = 30 menit
-// const dokumen = 30 menit
-// const gambar = 15 menit
-// 1. Setelah exports.storeLearningAttempt, ambil created at nya
-// 2. Hitung selisih waktu dari waktu sekarang, jika belum memenuhi syarat kembalikan response
-// 3. Jika memenuhi syarat, lanjutkan ke exports.updateProgressLearningAttempt
-// 4. Metode updatenya tidak menggunakan completedMaterial lagi, namun auto increment sesuai dengan total_material yang diselesaikan.
-
-// contoh
-// materi yang harus diselesaikan adalah 7,
-// maka ketika update progress, auto increment pada kolom completed_material. (tambahkan juga validasi gaboleh lebih dari total_material)
-
+// TODO: bug validasi materialTypes belum nyala
 exports.updateProgressLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
-  const { completedMaterial } = req.body;
   const id = req.params.id;
 
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      const message = errors
-        .array()
-        .map((err) => err.msg)
-        .join(" ");
-      const response = new WithoutDataResource(
-        422,
-        "FAILED_VALIDATION",
-        "Format Data Tidak Sesuai Ketentuan",
-        message
-      );
-      return res.status(422).json(response.toResponse());
-    }
-
+    // Ambil data learning attempt berdasarkan id
     const learningAttempt = await trx("kmis_learning_attempts")
       .where("id", id)
       .whereNull("deleted_at")
@@ -355,48 +430,135 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const totalMaterial = Number(learningAttempt.total_material ?? 0);
-    const prevCompleted = Number(learningAttempt.completed_material ?? 0);
-    const nextCompleted = Number(completedMaterial);
-
-    if (Number.isNaN(nextCompleted)) {
+    // Ambil material_order_ids dari kmis_topics
+    const topic = await trx("kmis_topics")
+      .where("id", learningAttempt.kmis_topic_id)
+      .whereNull("deleted_at")
+      .first();
+    const materialOrderIds = topic?.material_order_ids; // Ambil urutan materi pada topik
+    if (!materialOrderIds || materialOrderIds.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
         422,
-        "FAILED_VALIDATION",
-        "Format Data Tidak Sesuai Ketentuan",
-        "Tahapan Materi harus berupa bilangan bulat."
+        "TOPIC_INVALID",
+        "Topik Tidak Valid",
+        "Tidak ada materi yang tersedia dalam topik ini."
       );
       return res.status(422).json(response.toResponse());
     }
 
-    if (nextCompleted > totalMaterial) {
+    // Cek jika progress sudah selesai
+    if (
+      learningAttempt.completed_material_ids.length === materialOrderIds.length
+    ) {
       await trx.rollback();
       const response = new WithoutDataResource(
         422,
-        "FAILED_VALIDATION",
-        "Nilai Melebihi Batas",
-        `Progress saat ini adalah ${prevCompleted}/${totalMaterial}. Nilai yang dikirim (${nextCompleted}) tidak boleh melebihi total materi.`
+        "LEARNING_ALREADY_COMPLETED",
+        "Pembelajaran Sudah Selesai",
+        "Anda sudah menyelesaikan semua materi dalam topik ini. Silahkan lanjutkan mengerjakan kuis dan dapatkan sertifikatnya!."
       );
       return res.status(422).json(response.toResponse());
     }
 
-    if (nextCompleted < prevCompleted) {
+    // 1. Validasi materi pertama pada material_order_ids
+    if (learningAttempt.completed_material_ids.length > 0) {
+      const firstCompletedMaterial = learningAttempt.completed_material_ids[0];
+      if (firstCompletedMaterial !== materialOrderIds[0]) {
+        // Jika materi pertama bukan yang sesuai urutan, kembalikan response
+        await trx.rollback();
+        const response = new WithoutDataResource(
+          422,
+          "INVALID_MATERIAL_ORDER",
+          "Urutan Materi Tidak Sesuai",
+          "Anda harus menyelesaikan materi pertama terlebih dahulu."
+        );
+        return res.status(422).json(response.toResponse());
+      }
+    }
+
+    // 2. Validasi jenis materi dan waktu
+    const materialIdToCheck =
+      materialOrderIds[learningAttempt.completed_material_ids.length];
+    const material = await trx("kmis_materials")
+      .where("id", materialIdToCheck)
+      .whereNull("deleted_at")
+      .first();
+    if (!material) {
       await trx.rollback();
       const response = new WithoutDataResource(
         422,
-        "FAILED_VALIDATION",
-        "Progress Tidak Boleh Mundur",
-        `Progress saat ini adalah ${prevCompleted}/${totalMaterial}. Nilai yang dikirim (${nextCompleted}) tidak boleh lebih kecil dari progress saat ini.`
+        "MATERIAL_NOT_FOUND",
+        "Materi Tidak Ditemukan",
+        "Materi untuk validasi tidak ditemukan."
       );
       return res.status(422).json(response.toResponse());
     }
 
+    // Validasi jenis materi
+    const materialTypes = {
+      text: 5 * 60,
+      video: 30 * 60,
+      dokumen: 10 * 60,
+      gambar: 5 * 60,
+    };
+
+    const requiredDuration = materialTypes[material.material_types];
+    if (!requiredDuration) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "MATERIAL_TYPE_INVALID",
+        "Tipe Materi Tidak Valid",
+        `Jenis materi ${material.material_types} tidak dikenali untuk validasi durasi.`
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
+    // Hitung selisih waktu
+    const currentTime = dateHelper.toUTC(new Date().toISOString());
+    const materialStartTime = dateHelper.toUTC(material.created_at);
+    const elapsedTimeInSeconds = (currentTime - materialStartTime) / 1000;
+
+    if (elapsedTimeInSeconds < requiredDuration) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "TIME_NOT_ELAPSED",
+        "Waktu Belum Cukup",
+        `Anda harus menyelesaikan materi ini terlebih dahulu, waktu yang tersisa tidak mencukupi.`
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
+    // 3. Update completed_material_ids
+    const completedMaterialIds = [
+      ...learningAttempt.completed_material_ids,
+      materialIdToCheck,
+    ];
+
+    // Cek jika completed_material_ids melebihi total materi
+    if (completedMaterialIds.length > materialOrderIds.length) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "INVALID_PROGRESS",
+        "Progress Tidak Valid",
+        "Jumlah materi yang diselesaikan melebihi jumlah materi yang ada."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
+    // Pastikan completed_material_ids dalam format JSONB menggunakan helper
+    const validCompletedMaterialIds = asJsonb(completedMaterialIds);
+
+    // Simpan update ke kmis_learning_attempts
     await trx("kmis_learning_attempts").where("id", id).update({
-      completed_material: completedMaterial,
+      completed_material_ids: validCompletedMaterialIds,
       updated_at: trx.fn.now(),
     });
 
+    // 4. Log aktivitas
     await activityLogHelper.logUpdate(
       {
         userId: activityLogHelper.fromReq(req),
@@ -406,19 +568,20 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       trx
     );
 
+    // Commit transaksi
     await trx.commit();
 
     const response = new WithoutDataResource(
       200,
       "SUCCESS_UPDATE_DATA",
       "Berhasil Memperbarui",
-      `Progress materi berhasil diperbarui menjadi ${nextCompleted}/${totalMaterial}.`
+      `Progress materi berhasil diperbarui menjadi ${completedMaterialIds.length}/${materialOrderIds.length}.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
     logger.error(
-      `| Learning Attempt KMIS | - Error function updateProgressLearningAttempt : ${error.message}`
+      `| Learning Attempt KMIS | - Error function updateProgressLearningAttempt: ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -814,7 +977,7 @@ exports.submitAllAttempt = async (req, res) => {
 
 exports.feedback = async (req, res) => {
   const trx = await knex.transaction();
-  const { feedback } = req.body;
+  const { feedback, comment } = req.body;
   const { id } = req.params;
   const userId =
     req.auth?.userId ??
@@ -879,7 +1042,8 @@ exports.feedback = async (req, res) => {
     }
 
     await trx("kmis_learning_attempts").where("id", id).update({
-      feedback, // integer 0–5
+      feedback,
+      feedback_comment: comment,
       updated_at: trx.fn.now(),
     });
 
@@ -909,7 +1073,7 @@ exports.feedback = async (req, res) => {
 async function validateLearningProgress(learningAttemptId) {
   const attempt = await knex("kmis_learning_attempts as a")
     .where("a.id", learningAttemptId)
-    .select(["a.kmis_topic_id", "a.completed_material"])
+    .select(["a.kmis_topic_id", "a.completed_material_ids"])
     .first();
   if (!attempt) {
     throw new Error("Topik atau pembelajaran tidak ditemukan");
@@ -921,7 +1085,12 @@ async function validateLearningProgress(learningAttemptId) {
     .count("* as total");
 
   const totalMaterial = Number(totalStr ?? 0);
-  const completedMaterial = Number(attempt.completed_material ?? 0);
+
+  const completedMaterial = attempt.completed_material_ids?.length ?? 0;
+
+  console.log(
+    `completedMaterial: ${completedMaterial}, totalMaterial: ${totalMaterial}`
+  );
 
   return completedMaterial === totalMaterial;
 }

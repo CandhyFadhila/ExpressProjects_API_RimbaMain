@@ -16,7 +16,7 @@ const educatorResource = require("../../resources/kmis/educatorResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const {
   stripTitlesOnly,
-  makeInitialPasswordFromName,
+  generateRandomPassword,
 } = require("../../helpers/credentialHelper");
 const { checkEmailDeliverability } = require("../../helpers/emailValidChecker");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
@@ -150,7 +150,7 @@ exports.store = async (req, res) => {
     }
 
     const displayName = stripTitlesOnly(name);
-    const rawPassword = makeInitialPasswordFromName(name); // "{name-lowercase-tanpa-gelar}RIMBA2025"
+    const rawPassword = generateRandomPassword(8);
     const passwordHash = await bcrypt.hash(rawPassword, 12);
 
     const [created] = await trx("users")
@@ -158,7 +158,7 @@ exports.store = async (req, res) => {
         name,
         email,
         role_id: 2,
-        account_status: 1,
+        account_status: 2,
         password: passwordHash,
       })
       .returning(["id", "name", "email", "created_at"]);
