@@ -118,6 +118,9 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
         "description",
         "total_quiz",
         "quiz_duration",
+        "created_at",
+        "updated_at",
+        "deleted_at",
       ])
       .where("id", id)
       .whereNull("deleted_at")
@@ -301,6 +304,20 @@ exports.storeLearningAttempt = async (req, res) => {
 };
 
 // TODO: Revisi, auto update dari BE kasih validasi.
+// 0. Buat variabel untuk menampung waktu dalam detik
+// const text = 15 menit
+// const video = 30 menit
+// const dokumen = 30 menit
+// const gambar = 15 menit
+// 1. Setelah exports.storeLearningAttempt, ambil created at nya
+// 2. Hitung selisih waktu dari waktu sekarang, jika belum memenuhi syarat kembalikan response
+// 3. Jika memenuhi syarat, lanjutkan ke exports.updateProgressLearningAttempt
+// 4. Metode updatenya tidak menggunakan completedMaterial lagi, namun auto increment sesuai dengan total_material yang diselesaikan.
+
+// contoh
+// materi yang harus diselesaikan adalah 7,
+// maka ketika update progress, auto increment pada kolom completed_material. (tambahkan juga validasi gaboleh lebih dari total_material)
+
 exports.updateProgressLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { completedMaterial } = req.body;
