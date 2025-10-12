@@ -1234,11 +1234,10 @@ exports.getLearningAttemptCompletedById = async (req, res) => {
     req.user?.id;
 
   try {
+    // 1) Ambil attempt milik user
     const attempt = await knex("kmis_learning_attempts")
-      .where({
-        id: id,
-        attempt_by: userId,
-      })
+      .select("*")
+      .where({ id, attempt_by: userId })
       .whereNull("deleted_at")
       .first();
     if (!attempt) {
@@ -1252,25 +1251,12 @@ exports.getLearningAttemptCompletedById = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const quizResponse = await knex("kmis_quiz_responses as r")
-      .where("r.kmis_learning_attempt_id", attempt.id)
-      .whereNull("r.deleted_at")
-      .orderBy("r.answered_at", "asc");
-    if (quizResponse.length === 0) {
-      const response = new WithoutDataResource(
-        200,
-        "DATA_NOT_FOUND",
-        "Data Tidak Ditemukan",
-        `Data jawaban kuis untuk attempt '${id}' tidak ditemukan.`
-      );
-      return res.status(200).json(response.toResponse());
-    }
-
-    if ([QUIZ_STATUS.STARTED].includes(Number(attempt.quiz_attempt_status))) {
+    // 2) Validasi status attempt
+    if (Number(attempt.quiz_attempt_status) === QUIZ_STATUS.STARTED) {
       await trx.rollback();
       const response = new WithoutDataResource(
         409,
-        "LEARNING_COURSE_NOT_FINISHED",
+        "LEARNING_NOT_FINISHED",
         "Pembelajaran Belum Selesai",
         "Pembelajaran sedang berjalan, tidak dapat melihat detail pembelajaran."
       );
@@ -1285,23 +1271,103 @@ exports.getLearningAttemptCompletedById = async (req, res) => {
       await trx.rollback();
       const response = new WithoutDataResource(
         409,
-        "LEARNING_COURSE_NOT_COMPLETED",
+        "LEARNING_NOT_COMPLETED",
         "Pembelajaran Belum Selesai",
         "Status pembelajaran belum selesai."
       );
       return res.status(409).json(response.toResponse());
     }
 
-    // TODO: Pada resource ini, tambahkan informasi semua kuis dan jawabannya (isinya persis seperti async function attemptExamResponse).
-    const serializedData = await Promise.all(
-      quizResponse.map((row) => quizResponseResource(row))
+    // 3) Ambil topicId dari attempt
+    const topicId = attempt.kmis_topic_id;
+
+    // 4) Jika tidak ada topicId di attempt → fallback: pakai responses saja
+    if (!topicId) {
+      const quizResponses = await knex("kmis_quiz_responses as r")
+        .select("r.*")
+        .where("r.kmis_learning_attempt_id", attempt.id)
+        .whereNull("r.deleted_at")
+        .orderBy("r.answered_at", "asc");
+
+      if (quizResponses.length === 0) {
+        await trx.rollback();
+        const response = new WithoutDataResource(
+          200,
+          "DATA_NOT_FOUND",
+          "Data Tidak Ditemukan",
+          `Data jawaban kuis untuk attempt '${id}' tidak ditemukan.`
+        );
+        return res.status(200).json(response.toResponse());
+      }
+
+      const [learningParticipant, exam] = await Promise.all([
+        learningParticipantResource(attempt),
+        Promise.all(quizResponses.map((row) => quizResponseResource(row))),
+      ]);
+
+      await trx.commit();
+      const response = new WithDataResource(
+        200,
+        "SUCCESS_GET_DATA",
+        "Berhasil Mengambil Data",
+        "Detail pembelajaran dan jawaban kuis berhasil diambil.",
+        { learningParticipant, exam }
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    // 5) Mode ideal: tampilkan SEMUA QUIZ pada topik attempt (meski belum dijawab)
+    const [quizzes, responses] = await Promise.all([
+      knex("kmis_quiz as q")
+        .select("q.*")
+        .whereNull("q.deleted_at")
+        .where(function () {
+          this.where("q.kmis_topic_id", topicId);
+        })
+        .orderBy("q.created_at", "asc"),
+
+      knex("kmis_quiz_responses as r")
+        .select("r.*")
+        .where("r.kmis_learning_attempt_id", attempt.id)
+        .whereNull("r.deleted_at"),
+    ]);
+
+    // Index-kan response per quiz_id
+    const respByQuizId = new Map(
+      responses.map((r) => [Number(r.kmis_quiz_id), r])
     );
+
+    const examItems = quizzes.map((q) => {
+      const r = respByQuizId.get(Number(q.id));
+      return r
+        ? r
+        : {
+            id: null,
+            kmis_learning_attempt_id: attempt.id,
+            kmis_quiz_id: q.id,
+            selected_option: null,
+            is_marker: null,
+            is_correct: null,
+            answered_at: null,
+            created_at: null,
+            updated_at: null,
+            deleted_at: null,
+          };
+    });
+
+    // Serialize sesuai resource baru
+    const [learningParticipant, exam] = await Promise.all([
+      learningParticipantResource(attempt),
+      Promise.all(examItems.map((row) => quizResponseResource(row))),
+    ]);
+
+    await trx.commit();
     const response = new WithDataResource(
       200,
-      "SUCCESS_FINISH_QUIZ",
-      "Berhasil Menyimpan Data",
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
       "Detail pembelajaran dan jawaban kuis berhasil diambil.",
-      serializedData
+      { learningParticipant, exam }
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
