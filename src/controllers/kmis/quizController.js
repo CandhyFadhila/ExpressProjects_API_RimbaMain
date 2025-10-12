@@ -660,7 +660,7 @@ exports.downloadTemplate = async (req, res) => {
         "(text)",
         "(text)",
         "A/B/C/D",
-        "(optional)",
+        "(text, optional)",
       ],
     ];
 
