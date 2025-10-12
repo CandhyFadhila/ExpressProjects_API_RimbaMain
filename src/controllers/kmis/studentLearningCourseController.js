@@ -144,14 +144,15 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
         knex("kmis_learning_attempts")
           .select(["attempt_by", "feedback", "feedback_comment"])
           .where("kmis_topic_id", id)
-          .where("quiz_attempt_status", 3)
+          .where("quiz_attempt_status", QUIZ_STATUS.FINISHED)
           .whereNull("deleted_at")
-          .distinct("attempt_by"),
+          .distinct("attempt_by")
+          .limit(5),
 
         // AVG feedback (hanya yang FINISHED & feedback tidak null)
         knex("kmis_learning_attempts")
           .where("kmis_topic_id", id)
-          .where("quiz_attempt_status", 3)
+          .where("quiz_attempt_status", QUIZ_STATUS.FINISHED)
           .whereNotNull("feedback")
           .whereNull("deleted_at")
           .avg({ avg: "feedback" })
@@ -583,10 +584,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    // Pastikan completed_material_ids dalam format JSONB menggunakan helper
     const validCompletedMaterialIds = asJsonb(completedMaterialIds);
-
-    // Simpan update ke kmis_learning_attempts
     await trx("kmis_learning_attempts").where("id", id).update({
       completed_material_ids: validCompletedMaterialIds,
       updated_at: trx.fn.now(),
@@ -1052,13 +1050,13 @@ exports.submitAllAttempt = async (req, res) => {
 
       const { answeredCount, totalQuiz, correctCount, score } = summary;
       const response = new WithDataResource(
-        201,
+        200,
         "SUCCESS_FINISH_QUIZ",
         "Berhasil Menyimpan Data",
         `Semua jawaban yang dipilih berhasil disubmit. Terjawab: ${answeredCount}/${totalQuiz}, benar: ${correctCount}, skor: ${score}.`,
         resourcePayload
       );
-      return res.status(201).json(response.toResponse());
+      return res.status(200).json(response.toResponse());
     } catch (err) {
       await trx.rollback();
       throw err;
