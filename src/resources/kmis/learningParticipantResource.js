@@ -41,7 +41,7 @@ async function learningParticipantResource(quizParticipant) {
       "description",
       "is_public"
     )
-    .orderByRaw(`array_position(?, id)`, [topic.material_order_ids]);
+    .orderByRaw(`array_position(?, id)`, [completedIds]);
 
   const materialResources = await Promise.all(
     materials.map((material) => materialResource(material))
