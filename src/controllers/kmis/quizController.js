@@ -336,7 +336,7 @@ exports.update = async (req, res) => {
         answer_c: answerC ?? existing.answer_c,
         answer_d: answerD ?? existing.answer_d,
         correct_option: correctOption ?? existing.correct_option,
-        explanation: explanation ? existing.explanation : null,
+        explanation: explanation ?? existing.explanation,
         updated_at: trx.fn.now(),
       });
 
