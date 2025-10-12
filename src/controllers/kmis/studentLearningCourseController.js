@@ -232,7 +232,7 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Pembelajaran dengan ID '${id}' tidak ditemukan.`
+        `Pembelajaran dengan topik ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
@@ -640,9 +640,11 @@ exports.getAllQuizbyTopicId = async (req, res) => {
         "answer_b",
         "answer_c",
         "answer_d",
+        "created_at",
+        "updated_at"
       ])
       .orderBy("id", "asc");
-    if (!quizzes.data) {
+    if (!quizzes || quizzes.length === 0) {
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
@@ -660,7 +662,7 @@ exports.getAllQuizbyTopicId = async (req, res) => {
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      `Daftar kuis untuk topik '${topic.title ?? id}' berhasil didapatkan.`,
+      `Daftar kuis untuk topik '${topic.title}' berhasil didapatkan.`,
       { quiz: serializedData }
     );
     return res.status(200).json(response.toResponse());
