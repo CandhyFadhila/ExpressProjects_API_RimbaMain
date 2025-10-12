@@ -170,9 +170,7 @@ exports.profileValidator = [
     .bail()
     .trim()
     .isLength({ max: 30 })
-    .withMessage("Nomor telepon maksimal 30 karakter.")
-    .matches(/^[0-9\s]*$/)
-    .withMessage("Nomor telepon hanya boleh angka."),
+    .withMessage("Nomor telepon maksimal 30 karakter."),
 
   // PROFESSION: maks 100
   body("profession")
