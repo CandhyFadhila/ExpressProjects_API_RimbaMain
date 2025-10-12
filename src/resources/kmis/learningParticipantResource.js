@@ -2,6 +2,7 @@ const knex = require("../../config/database");
 const {
   resolveArrayRelations,
 } = require("../../helpers/resolveArrayRelations");
+const { normIdArray } = require("../../helpers/inputNorm");
 const documentResource = require("../../resources/doc/documentResource");
 const materialResource = require("../../resources/kmis/materialResource");
 const UserResource = require("../../resources/auth/UserResource");
@@ -23,8 +24,12 @@ async function learningParticipantResource(quizParticipant) {
     documentResource
   );
 
+  const completedIds = normIdArray(quizParticipant.completed_material_ids, {
+    as: "number",
+  });
+
   const materials = await knex("kmis_materials")
-    .whereIn("id", topic.material_order_ids || [])
+    .whereIn("id", completedIds)
     .select(
       "id",
       "kmis_topic_id",

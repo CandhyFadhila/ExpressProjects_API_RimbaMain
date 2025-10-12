@@ -144,7 +144,10 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
         knex("kmis_learning_attempts")
           .select(["attempt_by", "feedback", "feedback_comment"])
           .where("kmis_topic_id", id)
-          .where("quiz_attempt_status", QUIZ_STATUS.FINISHED)
+          .whereIn("quiz_attempt_status", [
+            QUIZ_STATUS.FINISHED,
+            QUIZ_STATUS.ABANDONED,
+          ])
           .whereNull("deleted_at")
           .distinct("attempt_by")
           .limit(5),
@@ -152,7 +155,10 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
         // AVG feedback (hanya yang FINISHED & feedback tidak null)
         knex("kmis_learning_attempts")
           .where("kmis_topic_id", id)
-          .where("quiz_attempt_status", QUIZ_STATUS.FINISHED)
+          .whereIn("quiz_attempt_status", [
+            QUIZ_STATUS.FINISHED,
+            QUIZ_STATUS.ABANDONED,
+          ])
           .whereNotNull("feedback")
           .whereNull("deleted_at")
           .avg({ avg: "feedback" })
