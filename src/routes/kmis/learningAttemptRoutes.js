@@ -100,4 +100,13 @@ router.patch(
   studentLearningCourseController.feedback
 );
 
+router.get(
+  "/get-finished-attempt/:id",
+  rateLimiter,
+  authMiddleware,
+  requireAbility("student"),
+  requirePermission(["view.kmis_learning_course"]),
+  studentLearningCourseController.getLearningAttemptCompletedById
+);
+
 module.exports = router;

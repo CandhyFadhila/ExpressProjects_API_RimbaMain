@@ -26,8 +26,10 @@ const UserResource = require("../../resources/auth/UserResource");
 const topicResource = require("../../resources/kmis/topicResource");
 const quizResource = require("../../resources/kmis/quizResource");
 const materialResource = require("../../resources/kmis/materialResource");
+const quizResponseResource = require("../../resources/kmis/quizResponseResource");
 const QUIZ_STATUS = Object.freeze({ STARTED: 1, FINISHED: 2, ABANDONED: 3 });
 
+// Ini adalah fungsi untuk get kursus saya (kursus yang sudah selesai dan yang masih berlangsung)
 exports.getListLearningAttempt = async (req, res) => {
   const { search, categoryId } = req.query;
   const userId =
@@ -110,6 +112,7 @@ exports.getListLearningAttempt = async (req, res) => {
   }
 };
 
+// Ini adalah fungsi untuk get detail kursus berdasarkan id topic
 exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
   const { id } = req.params;
 
@@ -222,6 +225,7 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
   }
 };
 
+// Ini adalah fungsi untuk get detail kursus berdasarkan id topic (untuk order material, kondisi ketika mau belajar)
 exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
   const { id } = req.params;
   const userId =
@@ -306,6 +310,7 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
   }
 };
 
+// Ini adalah fungsi untuk get detail materi berdasarkan id materi (untuk mendapatkan materi berdasarkan id yang ingin diperlajari)
 exports.getLearningAttemptMaterialbyId = async (req, res) => {
   const { id } = req.params;
 
@@ -348,6 +353,7 @@ exports.getLearningAttemptMaterialbyId = async (req, res) => {
   }
 };
 
+// Ini adalah fungsi untuk store learning attempt (untuk memulai belajar)
 exports.storeLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { topicId } = req.body;
@@ -454,6 +460,7 @@ exports.storeLearningAttempt = async (req, res) => {
   }
 };
 
+// Ini adalah fungsi untuk update progress learning attempt (ketika materi 1 selesai dan klik lanjut ke materi selanjutnya)
 exports.updateProgressLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const id = req.params.id;
@@ -652,6 +659,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
   }
 };
 
+// Ini adalah fungsi untuk get semua quiz berdasarkan id topik (ketika materi sudah selesai, dan quiz mau dikerjakan maka dapat diambil dahulu semua quiz dari topik tersebut)
 exports.getAllQuizbyTopicId = async (req, res) => {
   const { id } = req.params;
 
@@ -721,6 +729,7 @@ exports.getAllQuizbyTopicId = async (req, res) => {
   }
 };
 
+// Ini adalah fungsi untuk get semua quiz beserta jawabannya berdasarkan id learning attempt
 exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
   const trx = await knex.transaction();
   const { id } = req.params;
@@ -813,6 +822,7 @@ exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
   }
 };
 
+// Ini adalah fungsi untuk store jawaban kuis per soal, juga berlaku jika memperbarui jawaban
 exports.storeQuizAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { learningAttemptId, quizId } = req.body;
@@ -1065,6 +1075,7 @@ exports.storeQuizAttempt = async (req, res) => {
   }
 };
 
+// Ini adalah fungsi untuk submit quiz berdasarkan id learning attempt, dan berfungsi untuk mengakhiri pengerjaan quiz
 exports.submitAllAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { learningAttemptId } = req.body;
@@ -1184,20 +1195,12 @@ exports.submitAllAttempt = async (req, res) => {
         summary,
       });
 
-      const freshAttempt = await knex("kmis_learning_attempts")
-        .where("id", learningAttemptId)
-        .where("attempt_by", userId)
-        .whereNull("deleted_at")
-        .first();
-      const resourcePayload = await learningParticipantResource(freshAttempt);
-
       const { answeredCount, totalQuiz, correctCount, score } = summary;
-      const response = new WithDataResource(
+      const response = new WithoutDataResource(
         200,
         "SUCCESS_FINISH_QUIZ",
         "Berhasil Menyimpan Data",
-        `Semua jawaban yang dipilih berhasil disubmit. Terjawab: ${answeredCount}/${totalQuiz}, benar: ${correctCount}, skor: ${score}.`,
-        resourcePayload
+        `Semua jawaban yang dipilih berhasil disubmit. Terjawab: ${answeredCount}/${totalQuiz}, benar: ${correctCount}, skor: ${score}.`
       );
       return res.status(200).json(response.toResponse());
     } catch (err) {
@@ -1219,6 +1222,104 @@ exports.submitAllAttempt = async (req, res) => {
   }
 };
 
+// Ini adalah fungsi untuk mendapatkan detail learning attempt berdasarkan id learning attempt (bisa di get ketika selesai quis)
+exports.getLearningAttemptCompletedById = async (req, res) => {
+  const trx = await knex.transaction();
+  const { id } = req.params;
+  const userId =
+    req.auth?.userId ??
+    req.auth?.user_id ??
+    req.auth?.id ??
+    req.userId ??
+    req.user?.id;
+
+  try {
+    const attempt = await knex("kmis_learning_attempts")
+      .where({
+        id: id,
+        attempt_by: userId,
+      })
+      .whereNull("deleted_at")
+      .first();
+    if (!attempt) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Pembelajaran dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const quizResponse = await knex("kmis_quiz_responses as r")
+      .where("r.kmis_learning_attempt_id", attempt.id)
+      .whereNull("r.deleted_at")
+      .orderBy("r.answered_at", "asc");
+    if (quizResponse.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data jawaban kuis untuk attempt '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    if ([QUIZ_STATUS.STARTED].includes(Number(attempt.quiz_attempt_status))) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        409,
+        "LEARNING_COURSE_NOT_FINISHED",
+        "Pembelajaran Belum Selesai",
+        "Pembelajaran sedang berjalan, tidak dapat melihat detail pembelajaran."
+      );
+      return res.status(409).json(response.toResponse());
+    }
+
+    if (
+      ![QUIZ_STATUS.FINISHED, QUIZ_STATUS.ABANDONED].includes(
+        Number(attempt.quiz_attempt_status)
+      )
+    ) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        409,
+        "LEARNING_COURSE_NOT_COMPLETED",
+        "Pembelajaran Belum Selesai",
+        "Status pembelajaran belum selesai."
+      );
+      return res.status(409).json(response.toResponse());
+    }
+
+    // TODO: Pada resource ini, tambahkan informasi semua kuis dan jawabannya (isinya persis seperti async function attemptExamResponse).
+    const serializedData = await Promise.all(
+      quizResponse.map((row) => quizResponseResource(row))
+    );
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_FINISH_QUIZ",
+      "Berhasil Menyimpan Data",
+      "Detail pembelajaran dan jawaban kuis berhasil diambil.",
+      serializedData
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    await trx.rollback();
+    logger.error(
+      `| Quiz Attempt KMIS | - Error function getLearningAttemptCompletedById: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
+// Ini adalah fungsi untuk memberikan feedback pada learning attempt yang sudah selesai
 exports.feedback = async (req, res) => {
   const trx = await knex.transaction();
   const { feedback, comment } = req.body;
