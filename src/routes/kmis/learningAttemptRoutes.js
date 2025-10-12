@@ -40,6 +40,15 @@ router.get(
   studentLearningCourseController.getOrderMaterialLearningAttemptbyTopicId
 );
 
+router.get(
+  "/get-quiz-by-topic/:id",
+  rateLimiter,
+  authMiddleware,
+  requireAbility("student"),
+  requirePermission(["view.kmis_learning_course"]),
+  studentLearningCourseController.getAllQuizbyTopicId
+);
+
 router.post(
   "/create",
   rateLimiter,

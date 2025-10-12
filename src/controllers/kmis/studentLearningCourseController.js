@@ -21,10 +21,10 @@ const activityLogHelper = require("../../helpers/activityLogHelper");
 const learningParticipantResource = require("../../resources/kmis/learningParticipantResource");
 const UserResource = require("../../resources/auth/UserResource");
 const topicResource = require("../../resources/kmis/topicResource");
+const quizResource = require("../../resources/kmis/quizResource");
 const materialResource = require("../../resources/kmis/materialResource");
 const QUIZ_STATUS = Object.freeze({ STARTED: 1, FINISHED: 2, ABANDONED: 3 });
 
-// Untuk melihat daftar pembelajaran (topic) yang diambil
 exports.getListLearningAttempt = async (req, res) => {
   const { search, categoryId } = req.query;
   const userId =
@@ -126,40 +126,57 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const [materials, materialCountRow, feedbackData] = await Promise.all([
-      knex("kmis_materials")
-        .select(["id", "title", "material_types"])
-        .where("kmis_topic_id", id)
-        .whereNull("deleted_at")
-        .orderBy("created_at", "asc"),
-      knex("kmis_materials")
-        .where("kmis_topic_id", id)
-        .whereNull("deleted_at")
-        .count("* as total")
-        .first(),
-      knex("kmis_learning_attempts")
-        .select(["attempt_by", "feedback", "feedback_comment"])
-        .where("kmis_topic_id", id)
-        .where("quiz_attempt_status", 3) // Quiz status 3 = finished
-        .whereNull("deleted_at")
-        .distinct("attempt_by"),
-    ]);
+    const [materials, materialCountRow, feedbackData, avgRow] =
+      await Promise.all([
+        knex("kmis_materials")
+          .select(["id", "title", "material_types"])
+          .where("kmis_topic_id", id)
+          .whereNull("deleted_at")
+          .orderBy("created_at", "asc"),
+
+        knex("kmis_materials")
+          .where("kmis_topic_id", id)
+          .whereNull("deleted_at")
+          .count("* as total")
+          .first(),
+
+        // Feedback list (unik per attempt_by)
+        knex("kmis_learning_attempts")
+          .select(["attempt_by", "feedback", "feedback_comment"])
+          .where("kmis_topic_id", id)
+          .where("quiz_attempt_status", 3)
+          .whereNull("deleted_at")
+          .distinct("attempt_by"),
+
+        // AVG feedback (hanya yang FINISHED & feedback tidak null)
+        knex("kmis_learning_attempts")
+          .where("kmis_topic_id", id)
+          .where("quiz_attempt_status", 3)
+          .whereNotNull("feedback")
+          .whereNull("deleted_at")
+          .avg({ avg: "feedback" })
+          .first(),
+      ]);
 
     const totalMaterial = Number(materialCountRow?.total || 0);
 
     const feedback = await Promise.all(
-      feedbackData.map(async (feedbackItem) => {
+      feedbackData.map(async (row) => {
         const ratedByUser = await knex("users")
           .select("*")
-          .where("id", feedbackItem.attempt_by)
+          .where("id", row.attempt_by)
           .first();
         return {
           ratedBy: ratedByUser ? await UserResource(ratedByUser) : null,
-          rate: feedbackItem.feedback || null,
-          comment: feedbackItem.feedback_comment || null,
+          rate: row.feedback ?? null,
+          comment: row.feedback_comment ?? null,
         };
       })
     );
+
+    // Convert AVG ke number JS (misal "3.5000" -> 3.5). Jika tidak ada data, null.
+    const avgFeedbackRate =
+      avgRow && avgRow.avg != null ? Number(avgRow.avg) : null;
 
     const data = {
       topic: await topicResource(topic),
@@ -170,6 +187,7 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
       })),
       totalMaterial,
       feedback,
+      avgFeedbackRate, // <— tambah di response
     };
 
     const response = new WithDataResource(
@@ -588,6 +606,73 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       "SERVER_ERROR",
       "Server Sedang Error",
       "Terjadi kesalahan pada sistem. Silakan coba lagi nanti."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getAllQuizbyTopicId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const topic = await knex("kmis_topics")
+      .where("id", id)
+      .select("id", "title")
+      .first();
+    if (!topic) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data topik dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const quizzes = await knex("kmis_quiz")
+      .where("kmis_topic_id", topic.id)
+      .whereNull("deleted_at")
+      .select([
+        "id",
+        "kmis_topic_id",
+        "question",
+        "answer_a",
+        "answer_b",
+        "answer_c",
+        "answer_d",
+      ])
+      .orderBy("id", "asc");
+    if (!quizzes.data) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data kuis untuk topik '${topic.title}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      quizzes.map((quiz) => quizResource(quiz))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      `Daftar kuis untuk topik '${topic.title ?? id}' berhasil didapatkan.`,
+      { quiz: serializedData }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Learning Attempt KMIS | - Error function getAllQuizbyTopicId : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
     );
     return res.status(500).json(response.toResponse());
   }
@@ -1190,7 +1275,7 @@ async function attemptExamResponse(learningAttemptId) {
       answerD: q.answer_d,
     };
     return {
-      // id: resp ? resp.id : null,
+      id: resp ? resp.id : null,
       quiz: quizPayload, // selalu ada untuk kuis yang eksis
       selectedOption: resp ? resp.selected_option : null,
       isMarker: resp ? !!resp.is_marker : null,
