@@ -40,9 +40,7 @@ exports.storeQuizAttemptValidator = [
     }),
 
   body("selectedOption")
-    .trim()
-    .notEmpty()
-    .withMessage("Jawaban tidak boleh kosong.")
+    .optional({ nullable: true, checkFalsy: true })
     .bail()
     .isString()
     .withMessage("Jawaban harus berupa teks.")

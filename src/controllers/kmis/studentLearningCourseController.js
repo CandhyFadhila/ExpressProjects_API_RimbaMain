@@ -2,6 +2,8 @@ const { validationResult } = require("express-validator");
 const knex = require("../../config/database");
 const logger = require("../../utils/logger");
 const PDFDocument = require("pdfkit");
+const fs = require("fs");
+const path = require("path");
 const nodemailer = require("nodemailer");
 const { asJsonb } = require("../../helpers/dbJson");
 const renderEmailTemplate = require("../../utils/emailOTP/renderEmailTemplate");
@@ -345,6 +347,7 @@ exports.getLearningAttemptMaterialbyId = async (req, res) => {
   }
 };
 
+// TODO: Total material nya tidak terhitung
 exports.storeLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { topicId } = req.body;
@@ -742,6 +745,84 @@ exports.getAllQuizbyTopicId = async (req, res) => {
   }
 };
 
+exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
+  const trx = await knex.transaction();
+  const { id } = req.params;
+  const userId =
+    req.auth?.userId ??
+    req.auth?.user_id ??
+    req.auth?.id ??
+    req.userId ??
+    req.user?.id;
+
+  try {
+    // Validasi progress belajar
+    const isProgressValid = await validateLearningProgress(id);
+    if (!isProgressValid) {
+      const response = new WithoutDataResource(
+        422,
+        "LEARNING_PROGRESS_INCOMPLETE",
+        "Progress Belajar Belum Tercapai",
+        "Anda belum menyelesaikan seluruh materi pada topik ini. Silahkan selesaikan materi terlebih dahulu."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
+    // Ambil attempt & kunci baris
+    const attempt = await trx("kmis_learning_attempts")
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!attempt) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Pembelajaran dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    // Kepemilikan
+    const attemptByBig = BigInt(String(attempt.attempt_by));
+    const userIdBig = BigInt(String(userId));
+    if (attemptByBig !== userIdBig) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        403,
+        "FORBIDDEN_QUIZ_ACCESS",
+        "Akses Ditolak",
+        "Anda tidak berhak melihat jawaban untuk kuis yang bukan milik anda."
+      );
+      return res.status(403).json(response.toResponse());
+    }
+
+    const dataPayload = await attemptExamResponse(id);
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Detail jawaban kuis berhasil didapatkan.",
+      dataPayload
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    await trx.rollback();
+    logger.error(
+      `| Quiz Attempt KMIS | - Error function getQuizAttemptbylearningAttemptId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
 exports.storeQuizAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { learningAttemptId, quizId } = req.body;
@@ -939,16 +1020,13 @@ exports.storeQuizAttempt = async (req, res) => {
 
       await trx.commit();
 
-      const dataPayload = await attemptExamResponse(learningAttemptId);
-
-      const response = new WithDataResource(
+      const response = new WithoutDataResource(
         201,
         isRevision ? "SUCCESS_REVISED_ANSWER" : "SUCCESS_ANSWERED_QUESTION",
         "Berhasil Menyimpan Data",
         isRevision
           ? `Revisi jawaban pada soal ${quizId} tersimpan (${answeredAfter}/${totalQuiz}).`
-          : `Jawaban berhasil tersimpan (${answeredAfter}/${totalQuiz}).`,
-        dataPayload
+          : `Jawaban berhasil tersimpan (${answeredAfter}/${totalQuiz}).`
       );
       return res.status(201).json(response.toResponse());
     } catch (err) {
@@ -1431,6 +1509,18 @@ function computeScorePercent(correct, total, decimals = 2) {
   return Math.round(raw * factor) / factor;
 }
 
+function resolveRasterLogo(p) {
+  if (!p) return null;
+  if (fs.existsSync(p)) {
+    const ext = path.extname(p).toLowerCase();
+    if (ext !== ".svg") return p;
+  }
+  const png = p.replace(/\.svg$/i, ".png");
+  if (fs.existsSync(png)) return png;
+  return null;
+}
+
+// TODO: Bentuk sertifikat masih belum disesuaikan
 async function generateCertificateFile(trx, { learningAttemptId }) {
   const attempt = await trx("kmis_learning_attempts as a")
     .leftJoin("users as u", "u.id", "a.attempt_by")
@@ -1468,13 +1558,22 @@ async function generateCertificateFile(trx, { learningAttemptId }) {
     1
   );
 
-  // Render PDF ke Buffer
+  // Lokasi assets (logo). Bisa override via env CERT_ASSETS_DIR
+  const assetsDir =
+    process.env.CERT_ASSETS_DIR || path.resolve(process.cwd(), "assets");
+  const logoFiles = [
+    path.join(assetsDir, "logo-atrbpn.svg"),
+    path.join(assetsDir, "logo-GEF.svg"),
+    path.join(assetsDir, "logo-UNEP.svg"),
+  ].map(resolveRasterLogo); // hasil bisa null jika png tidak ada
+
+  // Render PDF -> Buffer
   const buffer = await new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
         size: "A4",
         layout: "landscape",
-        margin: 50,
+        margin: 0, // kita gambar full-bleed
         info: {
           Title: `Certificate Attempt #${attempt.id}`,
           Author: "Rimba",
@@ -1487,58 +1586,208 @@ async function generateCertificateFile(trx, { learningAttemptId }) {
       doc.on("end", () => resolve(Buffer.concat(chunks)));
       doc.on("error", reject);
 
-      // Border
-      doc
-        .lineWidth(2)
-        .rect(20, 20, doc.page.width - 40, doc.page.height - 40)
-        .stroke();
+      const W = doc.page.width;
+      const H = doc.page.height;
 
-      // Judul
-      doc.moveDown(1.5);
+      // Latar putih
+      doc.rect(0, 0, W, H).fill("#FFFFFF");
+
+      // Frame tipis di dalam
+      doc.save();
+      doc.opacity(0.15);
+      doc.lineWidth(2).strokeColor("#1f1b2d");
+      doc.rect(18, 18, W - 36, H - 36).stroke();
+      doc.restore();
+
+      // Dekor kiri (gradasi hijau, bentuk poligon)
+      const gradLeft = doc.linearGradient(0, 0, 0, H);
+      gradLeft.stop(0, "#7fb786").stop(0.6, "#568d5d").stop(1, "#3e6b44");
+      doc
+        .save()
+        .moveTo(-40, -40)
+        .lineTo(W * 0.3, -40)
+        .lineTo(W * 0.22, H * 0.6)
+        .lineTo(W * 0.36, H + 40)
+        .lineTo(-40, H + 40)
+        .closePath()
+        .fill(gradLeft)
+        .restore();
+
+      // Dekor kanan (gradasi hijau, bentuk poligon)
+      const gradRight = doc.linearGradient(0, 0, 0, H);
+      gradRight.stop(0, "#3e6b44").stop(0.5, "#568d5d").stop(1, "#7fb786");
+      doc
+        .save()
+        .moveTo(W * 0.45, -60)
+        .lineTo(W + 60, -60)
+        .lineTo(W + 60, H + 60)
+        .lineTo(W * 0.25, H + 60)
+        .lineTo(W * 0.55, H * 0.5)
+        .closePath()
+        .fill(gradRight)
+        .restore();
+
+      // Header (brand kiri, box logo kanan)
+      const PX = 48; // padding X
+      const headerTop = 36;
+
+      // Brand
       doc
         .font("Helvetica-Bold")
-        .fontSize(28)
-        .text("SERTIFIKAT KELULUSAN KUIS", { align: "center" });
-      doc.moveDown(0.5);
+        .fontSize(18)
+        .fillColor("#1f1b2d")
+        .text("Program Koridor RIMBA", PX, headerTop);
       doc
         .font("Helvetica")
-        .fontSize(14)
-        .text("Diberikan kepada:", { align: "center" });
+        .fontSize(7)
+        .fillColor("#313038")
+        .text(`Sertifikat · ${printedAtStr}`, PX, headerTop + 24);
 
-      // Nama
-      doc.moveDown(0.3);
+      // Box logo dinamis menyesuaikan 3 logo (tinggi 30, padding 10, gap 8)
+      const logoH = 30;
+      const pad = 10;
+      const gap = 8;
+      const perLogoW = 20; // width target tiap logo (konsisten)
+      const boxW = pad * 2 + perLogoW * 3 + gap * 2;
+      const boxH = logoH + pad * 2;
+      const boxX = W - PX - boxW;
+      const boxY = headerTop;
+
+      // kotak
+      doc
+        .save()
+        .roundedRect(boxX, boxY, boxW, boxH, 10)
+        .fill("#ffffff")
+        .lineWidth(3)
+        .strokeColor("#568d5d")
+        .roundedRect(boxX, boxY, boxW, boxH, 10)
+        .stroke()
+        .restore();
+
+      // gambar logo (pakai png kalau ada; kalau tidak, placeholder)
+      let cx = boxX + pad;
+      for (let i = 0; i < logoFiles.length; i++) {
+        const p = logoFiles[i];
+        if (p) {
+          try {
+            doc.image(p, cx, boxY + pad, {
+              fit: [perLogoW, logoH],
+              align: "center",
+              valign: "center",
+            });
+          } catch {
+            // placeholder
+            doc
+              .save()
+              .rect(cx, boxY + pad, perLogoW, logoH)
+              .fill("#e7efe8")
+              .restore();
+          }
+        } else {
+          // placeholder kalau png tidak tersedia
+          doc
+            .save()
+            .rect(cx, boxY + pad, perLogoW, logoH)
+            .fill("#e7efe8")
+            .restore();
+        }
+        cx += perLogoW + gap;
+      }
+
+      // Title
       doc
         .font("Helvetica-Bold")
-        .fontSize(24)
-        .text(userName, { align: "center" });
-
-      // Garis tipis
-      doc.moveDown(0.6);
-      const centerX = doc.page.width / 2;
+        .fontSize(56)
+        .fillColor("#568d5d")
+        .text("CERTIFICATE", 0, 150, { align: "center" });
       doc
-        .moveTo(centerX - 150, doc.y)
-        .lineTo(centerX + 150, doc.y)
-        .stroke();
+        .font("Helvetica-Bold")
+        .fontSize(16)
+        .fillColor("#b7b3c9")
+        .text("OF ACHIEVEMENT", 0, 190, {
+          align: "center",
+          characterSpacing: 2,
+        });
 
-      // Detail
-      doc.moveDown(1.2);
+      // Nama peserta + underline halus
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(40)
+        .fillColor("#1f1b2d")
+        .text(userName, 0, 240, { align: "center" });
+      const nameWidth = doc.widthOfString(userName);
+      const nameX = (W - nameWidth) / 2;
+      const nameY = doc.y + 5;
+      doc
+        .save()
+        .opacity(0.15)
+        .moveTo(nameX - 10, nameY)
+        .lineTo(nameX + nameWidth + 10, nameY)
+        .lineWidth(3)
+        .stroke("#1f1b2d")
+        .restore();
+
+      // Ringkasan
+      const summaryY = nameY + 20;
       doc
         .font("Helvetica")
-        .fontSize(14)
-        .text(`Topik: ${topicName}`, { align: "center" });
-      doc.moveDown(0.2);
-      doc.text(`Nilai Akhir: ${scoreStr}`, { align: "center" });
-      doc.moveDown(0.2);
-      doc.text(`Mulai Mengerjakan: ${startedAtStr}`, { align: "center" });
+        .fontSize(13)
+        .fillColor("#5e5b6b")
+        .text(
+          `Telah menyelesaikan program pembelajaran untuk topik “${topicName}” dengan skor akhir ${scoreStr}.`,
+          W * 0.14,
+          summaryY,
+          { width: W * 0.72, align: "center" }
+        );
+
+      // Info bar (3 kolom)
+      const infoTop = summaryY + 70;
+      const infoWidth = W * 0.8;
+      const infoX = (W - infoWidth) / 2;
+      const colW = infoWidth / 3;
+
+      function infoCell(i, label, value) {
+        const x = infoX + i * colW;
+        const y = infoTop;
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(10)
+          .fillColor("#313038")
+          .text(label.toUpperCase(), x, y, {
+            width: colW,
+            align: "center",
+            characterSpacing: 1.5,
+          });
+        const lineY = y + 22;
+        doc
+          .save()
+          .opacity(0.2)
+          .moveTo(x + 8, lineY)
+          .lineTo(x + colW - 8, lineY)
+          .lineWidth(2)
+          .stroke("#1f1b2d")
+          .restore();
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(12)
+          .fillColor("#1f1b2d")
+          .text(value, x, lineY + 8, { width: colW, align: "center" });
+      }
+      infoCell(0, "Issued on", printedAtStr);
+      infoCell(1, "Started", startedAtStr);
+      infoCell(2, "Attempt ID", `#${attempt.id}`);
 
       // Footer
-      doc.moveDown(2);
       doc
-        .fontSize(12)
-        .text(`Dicetak pada: ${printedAtStr}`, 50, doc.page.height - 90, {
-          width: doc.page.width - 100,
-          align: "right",
-        });
+        .font("Helvetica")
+        .fontSize(10)
+        .fillColor("#313038")
+        .text(
+          "Sertifikat ini diterbitkan secara otomatis oleh sistem setelah peserta menyelesaikan seluruh materi dan kuis pada topik terkait.",
+          48,
+          H - 40,
+          { width: W - 96, align: "center" }
+        );
 
       doc.end();
     } catch (err) {
@@ -1549,10 +1798,10 @@ async function generateCertificateFile(trx, { learningAttemptId }) {
   // Bentuk "file object" kompatibel upload helper
   const filename = `certificate-${attempt.id}.pdf`;
   const file = {
-    fieldname: "files[]", // generic
+    fieldname: "files[]",
     originalname: filename,
     mimetype: "application/pdf",
-    buffer, // <<== penting: in-memory buffer
+    buffer,
     size: buffer.length,
   };
 
