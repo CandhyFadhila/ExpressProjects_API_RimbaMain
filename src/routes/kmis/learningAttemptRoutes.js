@@ -46,7 +46,7 @@ router.get(
   authMiddleware,
   requireAbility("student"),
   requirePermission(["view.kmis_learning_course"]),
-  studentLearningCourseController.getOrderMaterialLearningAttemptbyTopicId
+  studentLearningCourseController.getLearningAttemptMaterialbyId
 );
 
 router.get(
