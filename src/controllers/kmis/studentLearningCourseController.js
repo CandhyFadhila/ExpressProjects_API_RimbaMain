@@ -832,7 +832,7 @@ exports.storeQuizAttempt = async (req, res) => {
     // Validasi progress belajar
     let isProgressValid;
     try {
-      isProgressValid = await validateLearningProgress(id);
+      isProgressValid = await validateLearningProgress(learningAttemptId);
     } catch (e) {
       await trx.rollback();
       const response = new WithoutDataResource(
