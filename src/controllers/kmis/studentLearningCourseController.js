@@ -425,7 +425,6 @@ exports.storeLearningAttempt = async (req, res) => {
   }
 };
 
-// TODO: bug validasi materialTypes belum nyala
 exports.updateProgressLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const id = req.params.id;
@@ -471,12 +470,12 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     ) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        422,
+        200,
         "LEARNING_ALREADY_COMPLETED",
         "Pembelajaran Sudah Selesai",
         "Anda sudah menyelesaikan semua materi dalam topik ini. Silahkan lanjutkan mengerjakan kuis dan dapatkan sertifikatnya!."
       );
-      return res.status(422).json(response.toResponse());
+      return res.status(200).json(response.toResponse());
     }
 
     // 1. Validasi materi pertama pada material_order_ids
@@ -520,7 +519,6 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       dokumen: 10 * 60,
       gambar: 5 * 60,
     };
-
     const requiredDuration = materialTypes[material.material_types];
     if (!requiredDuration) {
       await trx.rollback();
@@ -533,20 +531,38 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    // Hitung selisih waktu
-    const currentTime = dateHelper.toUTC(new Date().toISOString());
-    const materialStartTime = dateHelper.toUTC(material.created_at);
-    const elapsedTimeInSeconds = (currentTime - materialStartTime) / 1000;
+    {
+      const hasAnyProgress =
+        Array.isArray(learningAttempt.completed_material_ids) &&
+        learningAttempt.completed_material_ids.length > 0;
 
-    if (elapsedTimeInSeconds < requiredDuration) {
-      await trx.rollback();
-      const response = new WithoutDataResource(
-        422,
-        "TIME_NOT_ELAPSED",
-        "Waktu Belum Cukup",
-        `Anda harus menyelesaikan materi ini terlebih dahulu, waktu yang tersisa tidak mencukupi.`
-      );
-      return res.status(422).json(response.toResponse());
+      const baselineTs = hasAnyProgress
+        ? learningAttempt.updated_at
+        : learningAttempt.learning_started;
+
+      const baselineUTC = dateHelper.toUTC(baselineTs);
+      const nowUTC = dateHelper.toUTC(new Date());
+
+      // Jika baseline belum tersedia, anggap baru mulai belajar
+      const elapsedSec =
+        baselineUTC && nowUTC ? Math.max(0, (nowUTC - baselineUTC) / 1000) : 0;
+
+      if (elapsedSec < requiredDuration) {
+        const remainSec = Math.ceil(requiredDuration - elapsedSec);
+        const remainMin = Math.ceil(remainSec / 60);
+        await trx.rollback();
+        const response = new WithoutDataResource(
+          422,
+          "TIME_NOT_ELAPSED",
+          "Waktu Belajar Belum Cukup",
+          `Untuk materi bertipe '${
+            material.material_types
+          }', minimal belajar ${Math.round(
+            requiredDuration / 60
+          )} menit. Sisa waktu kira-kira ${remainMin} menit lagi.`
+        );
+        return res.status(422).json(response.toResponse());
+      }
     }
 
     // 3. Update completed_material_ids
@@ -641,7 +657,7 @@ exports.getAllQuizbyTopicId = async (req, res) => {
         "answer_c",
         "answer_d",
         "created_at",
-        "updated_at"
+        "updated_at",
       ])
       .orderBy("id", "asc");
     if (!quizzes || quizzes.length === 0) {
