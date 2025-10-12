@@ -41,6 +41,15 @@ router.get(
 );
 
 router.get(
+  "/get-material/:id",
+  rateLimiter,
+  authMiddleware,
+  requireAbility("student"),
+  requirePermission(["view.kmis_learning_course"]),
+  studentLearningCourseController.getOrderMaterialLearningAttemptbyTopicId
+);
+
+router.get(
   "/get-quiz-by-topic/:id",
   rateLimiter,
   authMiddleware,

@@ -297,6 +297,48 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
   }
 };
 
+exports.getLearningAttemptMaterialbyId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const material = await knex("kmis_materials")
+      .select("*")
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!material) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data materi dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const data = await materialResource(material);
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      `Detail data materi '${material.title}' berhasil didapatkan.`,
+      data
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Learning Attempt KMIS | - Error function getLearningAttemptMaterialbyId : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
 exports.storeLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { topicId } = req.body;
