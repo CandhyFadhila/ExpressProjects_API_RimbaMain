@@ -263,7 +263,7 @@ exports.store = async (req, res) => {
       notes = `Materi diunggah oleh akun super admin yang mengatasnamakan akun pengajar.`;
     }
 
-    const [newMaterial] = await trx("kmis_materials")
+    await trx("kmis_materials")
       .insert({
         created_by: userId,
         // uploaded_by: uploadedBy,

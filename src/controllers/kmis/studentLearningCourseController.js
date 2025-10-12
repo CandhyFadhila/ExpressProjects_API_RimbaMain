@@ -13,6 +13,7 @@ const {
   applyRelationIn,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
+const { normIdArray } = require("../../helpers/inputNorm");
 const dateHelper = require("../../helpers/dateHelper");
 const { stripTitlesOnly } = require("../../helpers/credentialHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
@@ -347,7 +348,6 @@ exports.getLearningAttemptMaterialbyId = async (req, res) => {
   }
 };
 
-// TODO: Total material nya tidak terhitung
 exports.storeLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { topicId } = req.body;
@@ -388,32 +388,9 @@ exports.storeLearningAttempt = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const [materialsAgg, quizAgg] = await Promise.all([
-      trx("kmis_materials")
-        .where("kmis_topic_id", topicId)
-        .whereNull("deleted_at")
-        .count("* as total")
-        .first(),
-      trx("kmis_quiz")
-        .where("kmis_topic_id", topicId)
-        .whereNull("deleted_at")
-        .count("* as total")
-        .first(),
-    ]);
-
-    const totalMaterial = Number(materialsAgg?.total ?? 0);
-    const totalQuiz = Number(quizAgg?.total ?? 0);
-
-    // if (totalMaterial < 1 || totalQuiz < 1) {
-    //   await trx.rollback();
-    //   const response = new WithoutDataResource(
-    //     422,
-    //     "FAILED_VALIDATION",
-    //     "Topik Belum Siap Dipelajari",
-    //     `Topik '${topicId}' membutuhkan minimal 1 materi dan 1 soal kuis. Saat ini: ${totalMaterial} materi dan ${totalQuiz} kuis.`
-    //   );
-    //   return res.status(422).json(response.toResponse());
-    // }
+    const totalMaterial = normIdArray(topic.material_order_ids, {
+      as: "number",
+    }).length;
 
     const already = await trx("kmis_learning_attempts")
       .where({ attempt_by: userId, kmis_topic_id: topicId })
@@ -567,8 +544,8 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     // Validasi jenis materi
     const materialTypes = {
       text: 5 * 60,
-      video: 30 * 60,
-      dokumen: 10 * 60,
+      video: 15 * 60,
+      dokumen: 7 * 60,
       gambar: 5 * 60,
     };
     const requiredDuration = materialTypes[material.material_types];
@@ -651,7 +628,6 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       trx
     );
 
-    // Commit transaksi
     await trx.commit();
 
     const response = new WithoutDataResource(
@@ -757,8 +733,22 @@ exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
 
   try {
     // Validasi progress belajar
-    const isProgressValid = await validateLearningProgress(id);
+    let isProgressValid;
+    try {
+      isProgressValid = await validateLearningProgress(id);
+    } catch (e) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "LEARNING_ATTEMPT_NOT_FOUND",
+        "Topik atau Pembelajaran Tidak Ditemukan",
+        "Data learning attempt tidak ditemukan."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
     if (!isProgressValid) {
+      await trx.rollback();
       const response = new WithoutDataResource(
         422,
         "LEARNING_PROGRESS_INCOMPLETE",
@@ -840,8 +830,22 @@ exports.storeQuizAttempt = async (req, res) => {
 
   try {
     // Validasi progress belajar
-    const isProgressValid = await validateLearningProgress(learningAttemptId);
+    let isProgressValid;
+    try {
+      isProgressValid = await validateLearningProgress(id);
+    } catch (e) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "LEARNING_ATTEMPT_NOT_FOUND",
+        "Topik atau Pembelajaran Tidak Ditemukan",
+        "Data learning attempt tidak ditemukan."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
     if (!isProgressValid) {
+      await trx.rollback();
       const response = new WithoutDataResource(
         422,
         "LEARNING_PROGRESS_INCOMPLETE",
@@ -852,7 +856,20 @@ exports.storeQuizAttempt = async (req, res) => {
     }
 
     // Validasi durasi
-    const isValidTime = await validateQuizDuration(learningAttemptId);
+    let isValidTime;
+    try {
+      isValidTime = await validateQuizDuration(learningAttemptId);
+    } catch (e) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "LEARNING_ATTEMPT_NOT_FOUND",
+        "Topik atau Pembelajaran Tidak Ditemukan",
+        "Data learning attempt tidak ditemukan."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
     if (!isValidTime) {
       // Jika waktu sudah habis, langsung panggil submitAllAttempt
       return exports.submitAllAttempt(req, res);
@@ -1306,18 +1323,19 @@ async function validateLearningProgress(learningAttemptId) {
     throw new Error("Topik atau pembelajaran tidak ditemukan");
   }
 
-  const [{ total: totalStr }] = await knex("kmis_materials")
-    .where("kmis_topic_id", attempt.kmis_topic_id)
+  const topic = await knex("kmis_topics")
+    .where("id", attempt.kmis_topic_id)
     .whereNull("deleted_at")
-    .count("* as total");
+    .select("material_order_ids")
+    .first();
 
-  const totalMaterial = Number(totalStr ?? 0);
+  const requiredIds = normIdArray(topic?.material_order_ids, { as: "number" });
+  const totalMaterial = requiredIds.length;
 
-  const completedMaterial = attempt.completed_material_ids?.length ?? 0;
-
-  console.log(
-    `completedMaterial: ${completedMaterial}, totalMaterial: ${totalMaterial}`
-  );
+  const completedIds = normIdArray(attempt?.completed_material_ids, {
+    as: "number",
+  });
+  const completedMaterial = completedIds.length;
 
   return completedMaterial === totalMaterial;
 }
@@ -1520,7 +1538,6 @@ function resolveRasterLogo(p) {
   return null;
 }
 
-// TODO: Bentuk sertifikat masih belum disesuaikan
 async function generateCertificateFile(trx, { learningAttemptId }) {
   const attempt = await trx("kmis_learning_attempts as a")
     .leftJoin("users as u", "u.id", "a.attempt_by")
@@ -1542,7 +1559,6 @@ async function generateCertificateFile(trx, { learningAttemptId }) {
     );
   }
 
-  // Siapkan data tampilan
   const topicName = attempt.topic_name || "-";
   const userName = stripTitlesOnly(attempt.user_name || "-");
   const scoreNum = Number(attempt.score_total || 0);
@@ -1558,22 +1574,20 @@ async function generateCertificateFile(trx, { learningAttemptId }) {
     1
   );
 
-  // Lokasi assets (logo). Bisa override via env CERT_ASSETS_DIR
   const assetsDir =
     process.env.CERT_ASSETS_DIR || path.resolve(process.cwd(), "assets");
   const logoFiles = [
     path.join(assetsDir, "logo-atrbpn.svg"),
     path.join(assetsDir, "logo-GEF.svg"),
     path.join(assetsDir, "logo-UNEP.svg"),
-  ].map(resolveRasterLogo); // hasil bisa null jika png tidak ada
+  ].map(resolveRasterLogo);
 
-  // Render PDF -> Buffer
   const buffer = await new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
         size: "A4",
         layout: "landscape",
-        margin: 0, // kita gambar full-bleed
+        margin: 0,
         info: {
           Title: `Certificate Attempt #${attempt.id}`,
           Author: "Rimba",
@@ -1589,82 +1603,89 @@ async function generateCertificateFile(trx, { learningAttemptId }) {
       const W = doc.page.width;
       const H = doc.page.height;
 
-      // Latar putih
+      // ===== Background
       doc.rect(0, 0, W, H).fill("#FFFFFF");
-
-      // Frame tipis di dalam
       doc.save();
-      doc.opacity(0.15);
-      doc.lineWidth(2).strokeColor("#1f1b2d");
+      doc.opacity(0.1).lineWidth(2).strokeColor("#1f1b2d");
       doc.rect(18, 18, W - 36, H - 36).stroke();
       doc.restore();
 
-      // Dekor kiri (gradasi hijau, bentuk poligon)
-      const gradLeft = doc.linearGradient(0, 0, 0, H);
-      gradLeft.stop(0, "#7fb786").stop(0.6, "#568d5d").stop(1, "#3e6b44");
+      const g1 = doc.linearGradient(0, 0, 0, H);
+      g1.stop(0, "#7fb786").stop(0.6, "#568d5d").stop(1, "#3e6b44");
+      const g2 = doc.linearGradient(0, 0, 0, H);
+      g2.stop(0, "#3e6b44").stop(0.5, "#568d5d").stop(1, "#7fb786");
+
+      // Wedge kiri (ikuti CSS)
+      const LW = Math.min(340, W * 0.34);
+      const Lx = -40,
+        LyTop = -40,
+        LyBottom = H + 40;
+      doc.save();
       doc
-        .save()
-        .moveTo(-40, -40)
-        .lineTo(W * 0.3, -40)
-        .lineTo(W * 0.22, H * 0.6)
-        .lineTo(W * 0.36, H + 40)
-        .lineTo(-40, H + 40)
+        .moveTo(Lx + 0.0 * LW, LyTop)
+        .lineTo(Lx + 0.75 * LW, LyTop)
+        .lineTo(Lx + 0.5 * LW, H * 0.6)
+        .lineTo(Lx + 0.85 * LW, LyBottom)
+        .lineTo(Lx + 0.0 * LW, LyBottom)
         .closePath()
-        .fill(gradLeft)
-        .restore();
+        .fill(g1);
+      doc.restore();
 
-      // Dekor kanan (gradasi hijau, bentuk poligon)
-      const gradRight = doc.linearGradient(0, 0, 0, H);
-      gradRight.stop(0, "#3e6b44").stop(0.5, "#568d5d").stop(1, "#7fb786");
+      // Wedge kanan (ikuti CSS)
+      const RW = Math.min(360, W * 0.36);
+      const Rx = W - RW + 60,
+        RyTop = -60,
+        RyBottom = H + 60;
+      doc.save();
       doc
-        .save()
-        .moveTo(W * 0.45, -60)
-        .lineTo(W + 60, -60)
-        .lineTo(W + 60, H + 60)
-        .lineTo(W * 0.25, H + 60)
-        .lineTo(W * 0.55, H * 0.5)
+        .moveTo(Rx + 0.45 * RW, RyTop)
+        .lineTo(Rx + 1.0 * RW, RyTop)
+        .lineTo(Rx + 1.0 * RW, RyBottom)
+        .lineTo(Rx + 0.25 * RW, RyBottom)
+        .lineTo(Rx + 0.55 * RW, H * 0.5)
         .closePath()
-        .fill(gradRight)
-        .restore();
+        .fill(g2);
+      doc.restore();
 
-      // Header (brand kiri, box logo kanan)
-      const PX = 48; // padding X
-      const headerTop = 36;
+      // ===== Header
+      const PX = 48,
+        headerTop = 36;
 
-      // Brand
+      // Brand kiri (diperkecil)
       doc
         .font("Helvetica-Bold")
-        .fontSize(18)
+        .fontSize(16)
         .fillColor("#1f1b2d")
-        .text("Program Koridor RIMBA", PX, headerTop);
+        .text("Program Koridor RIMBA", PX, headerTop, { align: "left" });
       doc
         .font("Helvetica")
         .fontSize(7)
         .fillColor("#313038")
-        .text(`Sertifikat · ${printedAtStr}`, PX, headerTop + 24);
+        .text(`Sertifikat · ${printedAtStr}`, PX, headerTop + 22, {
+          align: "left",
+          characterSpacing: 1.5,
+        });
 
-      // Box logo dinamis menyesuaikan 3 logo (tinggi 30, padding 10, gap 8)
-      const logoH = 30;
-      const pad = 10;
-      const gap = 8;
-      const perLogoW = 20; // width target tiap logo (konsisten)
+      // Logo kanan (diperkecil)
+      const logoH = 24,
+        pad = 8,
+        gap = 8,
+        perLogoW = 32;
       const boxW = pad * 2 + perLogoW * 3 + gap * 2;
       const boxH = logoH + pad * 2;
       const boxX = W - PX - boxW;
       const boxY = headerTop;
 
-      // kotak
       doc
         .save()
-        .roundedRect(boxX, boxY, boxW, boxH, 10)
+        .roundedRect(boxX, boxY, boxW, boxH, 8)
         .fill("#ffffff")
-        .lineWidth(3)
+        .lineWidth(2)
         .strokeColor("#568d5d")
-        .roundedRect(boxX, boxY, boxW, boxH, 10)
+        .roundedRect(boxX, boxY, boxW, boxH, 8)
         .stroke()
         .restore();
 
-      // gambar logo (pakai png kalau ada; kalau tidak, placeholder)
       let cx = boxX + pad;
       for (let i = 0; i < logoFiles.length; i++) {
         const p = logoFiles[i];
@@ -1676,7 +1697,6 @@ async function generateCertificateFile(trx, { learningAttemptId }) {
               valign: "center",
             });
           } catch {
-            // placeholder
             doc
               .save()
               .rect(cx, boxY + pad, perLogoW, logoH)
@@ -1684,7 +1704,6 @@ async function generateCertificateFile(trx, { learningAttemptId }) {
               .restore();
           }
         } else {
-          // placeholder kalau png tidak tersedia
           doc
             .save()
             .rect(cx, boxY + pad, perLogoW, logoH)
@@ -1694,41 +1713,51 @@ async function generateCertificateFile(trx, { learningAttemptId }) {
         cx += perLogoW + gap;
       }
 
-      // Title
+      // ===== Title (jarak lebih longgar)
+      const titleY = 120;
       doc
         .font("Helvetica-Bold")
         .fontSize(56)
         .fillColor("#568d5d")
-        .text("CERTIFICATE", 0, 150, { align: "center" });
+        .text("CERTIFICATE", 0, titleY, {
+          align: "center",
+          characterSpacing: 4.5,
+        });
       doc
         .font("Helvetica-Bold")
         .fontSize(16)
         .fillColor("#b7b3c9")
-        .text("OF ACHIEVEMENT", 0, 190, {
+        .text("OF ACHIEVEMENT", 0, titleY + 54, {
           align: "center",
-          characterSpacing: 2,
+          characterSpacing: 2.5,
         });
 
-      // Nama peserta + underline halus
+      // ===== Recipient
+      const maxNameWidth = W * 0.7;
+      let nameFontSize = 40;
+      doc.font("Helvetica-Bold").fontSize(nameFontSize);
+      while (doc.widthOfString(userName) > maxNameWidth && nameFontSize > 22) {
+        nameFontSize -= 1;
+        doc.fontSize(nameFontSize);
+      }
       doc
-        .font("Helvetica-Bold")
-        .fontSize(40)
         .fillColor("#1f1b2d")
-        .text(userName, 0, 240, { align: "center" });
-      const nameWidth = doc.widthOfString(userName);
-      const nameX = (W - nameWidth) / 2;
-      const nameY = doc.y + 5;
+        .text(userName, 0, titleY + 112, { align: "center" });
+
+      const hrW = W * 0.7,
+        hrX = (W - hrW) / 2,
+        hrY = doc.y + 8;
       doc
         .save()
         .opacity(0.15)
-        .moveTo(nameX - 10, nameY)
-        .lineTo(nameX + nameWidth + 10, nameY)
+        .moveTo(hrX, hrY)
+        .lineTo(hrX + hrW, hrY)
         .lineWidth(3)
         .stroke("#1f1b2d")
         .restore();
 
-      // Ringkasan
-      const summaryY = nameY + 20;
+      // ===== Summary
+      const summaryY = hrY + 18;
       doc
         .font("Helvetica")
         .fontSize(13)
@@ -1740,15 +1769,14 @@ async function generateCertificateFile(trx, { learningAttemptId }) {
           { width: W * 0.72, align: "center" }
         );
 
-      // Info bar (3 kolom)
-      const infoTop = summaryY + 70;
-      const infoWidth = W * 0.8;
-      const infoX = (W - infoWidth) / 2;
-      const colW = infoWidth / 3;
-
+      // ===== Info bar
+      const infoTop = summaryY + 64,
+        infoWidth = W * 0.8,
+        infoX = (W - infoWidth) / 2,
+        colW = infoWidth / 3;
       function infoCell(i, label, value) {
-        const x = infoX + i * colW;
-        const y = infoTop;
+        const x = infoX + i * colW,
+          y = infoTop;
         doc
           .font("Helvetica-Bold")
           .fontSize(10)
@@ -1762,8 +1790,8 @@ async function generateCertificateFile(trx, { learningAttemptId }) {
         doc
           .save()
           .opacity(0.2)
-          .moveTo(x + 8, lineY)
-          .lineTo(x + colW - 8, lineY)
+          .moveTo(x + 16, lineY)
+          .lineTo(x + colW - 16, lineY)
           .lineWidth(2)
           .stroke("#1f1b2d")
           .restore();
@@ -1777,7 +1805,7 @@ async function generateCertificateFile(trx, { learningAttemptId }) {
       infoCell(1, "Started", startedAtStr);
       infoCell(2, "Attempt ID", `#${attempt.id}`);
 
-      // Footer
+      // ===== Footer
       doc
         .font("Helvetica")
         .fontSize(10)
@@ -1795,17 +1823,13 @@ async function generateCertificateFile(trx, { learningAttemptId }) {
     }
   });
 
-  // Bentuk "file object" kompatibel upload helper
-  const filename = `certificate-${attempt.id}.pdf`;
-  const file = {
+  return {
     fieldname: "files[]",
-    originalname: filename,
+    originalname: `certificate-${attempt.id}.pdf`,
     mimetype: "application/pdf",
     buffer,
     size: buffer.length,
   };
-
-  return file;
 }
 
 async function uploadCertificateAndAttach(
