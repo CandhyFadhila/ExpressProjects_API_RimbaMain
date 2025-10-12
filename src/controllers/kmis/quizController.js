@@ -756,13 +756,15 @@ exports.importTemplate = async (req, res) => {
     const allowedMimes = new Set([
       "application/vnd.ms-excel", // .xls
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+      "text/csv",
+      "application/csv",
     ]);
     if (!allowedMimes.has(file.mimetype)) {
       const response = new WithoutDataResource(
         422,
         "INVALID_FILE_TYPE",
         "Tipe File Tidak Didukung",
-        "Format file harus .xls atau .xlsx."
+        "Format file harus .xls, .xlsx, atau .csv."
       );
       return res.status(422).json(response.toResponse());
     }
