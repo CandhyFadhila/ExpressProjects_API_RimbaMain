@@ -5,7 +5,8 @@ const env = (process.env.PG_ENV || "windows").toLowerCase();
 const connections = {
   windows: {
     host:"localhost",
-    port: 5433,
+    // port: 5433,
+    port: 5432,
     user: "postgres",
     password: "super.admin",
     database: "rimba_main",

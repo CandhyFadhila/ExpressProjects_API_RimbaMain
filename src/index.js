@@ -49,7 +49,8 @@ if (isLinux()) {
   app.set("trust proxy", 1);
 }
 
-const PORT = 3000;
+// const PORT = 3000;
+const PORT = 4000;
 app.locals.baseUrl = resolvePublicBaseUrl(PORT);
 
 // Cek API root
