@@ -41,7 +41,7 @@ function resolvePublicBaseUrl(port) {
   // return isLinux() ? "https://rimbaexium.org" : `http://localhost:${port}`;
 
   // Ini setup laptop reza
-  return isLinux() ? "https://api-rimba.exium.my.id/" : `http://localhost:${port}`;
+  return isLinux() ? "https://api-rimba.exium.my.id" : `http://localhost:${port}`;
 }
 
 // Middleware

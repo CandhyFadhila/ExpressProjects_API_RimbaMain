@@ -311,6 +311,7 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
 };
 
 // Ini adalah fungsi untuk get detail materi berdasarkan id materi (untuk mendapatkan materi berdasarkan id yang ingin diperlajari)
+// TODO: update started learning disini
 exports.getLearningAttemptMaterialbyId = async (req, res) => {
   const { id } = req.params;
 
@@ -354,6 +355,7 @@ exports.getLearningAttemptMaterialbyId = async (req, res) => {
 };
 
 // Ini adalah fungsi untuk store learning attempt (untuk memulai belajar)
+// TODO: pindah update started learning di getLearningAttemptMaterialbyId
 exports.storeLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { topicId } = req.body;
@@ -1619,6 +1621,7 @@ async function attemptExamResponse(learningAttemptId) {
   return { learningParticipant, exam };
 }
 
+// TODO: Pindahkan update quiz_attempt_status didalam feedback
 async function handleFinalQuestion(trx, { learningAttemptId, topicId, req }) {
   const aggActive = await trx("kmis_quiz_responses")
     .where("kmis_learning_attempt_id", learningAttemptId)
