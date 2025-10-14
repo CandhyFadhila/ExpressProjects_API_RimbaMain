@@ -237,7 +237,27 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
 
   try {
     const learningAttempt = await knex("kmis_learning_attempts")
-      .select("*")
+      .select([
+        "id",
+        "attempt_by",
+        "certificate_ids",
+        "kmis_topic_id",
+        "completed_material_ids",
+        "quiz_attempt_status",
+        "quiz_assessment_status",
+        "total_material",
+        "learning_started",
+        "completed_quiz",
+        "quiz_started",
+        "quiz_finished",
+        "quiz_duration",
+        "questions_answered",
+        "feedback",
+        "feedback_comment",
+        "created_at",
+        "updated_at",
+        "deleted_at",
+      ])
       .where("kmis_topic_id", id)
       .where("attempt_by", userId)
       .first();
@@ -311,9 +331,14 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
 };
 
 // Ini adalah fungsi untuk get detail materi berdasarkan id materi (untuk mendapatkan materi berdasarkan id yang ingin diperlajari)
-// TODO: update started learning disini
 exports.getLearningAttemptMaterialbyId = async (req, res) => {
   const { id } = req.params;
+  const userId =
+    req.auth?.userId ??
+    req.auth?.user_id ??
+    req.auth?.id ??
+    req.userId ??
+    req.user?.id;
 
   try {
     const material = await knex("kmis_materials")
@@ -329,6 +354,32 @@ exports.getLearningAttemptMaterialbyId = async (req, res) => {
         `Data materi dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
+    }
+
+    const attempt = await knex("kmis_learning_attempts")
+      .where("attempt_by", userId)
+      .where("kmis_topic_id", material.kmis_topic_id)
+      .whereNull("deleted_at")
+      .orderBy("id", "desc")
+      .first();
+    if (!attempt) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Pembelajaran Tidak Ditemukan",
+        "Data learning attempt tidak ditemukan. Silakan mulai pembelajaran topik ini terlebih dahulu."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    if (attempt) {
+      await knex("kmis_learning_attempts")
+        .where("id", attempt.id)
+        .whereNull("learning_started")
+        .update({
+          learning_started: dateHelper.toUTC(new Date().toISOString()),
+          updated_at: knex.fn.now(),
+        });
     }
 
     const data = await materialResource(material);
@@ -355,7 +406,6 @@ exports.getLearningAttemptMaterialbyId = async (req, res) => {
 };
 
 // Ini adalah fungsi untuk store learning attempt (untuk memulai belajar)
-// TODO: pindah update started learning di getLearningAttemptMaterialbyId
 exports.storeLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { topicId } = req.body;
@@ -415,8 +465,6 @@ exports.storeLearningAttempt = async (req, res) => {
       return res.status(409).json(response.toResponse());
     }
 
-    const startedAtDb = dateHelper.toUTC(new Date().toISOString());
-
     await trx("kmis_learning_attempts")
       .insert({
         attempt_by: userId,
@@ -424,7 +472,6 @@ exports.storeLearningAttempt = async (req, res) => {
         quiz_attempt_status: 1,
         quiz_assessment_status: false,
         total_material: totalMaterial,
-        learning_started: startedAtDb,
       })
       .returning("*");
 
@@ -508,12 +555,12 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     ) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        200,
+        422,
         "LEARNING_ALREADY_COMPLETED",
         "Pembelajaran Sudah Selesai",
         "Anda sudah menyelesaikan semua materi dalam topik ini. Silahkan lanjutkan mengerjakan kuis dan dapatkan sertifikatnya!."
       );
-      return res.status(200).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     // 1. Validasi materi pertama pada material_order_ids
@@ -664,11 +711,18 @@ exports.updateProgressLearningAttempt = async (req, res) => {
 // Ini adalah fungsi untuk get semua quiz berdasarkan id topik (ketika materi sudah selesai, dan quiz mau dikerjakan maka dapat diambil dahulu semua quiz dari topik tersebut)
 exports.getAllQuizbyTopicId = async (req, res) => {
   const { id } = req.params;
+  const userId =
+    req.auth?.userId ??
+    req.auth?.user_id ??
+    req.auth?.id ??
+    req.userId ??
+    req.user?.id;
 
   try {
     const topic = await knex("kmis_topics")
       .where("id", id)
       .select("id", "title")
+      .whereNull("deleted_at")
       .first();
     if (!topic) {
       const response = new WithoutDataResource(
@@ -679,6 +733,31 @@ exports.getAllQuizbyTopicId = async (req, res) => {
       );
       return res.status(200).json(response.toResponse());
     }
+
+    const attempt = await knex("kmis_learning_attempts")
+      .where("kmis_topic_id", topic.id)
+      .where("attempt_by", userId)
+      .whereNull("deleted_at")
+      .orderBy("id", "desc")
+      .first();
+    if (!attempt) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Pembelajaran Tidak Ditemukan",
+        "Data learning attempt tidak ditemukan. Silakan mulai pembelajaran topik ini terlebih dahulu."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const nowDb = dateHelper.toUTC(new Date().toISOString());
+    await knex("kmis_learning_attempts")
+      .where("id", attempt.id)
+      .whereNull("quiz_started")
+      .update({
+        quiz_started: nowDb,
+        updated_at: knex.fn.now(),
+      });
 
     const quizzes = await knex("kmis_quiz")
       .where("kmis_topic_id", topic.id)
@@ -1009,7 +1088,7 @@ exports.storeQuizAttempt = async (req, res) => {
         });
       }
 
-      const answeredAtDb = dateHelper.toUTC(new Date().toISOString());
+      const now = dateHelper.toUTC(new Date().toISOString());
       const isCorrect =
         selectedOption === String(quiz.correct_option || "").toUpperCase();
 
@@ -1020,19 +1099,9 @@ exports.storeQuizAttempt = async (req, res) => {
           selected_option: selectedOption,
           is_marker: isMarker,
           is_correct: isCorrect,
-          answered_at: answeredAtDb,
+          answered_at: now,
         })
         .returning("*");
-
-      await trx("kmis_learning_attempts")
-        .where("id", learningAttemptId)
-        .update({
-          quiz_started: trx.raw(
-            "COALESCE(quiz_started, ?::timestamp without time zone)",
-            [answeredAtDb]
-          ),
-          updated_at: trx.fn.now(),
-        });
 
       const answeredAfter = answeredActiveBefore + (isRevision ? 0 : 1);
       await activityLogHelper.logCreate(

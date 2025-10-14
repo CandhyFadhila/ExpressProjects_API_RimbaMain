@@ -29,7 +29,6 @@ class StorageServerHelper {
         return "https://doc-rimba.exium.my.id";
       case "windows":
         return "http://localhost:4001";
-      // return "https://doc-rimba.exium.my.id";
     }
   }
 
