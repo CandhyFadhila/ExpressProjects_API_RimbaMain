@@ -37,10 +37,6 @@ function isLinux() {
 }
 
 function resolvePublicBaseUrl(port) {
-  // Ini setup laptop sendi
-  // return isLinux() ? "https://rimbaexium.org" : `http://localhost:${port}`;
-
-  // Ini setup laptop reza
   return isLinux() ? "https://api-rimba.exium.my.id" : `http://localhost:${port}`;
 }
 
@@ -53,10 +49,6 @@ if (isLinux()) {
   app.set("trust proxy", 1);
 }
 
-// Ini setup laptop sendi
-// const PORT = 3000;
-
-// Ini setup laptop reza
 const PORT = 4000;
 app.locals.baseUrl = resolvePublicBaseUrl(PORT);
 

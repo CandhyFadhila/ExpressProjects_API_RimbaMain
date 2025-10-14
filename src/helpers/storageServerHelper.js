@@ -24,16 +24,6 @@ class StorageServerHelper {
     const env = String(process.env.PG_ENV || "windows")
       .trim()
       .toLowerCase();
-    // Ini setup laptop sendi
-    // switch (env) {
-    //   case "linux":
-    //     return "https://doc.rimbaexium.org";
-    //   case "windows":
-    //   default:
-    //     return "http://localhost:3001";
-    // }
-
-    // Ini setup laptop reza
     switch (env) {
       case "linux":
         return "https://doc-rimba.exium.my.id";
