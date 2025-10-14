@@ -36,7 +36,7 @@ class StorageServerHelper {
     // Ini setup laptop reza
     switch (env) {
       case "linux":
-        return "https://api-rimba.exium.my.id";
+        return "https://doc-rimba.exium.my.id";
       case "windows":
       default:
         return "http://localhost:4001";
