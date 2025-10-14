@@ -153,7 +153,7 @@ app.use("/api/master-data/animal-category", animalCategoryRoutes);
 
 // Jalankan server
 app.listen(PORT, () => {
-  // Di windows akan log: http://localhost:3000
+  // Di windows akan log: http://localhost:4000
   // Di linux akan log:   https://rimbaexium.org
   console.log(`Server berjalan di ${app.locals.baseUrl} (listen port ${PORT})`);
 });

@@ -8,12 +8,10 @@ const connections = {
 
     // Ini setup laptop sendi
     // port: 5433,
-    // user: "postgres",
-    // password: "super.admin",
-    // database: "rimba_main",
 
     // Ini setup laptop reza
     port: 5432,
+
     user: "postgres",
     password: "super.admin",
     database: "rimba_main",
