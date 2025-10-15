@@ -62,17 +62,17 @@ exports.getListLearningAttempt = async (req, res) => {
     const only = (n) => fsArr.length === 1 && fsArr[0] === n;
     if (only(2)) {
       query.andWhere(function () {
-        this.whereRaw(
-          `COALESCE("quizParticipant"."certificate_ids", '[]'::jsonb) = '[]'::jsonb`
-        );
-      });
-    } else if (only(3)) {
-      query.andWhere(function () {
         this.whereRaw(`
           "quizParticipant"."certificate_ids" IS NOT NULL
           AND jsonb_typeof("quizParticipant"."certificate_ids") = 'array'
           AND jsonb_array_length("quizParticipant"."certificate_ids") > 0
         `);
+      });
+    } else if (only(3)) {
+      query.andWhere(function () {
+        this.whereRaw(
+          `COALESCE("quizParticipant"."certificate_ids", '[]'::jsonb) = '[]'::jsonb`
+        );
       });
     }
 
