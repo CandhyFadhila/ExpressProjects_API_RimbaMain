@@ -575,12 +575,12 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     ) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        422,
+        200,
         "LEARNING_ALREADY_COMPLETED",
         "Pembelajaran Sudah Selesai",
         "Anda sudah menyelesaikan semua materi dalam topik ini. Silahkan lanjutkan mengerjakan kuis dan dapatkan sertifikatnya!."
       );
-      return res.status(422).json(response.toResponse());
+      return res.status(200).json(response.toResponse());
     }
 
     // 1. Validasi materi pertama pada material_order_ids
