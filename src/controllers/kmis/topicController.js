@@ -23,6 +23,7 @@ const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
 exports.index = async (req, res) => {
   const { search, categoryId } = req.query;
+  const categoryIdAny = categoryId ?? req.query["categoryId[]"];
 
   try {
     let query = knex("kmis_topics as topic")
@@ -35,7 +36,7 @@ exports.index = async (req, res) => {
 
     applyTrashedScope(query, req, "topic.deleted_at");
 
-    applyRelationIn(query, "topic.kmis_categories_id", categoryId, {
+    applyRelationIn(query, "topic.kmis_categories_id", categoryIdAny, {
       as: "number",
     });
 

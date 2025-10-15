@@ -24,14 +24,15 @@ const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
 exports.index = async (req, res) => {
-  const { search, animalCategory } = req.query;
+  const { search, animalCategoryId } = req.query;
+  const animalCategoryIdAny = animalCategoryId ?? req.query["animalCategoryId[]"];
 
   try {
     let query = knex("cms_animal_composition as animal").select("animal.*");
 
     applyTrashedScope(query, req, "animal.deleted_at");
 
-    applyRelationIn(query, "animal.cms_animal_category_id", animalCategory, {
+    applyRelationIn(query, "animal.cms_animal_category_id", animalCategoryIdAny, {
       as: "number",
     });
 

@@ -15,6 +15,7 @@ const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 
 exports.index = async (req, res) => {
   const { search, topicId, status } = req.query;
+  const topicIdAny = topicId ?? req.query["topicId[]"];
 
   try {
     let query = knex("kmis_learning_attempts as quizParticipant")
@@ -29,7 +30,7 @@ exports.index = async (req, res) => {
 
     applyTrashedScope(query, req, "quizParticipant.deleted_at");
 
-    applyRelationIn(query, "quiz.kmis_topic_id", topicId, {
+    applyRelationIn(query, "quiz.kmis_topic_id", topicIdAny, {
       as: "number",
     });
 

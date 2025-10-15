@@ -115,14 +115,64 @@ function applyStartEndDateFilter(
 }
 
 function applyRelationIn(queryBuilder, column, values, opts = {}) {
-  const { as = "number" } = opts;
-  const ids = normIdArray(values, { as }).filter((v) =>
-    as === "number" ? Number.isFinite(v) : String(v).length > 0
-  );
-  if (ids.length > 0) {
-    queryBuilder.whereIn(column, ids);
+  const { as = "number", negate = false, allowEmpty = false } = opts;
+
+  // Normalisasi 'values' → array mentah
+  //    - Dukung: categoryId[]=1&categoryId[]=2 → ['1','2']
+  //    - Dukung: categoryId=[1,2]              → "[1,2]" (string)
+  //    - Dukung: categoryId=1,2,3              → "1,2,3" (string)
+  let arr;
+  if (Array.isArray(values)) {
+    arr = values;
+  } else if (typeof values === "string") {
+    let s = values.trim();
+    if (!s) {
+      arr = [];
+    } else if (s.startsWith("[") && s.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(s);
+        arr = Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        arr = s
+          .slice(1, -1)
+          .split(",")
+          .map((v) => v.trim().replace(/^['"]|['"]$/g, ""))
+          .filter(Boolean);
+      }
+    } else {
+      arr = s
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+    }
+  } else if (values == null) {
+    arr = [];
+  } else {
+    arr = [values];
   }
-  return queryBuilder;
+
+  // 2) Koersi tipe + bersihkan
+  let ids =
+    as === "number"
+      ? arr
+          .map((v) => Number(String(v).trim()))
+          .filter((v) => Number.isFinite(v))
+      : arr.map((v) => String(v).trim()).filter((v) => v.length > 0);
+
+  // 3) Unik-kan
+  ids = [...new Set(ids)];
+
+  // 4) Terapkan filter
+  if (ids.length === 0) {
+    if (allowEmpty) {
+      queryBuilder.whereRaw("1=0");
+    }
+    return queryBuilder;
+  }
+
+  return negate
+    ? queryBuilder.whereNotIn(column, ids)
+    : queryBuilder.whereIn(column, ids);
 }
 
 function applySearch(queryBuilder, search, columns) {

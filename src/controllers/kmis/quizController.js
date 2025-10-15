@@ -26,11 +26,12 @@ const normalizeAnswer = (v) =>
 
 exports.index = async (req, res) => {
   const { search, topicId } = req.query;
+  const topicIdAny = topicId ?? req.query["topicId[]"];
 
   try {
     let query = knex("kmis_quiz as quiz").select("quiz.*");
 
-    applyRelationIn(query, "quiz.kmis_topic_id", topicId, {
+    applyRelationIn(query, "quiz.kmis_topic_id", topicIdAny, {
       as: "number",
     });
 

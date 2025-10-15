@@ -185,6 +185,7 @@ exports.getCategorybyId = async (req, res) => {
 // Topic
 exports.getAllTopic = async (req, res) => {
   const { search, categoryId } = req.query;
+  const categoryIdAny = categoryId ?? req.query["categoryId[]"];
 
   try {
     let query = knex("kmis_topics as topic")
@@ -206,7 +207,7 @@ exports.getAllTopic = async (req, res) => {
       .whereNull("topic.deleted_at")
       .orderBy("topic.created_at", "desc");
 
-    applyRelationIn(query, "topic.kmis_categories_id", categoryId, {
+    applyRelationIn(query, "topic.kmis_categories_id", categoryIdAny, {
       as: "number",
     });
 
@@ -668,6 +669,8 @@ exports.getUserbyId = async (req, res) => {
 // Material
 exports.getAllMaterial = async (req, res) => {
   const { search, categoryId, topicId } = req.query;
+  const categoryIdAny = categoryId ?? req.query["categoryId[]"];
+  const topicIdAny = topicId ?? req.query["topicId[]"];
 
   try {
     let query = knex("kmis_materials as material")
@@ -690,10 +693,10 @@ exports.getAllMaterial = async (req, res) => {
       .whereNull("material.deleted_at")
       .orderBy("material.created_at", "desc");
 
-    applyRelationIn(query, "material.kmis_categories_id", categoryId, {
+    applyRelationIn(query, "material.kmis_categories_id", categoryIdAny, {
       as: "number",
     });
-    applyRelationIn(query, "material.kmis_topic_id", topicId, {
+    applyRelationIn(query, "material.kmis_topic_id", topicIdAny, {
       as: "number",
     });
 
@@ -1303,6 +1306,7 @@ exports.getMaterialbyIsPublic = async (req, res) => {
 // Quiz
 exports.getAllQuiz = async (req, res) => {
   const { search, topicId } = req.query;
+  const topicIdAny = topicId ?? req.query["topicId[]"];
 
   try {
     let query = knex("kmis_quiz as quiz")
@@ -1321,7 +1325,7 @@ exports.getAllQuiz = async (req, res) => {
       .whereNull("quiz.deleted_at")
       .orderBy("quiz.created_at", "desc");
 
-    applyRelationIn(query, "quiz.kmis_topic_id", topicId, {
+    applyRelationIn(query, "quiz.kmis_topic_id", topicIdAny, {
       as: "number",
     });
 
@@ -1872,7 +1876,8 @@ exports.getAnimalCategorybyId = async (req, res) => {
 
 // Event (TextArray)
 exports.getAllEvent = async (req, res) => {
-  const { search, eventCategory } = req.query;
+  const { search, eventCategoryId } = req.query;
+  const eventCategoryIdAny = eventCategoryId ?? req.query["eventCategoryId[]"];
 
   try {
     let query = knex("cms_events as event")
@@ -1888,7 +1893,7 @@ exports.getAllEvent = async (req, res) => {
       .whereNull("event.deleted_at")
       .orderBy("event.created_at", "desc");
 
-    applyRelationIn(query, "event.cms_event_category_id", eventCategory, {
+    applyRelationIn(query, "event.cms_event_category_id", eventCategoryIdAny, {
       as: "number",
     });
 
@@ -2069,7 +2074,8 @@ exports.getEventbyEventCategoryId = async (req, res) => {
 
 // News (TextArray)
 exports.getAllNews = async (req, res) => {
-  const { search, newsCategory } = req.query;
+  const { search, newsCategoryId } = req.query;
+  const newsCategoryIdAny = newsCategoryId ?? req.query["newsCategoryId[]"];
 
   try {
     let query = knex("cms_news as news")
@@ -2086,7 +2092,7 @@ exports.getAllNews = async (req, res) => {
       .whereNull("news.deleted_at")
       .orderBy("news.created_at", "desc");
 
-    applyRelationIn(query, "news.cms_news_category_id", newsCategory, {
+    applyRelationIn(query, "news.cms_news_category_id", newsCategoryIdAny, {
       as: "number",
     });
 
@@ -2328,7 +2334,8 @@ exports.getNewsbySlug = async (req, res) => {
 
 // Animal Composition (TextArray)
 exports.getAllAnimalComposition = async (req, res) => {
-  const { search, animalCategory } = req.query;
+  const { search, animalCategoryId } = req.query;
+  const animalCategoryIdAny = animalCategoryId ?? req.query["animalCategoryId[]"];
 
   try {
     let query = knex("cms_animal_composition as animal")
@@ -2343,7 +2350,7 @@ exports.getAllAnimalComposition = async (req, res) => {
       .whereNull("animal.deleted_at")
       .orderBy("animal.created_at", "desc");
 
-    applyRelationIn(query, "animal.cms_animal_category_id", animalCategory, {
+    applyRelationIn(query, "animal.cms_animal_category_id", animalCategoryIdAny, {
       as: "number",
     });
 

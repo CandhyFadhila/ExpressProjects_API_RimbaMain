@@ -29,9 +29,10 @@ const materialResource = require("../../resources/kmis/materialResource");
 const quizResponseResource = require("../../resources/kmis/quizResponseResource");
 const QUIZ_STATUS = Object.freeze({ STARTED: 1, FINISHED: 2, ABANDONED: 3 });
 
-// Ini adalah fungsi untuk get kursus saya (kursus yang sudah selesai dan yang masih berlangsung)
+// get kursus saya (kursus yang sudah selesai dan yang masih berlangsung)
 exports.getListLearningAttempt = async (req, res) => {
   const { search, categoryId } = req.query;
+  const categoryIdAny = categoryId ?? req.query["categoryId[]"];
   const userId =
     req.auth?.userId ??
     req.auth?.user_id ??
@@ -52,7 +53,7 @@ exports.getListLearningAttempt = async (req, res) => {
 
     applyTrashedScope(query, req, "quizParticipant.deleted_at");
 
-    applyRelationIn(query, "topic.kmis_categories_id", categoryId, {
+    applyRelationIn(query, "topic.kmis_categories_id", categoryIdAny, {
       as: "number",
     });
 
@@ -112,7 +113,7 @@ exports.getListLearningAttempt = async (req, res) => {
   }
 };
 
-// Ini adalah fungsi untuk get detail kursus berdasarkan id topic
+// get detail kursus berdasarkan id topic
 exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
   const { id } = req.params;
 
@@ -225,7 +226,7 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
   }
 };
 
-// Ini adalah fungsi untuk get detail kursus berdasarkan id topic (untuk order material, kondisi ketika mau belajar)
+// get detail kursus berdasarkan id topic (untuk order material, kondisi ketika mau belajar)
 exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
   const { id } = req.params;
   const userId =
@@ -330,7 +331,7 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
   }
 };
 
-// Ini adalah fungsi untuk get detail materi berdasarkan id materi (untuk mendapatkan materi berdasarkan id yang ingin diperlajari)
+// get detail materi berdasarkan id materi (untuk mendapatkan materi berdasarkan id yang ingin diperlajari)
 exports.getLearningAttemptMaterialbyId = async (req, res) => {
   const { id } = req.params;
   const userId =
@@ -405,7 +406,7 @@ exports.getLearningAttemptMaterialbyId = async (req, res) => {
   }
 };
 
-// Ini adalah fungsi untuk store learning attempt (untuk memulai belajar)
+// store learning attempt (untuk memulai belajar)
 exports.storeLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { topicId } = req.body;
@@ -509,7 +510,7 @@ exports.storeLearningAttempt = async (req, res) => {
   }
 };
 
-// Ini adalah fungsi untuk update progress learning attempt (ketika materi 1 selesai dan klik lanjut ke materi selanjutnya)
+// update progress learning attempt (ketika materi 1 selesai dan klik lanjut ke materi selanjutnya)
 exports.updateProgressLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const id = req.params.id;
@@ -708,7 +709,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
   }
 };
 
-// Ini adalah fungsi untuk get semua quiz berdasarkan id topik (ketika materi sudah selesai, dan quiz mau dikerjakan maka dapat diambil dahulu semua quiz dari topik tersebut)
+// get semua quiz berdasarkan id topik (ketika materi sudah selesai, dan quiz mau dikerjakan maka dapat diambil dahulu semua quiz dari topik tersebut)
 exports.getAllQuizbyTopicId = async (req, res) => {
   const { id } = req.params;
   const userId =
@@ -810,7 +811,7 @@ exports.getAllQuizbyTopicId = async (req, res) => {
   }
 };
 
-// Ini adalah fungsi untuk get semua quiz beserta jawabannya berdasarkan id learning attempt
+// get semua quiz beserta jawabannya berdasarkan id learning attempt
 exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
   const trx = await knex.transaction();
   const { id } = req.params;
@@ -903,7 +904,7 @@ exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
   }
 };
 
-// Ini adalah fungsi untuk store jawaban kuis per soal, juga berlaku jika memperbarui jawaban
+// store jawaban kuis per soal, juga berlaku jika memperbarui jawaban
 exports.storeQuizAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { learningAttemptId, quizId } = req.body;
@@ -1146,7 +1147,7 @@ exports.storeQuizAttempt = async (req, res) => {
   }
 };
 
-// Ini adalah fungsi untuk submit quiz berdasarkan id learning attempt, dan berfungsi untuk mengakhiri pengerjaan quiz
+// submit quiz berdasarkan id learning attempt, dan berfungsi untuk mengakhiri pengerjaan quiz
 exports.submitAllAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { learningAttemptId } = req.body;
@@ -1293,7 +1294,7 @@ exports.submitAllAttempt = async (req, res) => {
   }
 };
 
-// Ini adalah fungsi untuk mendapatkan detail learning attempt berdasarkan id learning attempt (bisa di get ketika selesai quis)
+// mendapatkan detail learning attempt berdasarkan id learning attempt (bisa di get ketika selesai quis)
 exports.getLearningAttemptCompletedById = async (req, res) => {
   const trx = await knex.transaction();
   const { id } = req.params;
@@ -1456,7 +1457,7 @@ exports.getLearningAttemptCompletedById = async (req, res) => {
   }
 };
 
-// Ini adalah fungsi untuk memberikan feedback pada learning attempt yang sudah selesai
+// memberikan feedback pada learning attempt yang sudah selesai
 exports.feedback = async (req, res) => {
   const trx = await knex.transaction();
   const { feedback, comment } = req.body;

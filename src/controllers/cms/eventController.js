@@ -24,14 +24,15 @@ const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
 exports.index = async (req, res) => {
-  const { search, eventCategory } = req.query;
+  const { search, eventCategoryId } = req.query;
+  const eventCategoryIdAny = eventCategoryId ?? req.query["eventCategoryId[]"];
 
   try {
     let query = knex("cms_events as event").select("event.*");
 
     applyTrashedScope(query, req, "event.deleted_at");
 
-    applyRelationIn(query, "event.cms_event_category_id", eventCategory, {
+    applyRelationIn(query, "event.cms_event_category_id", eventCategoryIdAny, {
       as: "number",
     });
 

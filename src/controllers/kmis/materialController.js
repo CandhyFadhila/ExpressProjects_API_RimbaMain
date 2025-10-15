@@ -24,6 +24,7 @@ const materialResource = require("../../resources/kmis/materialResource");
 
 exports.index = async (req, res) => {
   const { search, topicId } = req.query;
+  const topicIdAny = topicId ?? req.query["topicId[]"];
 
   try {
     let query = knex("kmis_materials as material")
@@ -52,7 +53,9 @@ exports.index = async (req, res) => {
 
     applyTrashedScope(query, req, "material.deleted_at");
 
-    applyRelationIn(query, "material.kmis_topic_id", topicId, { as: "number" });
+    applyRelationIn(query, "material.kmis_topic_id", topicIdAny, {
+      as: "number",
+    });
 
     applySearch(query, search, ["material.title", "topic.title"]);
 
@@ -911,7 +914,9 @@ async function syncMaterialOrder() {
     await trx.commit();
   } catch (error) {
     await trx.rollback();
-    logger.error(`| Material KMIS | - Error function syncMaterialOrder: ${error.message}`);
+    logger.error(
+      `| Material KMIS | - Error function syncMaterialOrder: ${error.message}`
+    );
     throw new Error(`Error syncing material order: ${error.message}`);
   }
 }
