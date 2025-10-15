@@ -618,57 +618,57 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     }
 
     // Validasi jenis materi
-    const materialTypes = {
-      text: 5 * 60,
-      video: 15 * 60,
-      dokumen: 7 * 60,
-      gambar: 5 * 60,
-    };
-    const requiredDuration = materialTypes[material.material_types];
-    if (!requiredDuration) {
-      await trx.rollback();
-      const response = new WithoutDataResource(
-        422,
-        "MATERIAL_TYPE_INVALID",
-        "Tipe Materi Tidak Valid",
-        `Jenis materi ${material.material_types} tidak dikenali untuk validasi durasi.`
-      );
-      return res.status(422).json(response.toResponse());
-    }
+    // const materialTypes = {
+    //   text: 5 * 60,
+    //   video: 15 * 60,
+    //   dokumen: 7 * 60,
+    //   gambar: 5 * 60,
+    // };
+    // const requiredDuration = materialTypes[material.material_types];
+    // if (!requiredDuration) {
+    //   await trx.rollback();
+    //   const response = new WithoutDataResource(
+    //     422,
+    //     "MATERIAL_TYPE_INVALID",
+    //     "Tipe Materi Tidak Valid",
+    //     `Jenis materi ${material.material_types} tidak dikenali untuk validasi durasi.`
+    //   );
+    //   return res.status(422).json(response.toResponse());
+    // }
 
-    {
-      const hasAnyProgress =
-        Array.isArray(learningAttempt.completed_material_ids) &&
-        learningAttempt.completed_material_ids.length > 0;
+    // {
+    //   const hasAnyProgress =
+    //     Array.isArray(learningAttempt.completed_material_ids) &&
+    //     learningAttempt.completed_material_ids.length > 0;
 
-      const baselineTs = hasAnyProgress
-        ? learningAttempt.updated_at
-        : learningAttempt.learning_started;
+    //   const baselineTs = hasAnyProgress
+    //     ? learningAttempt.updated_at
+    //     : learningAttempt.learning_started;
 
-      const baselineUTC = dateHelper.toUTC(baselineTs);
-      const nowUTC = dateHelper.toUTC(new Date());
+    //   const baselineUTC = dateHelper.toUTC(baselineTs);
+    //   const nowUTC = dateHelper.toUTC(new Date());
 
-      // Jika baseline belum tersedia, anggap baru mulai belajar
-      const elapsedSec =
-        baselineUTC && nowUTC ? Math.max(0, (nowUTC - baselineUTC) / 1000) : 0;
+    //   // Jika baseline belum tersedia, anggap baru mulai belajar
+    //   const elapsedSec =
+    //     baselineUTC && nowUTC ? Math.max(0, (nowUTC - baselineUTC) / 1000) : 0;
 
-      if (elapsedSec < requiredDuration) {
-        const remainSec = Math.ceil(requiredDuration - elapsedSec);
-        const remainMin = Math.ceil(remainSec / 60);
-        await trx.rollback();
-        const response = new WithoutDataResource(
-          422,
-          "TIME_NOT_ELAPSED",
-          "Waktu Belajar Belum Cukup",
-          `Untuk materi bertipe '${
-            material.material_types
-          }', minimal belajar ${Math.round(
-            requiredDuration / 60
-          )} menit. Sisa waktu kira-kira ${remainMin} menit lagi.`
-        );
-        return res.status(422).json(response.toResponse());
-      }
-    }
+    //   if (elapsedSec < requiredDuration) {
+    //     const remainSec = Math.ceil(requiredDuration - elapsedSec);
+    //     const remainMin = Math.ceil(remainSec / 60);
+    //     await trx.rollback();
+    //     const response = new WithoutDataResource(
+    //       422,
+    //       "TIME_NOT_ELAPSED",
+    //       "Waktu Belajar Belum Cukup",
+    //       `Untuk materi bertipe '${
+    //         material.material_types
+    //       }', minimal belajar ${Math.round(
+    //         requiredDuration / 60
+    //       )} menit. Sisa waktu kira-kira ${remainMin} menit lagi.`
+    //     );
+    //     return res.status(422).json(response.toResponse());
+    //   }
+    // }
 
     // 3. Update completed_material_ids
     const completedMaterialIds = [
