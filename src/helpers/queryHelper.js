@@ -175,6 +175,21 @@ function applyRelationIn(queryBuilder, column, values, opts = {}) {
     : queryBuilder.whereIn(column, ids);
 }
 
+function applySelfIn(queryBuilder, column, values, opts = {}) {
+  const { as = "number", negate = false, allowEmpty = false } = opts;
+
+  const ids = normIdArray(values, { as });
+
+  if (!ids || ids.length === 0) {
+    if (allowEmpty) queryBuilder.whereRaw("1=0");
+    return queryBuilder;
+  }
+
+  return negate
+    ? queryBuilder.whereNotIn(column, ids)
+    : queryBuilder.whereIn(column, ids);
+}
+
 function applySearch(queryBuilder, search, columns) {
   if (!search || columns.length === 0) return queryBuilder;
 
@@ -281,6 +296,7 @@ module.exports = {
   validateDateRangeRequiredBoth,
   applyStartEndDateFilter,
   applyRelationIn,
+  applySelfIn,
   applySearch,
   applyJsonbSearch,
   applyPagination,

@@ -11,6 +11,7 @@ const {
   applySearch,
   applyPagination,
   applyRelationIn,
+  applySelfIn,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
 const { normIdArray } = require("../../helpers/inputNorm");
@@ -31,7 +32,7 @@ const QUIZ_STATUS = Object.freeze({ STARTED: 1, FINISHED: 2, ABANDONED: 3 });
 
 // get kursus saya (kursus yang sudah selesai dan yang masih berlangsung)
 exports.getListLearningAttempt = async (req, res) => {
-  const { search, categoryId } = req.query;
+  const { search, categoryId, finishedStatus } = req.query;
   const categoryIdAny = categoryId ?? req.query["categoryId[]"];
   const userId =
     req.auth?.userId ??
@@ -54,6 +55,10 @@ exports.getListLearningAttempt = async (req, res) => {
     applyTrashedScope(query, req, "quizParticipant.deleted_at");
 
     applyRelationIn(query, "topic.kmis_categories_id", categoryIdAny, {
+      as: "number",
+    });
+
+    applySelfIn(query, "quiz_attempt_status", finishedStatus, {
       as: "number",
     });
 
@@ -252,7 +257,7 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
         "quiz_started",
         "quiz_finished",
         "quiz_duration",
-        "questions_answered",
+        "score_total",
         "feedback",
         "feedback_comment",
         "created_at",
