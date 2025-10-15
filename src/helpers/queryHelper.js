@@ -94,6 +94,7 @@ function validateDateRangeRequiredBoth(startInput, endInput) {
   return { ok: true, startDb, endDb, hasRange: true };
 }
 
+// Ini buat filter rentang tanggal
 function applyStartEndDateFilter(
   queryBuilder,
   column,
@@ -114,6 +115,7 @@ function applyStartEndDateFilter(
   return queryBuilder;
 }
 
+// Ini buat filter relasi dan filter ke tabel itu sendiri
 function applyRelationIn(queryBuilder, column, values, opts = {}) {
   const { as = "number", negate = false, allowEmpty = false } = opts;
 
@@ -175,21 +177,7 @@ function applyRelationIn(queryBuilder, column, values, opts = {}) {
     : queryBuilder.whereIn(column, ids);
 }
 
-function applySelfIn(queryBuilder, column, values, opts = {}) {
-  const { as = "number", negate = false, allowEmpty = false } = opts;
-
-  const ids = normIdArray(values, { as });
-
-  if (!ids || ids.length === 0) {
-    if (allowEmpty) queryBuilder.whereRaw("1=0");
-    return queryBuilder;
-  }
-
-  return negate
-    ? queryBuilder.whereNotIn(column, ids)
-    : queryBuilder.whereIn(column, ids);
-}
-
+// Ini buat pencarian
 function applySearch(queryBuilder, search, columns) {
   if (!search || columns.length === 0) return queryBuilder;
 
@@ -206,6 +194,7 @@ function escapeLike(val) {
   return String(val).replace(/[\\%_]/g, "\\$&");
 }
 
+// Ini buat pencarian jsonb (filter di dalam json "in" dan "eng")
 function applyJsonbSearch(queryBuilder, search, exprs, opts = {}) {
   const { mode = "or", split = false } = opts;
   if (!search || !Array.isArray(exprs) || exprs.length === 0)
@@ -247,6 +236,7 @@ function applyJsonbSearch(queryBuilder, search, exprs, opts = {}) {
   return queryBuilder;
 }
 
+// Ini buat pagination
 function applyPagination({ page = 1, limit = 10 }) {
   const p = Math.max(parseInt(page) || 1, 1);
   const l = Math.max(parseInt(limit) || 10, 1);
@@ -296,7 +286,6 @@ module.exports = {
   validateDateRangeRequiredBoth,
   applyStartEndDateFilter,
   applyRelationIn,
-  applySelfIn,
   applySearch,
   applyJsonbSearch,
   applyPagination,

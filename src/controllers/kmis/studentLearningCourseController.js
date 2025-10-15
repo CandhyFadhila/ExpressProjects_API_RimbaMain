@@ -11,7 +11,6 @@ const {
   applySearch,
   applyPagination,
   applyRelationIn,
-  applySelfIn,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
 const { normIdArray } = require("../../helpers/inputNorm");
@@ -34,6 +33,7 @@ const QUIZ_STATUS = Object.freeze({ STARTED: 1, FINISHED: 2, ABANDONED: 3 });
 exports.getListLearningAttempt = async (req, res) => {
   const { search, categoryId, finishedStatus } = req.query;
   const categoryIdAny = categoryId ?? req.query["categoryId[]"];
+  const finishedStatusAny = finishedStatus ?? req.query["finishedStatus[]"];
   const userId =
     req.auth?.userId ??
     req.auth?.user_id ??
@@ -58,7 +58,7 @@ exports.getListLearningAttempt = async (req, res) => {
       as: "number",
     });
 
-    applySelfIn(query, "quiz_attempt_status", finishedStatus, {
+    applyRelationIn(query, "quiz_attempt_status", finishedStatusAny, {
       as: "number",
     });
 
