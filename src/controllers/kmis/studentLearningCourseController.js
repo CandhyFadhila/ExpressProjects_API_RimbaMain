@@ -626,23 +626,23 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     }
 
     // Validasi jenis materi
-    const materialTypes = {
-      text: 5 * 60,
-      video: 15 * 60,
-      dokumen: 7 * 60,
-      gambar: 5 * 60,
-    };
-    const requiredDuration = materialTypes[material.material_types];
-    if (!requiredDuration) {
-      await trx.rollback();
-      const response = new WithoutDataResource(
-        422,
-        "MATERIAL_TYPE_INVALID",
-        "Tipe Materi Tidak Valid",
-        `Jenis materi ${material.material_types} tidak dikenali untuk validasi durasi.`
-      );
-      return res.status(422).json(response.toResponse());
-    }
+    // const materialTypes = {
+    //   text: 5 * 60,
+    //   video: 15 * 60,
+    //   dokumen: 7 * 60,
+    //   gambar: 5 * 60,
+    // };
+    // const requiredDuration = materialTypes[material.material_types];
+    // if (!requiredDuration) {
+    //   await trx.rollback();
+    //   const response = new WithoutDataResource(
+    //     422,
+    //     "MATERIAL_TYPE_INVALID",
+    //     "Tipe Materi Tidak Valid",
+    //     `Jenis materi ${material.material_types} tidak dikenali untuk validasi durasi.`
+    //   );
+    //   return res.status(422).json(response.toResponse());
+    // }
 
     // {
     //   const hasAnyProgress =
