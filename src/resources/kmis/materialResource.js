@@ -46,8 +46,8 @@ async function materialResource(material) {
           deletedAt: topic.deleted_at,
         }
       : null,
-    materialFiles: file,
-    materialCovers: cover,
+    materialFile: file,
+    materialCover: cover,
     title: material.title,
     materialType: material.material_types,
     materialUrl: material.material_data,
