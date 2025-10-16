@@ -564,7 +564,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     const learningAttempt = await trx("kmis_learning_attempts")
       .where("id", id)
       .whereNull("deleted_at")
-      .forUpdate()
+      // .forUpdate()
       .first();
     if (!learningAttempt) {
       await trx.rollback();
