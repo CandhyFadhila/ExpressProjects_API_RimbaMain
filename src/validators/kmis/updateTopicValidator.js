@@ -11,7 +11,6 @@ exports.updateTopicValidator = [
     .custom(async (value) => {
       const category = await knex("kmis_categories")
         .where("id", value)
-        .whereNull("deleted_at")
         .first();
       if (!category) {
         throw new Error("Kategori topik yang Anda pilih tidak ditemukan.");

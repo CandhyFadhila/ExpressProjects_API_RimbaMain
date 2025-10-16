@@ -565,10 +565,8 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       .where("id", learningAttempt.kmis_topic_id)
       .whereNull("deleted_at")
       .first();
-    const requiredIds = normIdArray(topic?.material_order_ids, {
-      as: "number",
-    });
-    if (requiredIds.length === 0) {
+    const materialOrderIds = topic?.material_order_ids; // Ambil urutan materi pada topik
+    if (!materialOrderIds || materialOrderIds.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
         422,
@@ -580,10 +578,9 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     }
 
     // Cek jika progress sudah selesai
-    const completedIds = normIdArray(learningAttempt?.completed_material_ids, {
-      as: "number",
-    });
-    if (completedIds.length === requiredIds.length) {
+    if (
+      learningAttempt.completed_material_ids.length === materialOrderIds.length
+    ) {
       await trx.rollback();
       const response = new WithoutDataResource(
         200,
@@ -595,9 +592,9 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     }
 
     // 1. Validasi materi pertama pada material_order_ids
-    if (completedIds.length > 0) {
-      const firstCompletedMaterial = completedIds[0];
-      if (firstCompletedMaterial !== requiredIds[0]) {
+    if (learningAttempt.completed_material_ids.length > 0) {
+      const firstCompletedMaterial = learningAttempt.completed_material_ids[0];
+      if (firstCompletedMaterial !== materialOrderIds[0]) {
         await trx.rollback();
         const response = new WithoutDataResource(
           422,
@@ -610,7 +607,8 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     }
 
     // 2. Validasi jenis materi dan waktu
-    const materialIdToCheck = requiredIds[completedIds.length];
+    const materialIdToCheck =
+      materialOrderIds[learningAttempt.completed_material_ids.length];
     const material = await trx("kmis_materials")
       .where("id", materialIdToCheck)
       .whereNull("deleted_at")
@@ -680,10 +678,13 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     // }
 
     // 3. Update completed_material_ids
-    const nextCompletedIds = [...completedIds, materialIdToCheck];
+    const completedMaterialIds = [
+      ...learningAttempt.completed_material_ids,
+      materialIdToCheck,
+    ];
 
     // Cek jika completed_material_ids melebihi total materi
-    if (nextCompletedIds.length > requiredIds.length) {
+    if (completedMaterialIds.length > materialOrderIds.length) {
       await trx.rollback();
       const response = new WithoutDataResource(
         422,
@@ -694,7 +695,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    const validCompletedMaterialIds = asJsonb(nextCompletedIds);
+    const validCompletedMaterialIds = asJsonb(completedMaterialIds);
     await trx("kmis_learning_attempts").where("id", id).update({
       completed_material_ids: validCompletedMaterialIds,
       updated_at: trx.fn.now(),
@@ -716,7 +717,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       200,
       "SUCCESS_UPDATE_DATA",
       "Berhasil Memperbarui",
-      `Progress materi berhasil diperbarui menjadi ${nextCompletedIds.length}/${requiredIds.length}.`
+      `Progress materi berhasil diperbarui menjadi ${completedMaterialIds.length}/${materialOrderIds.length}.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
