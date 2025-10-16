@@ -361,16 +361,34 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
 // get detail materi berdasarkan id materi (untuk mendapatkan materi berdasarkan id yang ingin diperlajari)
 exports.getLearningAttemptMaterialbyId = async (req, res) => {
   const { id } = req.params;
-  const userId =
+  const userIdRaw =
     req.auth?.userId ??
     req.auth?.user_id ??
     req.auth?.id ??
     req.userId ??
     req.user?.id;
 
+  const userIdNum = Number(userIdRaw);
+  const userId = Number.isFinite(userIdNum) ? userIdNum : userIdRaw;
+
   try {
     const material = await knex("kmis_materials")
-      .select("*")
+      .select(
+        "id",
+        "created_by",
+        "uploaded_by",
+        "kmis_topic_id",
+        "materials_file_ids",
+        "materials_cover_ids",
+        "title",
+        "material_types",
+        "material_data",
+        "description",
+        "is_public",
+        "created_at",
+        "updated_at",
+        "deleted_at"
+      )
       .where("id", id)
       .whereNull("deleted_at")
       .first();
@@ -385,6 +403,7 @@ exports.getLearningAttemptMaterialbyId = async (req, res) => {
     }
 
     const attempt = await knex("kmis_learning_attempts")
+      .select("id", "learning_started")
       .where("attempt_by", userId)
       .where("kmis_topic_id", material.kmis_topic_id)
       .whereNull("deleted_at")
@@ -400,15 +419,13 @@ exports.getLearningAttemptMaterialbyId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    if (attempt) {
-      await knex("kmis_learning_attempts")
-        .where("id", attempt.id)
-        .whereNull("learning_started")
-        .update({
-          learning_started: dateHelper.toUTC(new Date().toISOString()),
-          updated_at: knex.fn.now(),
-        });
-    }
+    await knex("kmis_learning_attempts")
+      .where("id", attempt.id)
+      .whereNull("learning_started")
+      .update({
+        learning_started: dateHelper.toUTC(new Date().toISOString()),
+        updated_at: knex.fn.now(),
+      });
 
     const data = await materialResource(material);
     const response = new WithDataResource(
@@ -547,7 +564,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     const learningAttempt = await trx("kmis_learning_attempts")
       .where("id", id)
       .whereNull("deleted_at")
-      // .forUpdate()
+      .forUpdate()
       .first();
     if (!learningAttempt) {
       await trx.rollback();
