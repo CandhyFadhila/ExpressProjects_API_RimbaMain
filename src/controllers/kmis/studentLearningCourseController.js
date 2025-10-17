@@ -361,15 +361,12 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
 // get detail materi berdasarkan id materi (untuk mendapatkan materi berdasarkan id yang ingin diperlajari)
 exports.getLearningAttemptMaterialbyId = async (req, res) => {
   const { id } = req.params;
-  const userIdRaw =
+  const userId =
     req.auth?.userId ??
     req.auth?.user_id ??
     req.auth?.id ??
     req.userId ??
     req.user?.id;
-
-  const userIdNum = Number(userIdRaw);
-  const userId = Number.isFinite(userIdNum) ? userIdNum : userIdRaw;
 
   try {
     const material = await knex("kmis_materials")
@@ -427,12 +424,13 @@ exports.getLearningAttemptMaterialbyId = async (req, res) => {
         updated_at: knex.fn.now(),
       });
 
-    // const data = await materialResource(material);
-    const response = new WithoutDataResource(
+    const data = await materialResource(material);
+    const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      `Detail data materi '${material.title}' berhasil didapatkan.`
+      `Detail data materi '${material.title}' berhasil didapatkan.`,
+      data
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
