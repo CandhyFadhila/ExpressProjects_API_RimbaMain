@@ -427,13 +427,12 @@ exports.getLearningAttemptMaterialbyId = async (req, res) => {
         updated_at: knex.fn.now(),
       });
 
-    const data = await materialResource(material);
-    const response = new WithDataResource(
+    // const data = await materialResource(material);
+    const response = new WithoutDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      `Detail data materi '${material.title}' berhasil didapatkan.`,
-      data
+      `Detail data materi '${material.title}' berhasil didapatkan.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
