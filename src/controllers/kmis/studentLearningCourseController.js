@@ -254,10 +254,9 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
     req.auth?.id ??
     req.userId ??
     req.user?.id;
-  const trx = await knex.transaction();
 
   try {
-    const learningAttempt = await trx("kmis_learning_attempts")
+    const learningAttempt = await knex("kmis_learning_attempts")
       .select([
         "id",
         "attempt_by",
@@ -281,7 +280,7 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
       ])
       .where("kmis_topic_id", id)
       .where("attempt_by", userId)
-      .forUpdate()
+      // .forUpdate()
       .first();
     if (!learningAttempt) {
       const response = new WithoutDataResource(
@@ -315,7 +314,7 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
       { as: "number" }
     );
 
-    const materials = await trx("kmis_materials")
+    const materials = await knex("kmis_materials")
       .select("*")
       .whereIn("id", materialOrderIds)
       .whereNull("deleted_at")
