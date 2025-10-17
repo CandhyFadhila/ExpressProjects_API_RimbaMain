@@ -307,23 +307,28 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
     }
 
     const materialOrderIds = normIdArray(topic.material_order_ids, {
-      as: "number",
+      as: "string",
     });
     const completedMaterialIds = normIdArray(
       learningAttempt.completed_material_ids,
-      { as: "number" }
+      { as: "string" }
     );
 
     const materials = await knex("kmis_materials")
       .select("*")
-      .whereIn("id", materialOrderIds)
+      .whereIn(
+        "id",
+        materialOrderIds.map((v) => Number(v))
+      )
       .whereNull("deleted_at")
-      .orderByRaw(`array_position(?, id)`, [materialOrderIds]);
+      .orderByRaw(`array_position(?, id)`, [
+        materialOrderIds.map((v) => Number(v)),
+      ]);
 
     const materialWithStatus = await Promise.all(
       materials.map(async (material) => {
         const materialDetails = await materialResource(material);
-        const isCompleted = completedMaterialIds.includes(Number(material.id));
+        const isCompleted = completedMaterialIds.has(String(material.id));
         return {
           ...materialDetails,
           isCompleted,
@@ -560,7 +565,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     const learningAttempt = await trx("kmis_learning_attempts")
       .where("id", id)
       .whereNull("deleted_at")
-      // .forUpdate()
+      .forUpdate()
       .first();
     if (!learningAttempt) {
       await trx.rollback();
@@ -708,10 +713,13 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     }
 
     const validCompletedMaterialIds = asJsonb(nextCompletedIds);
-    await trx("kmis_learning_attempts").where("id", id).update({
-      completed_material_ids: validCompletedMaterialIds,
-      updated_at: trx.fn.now(),
-    });
+    await trx("kmis_learning_attempts")
+      .where("id", id)
+      .update({
+        completed_material_ids: validCompletedMaterialIds,
+        updated_at: trx.fn.now(),
+      })
+      .returning(["completed_material_ids", "updated_at"]);
 
     // 4. Log aktivitas
     await activityLogHelper.logUpdate(
