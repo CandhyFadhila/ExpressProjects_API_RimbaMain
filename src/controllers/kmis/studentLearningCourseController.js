@@ -305,33 +305,27 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    const materialOrderIds = normIdArray(topic.material_order_ids, {
+    const materialOrderIdsStr = normIdArray(topic.material_order_ids, {
       as: "string",
     });
-    const completedMaterialIds = normIdArray(
-      learningAttempt.completed_material_ids,
-      { as: "string" }
+    const materialOrderIdsNum = materialOrderIdsStr
+      .map((v) => Number(v))
+      .filter(Number.isFinite);
+    const completedSet = new Set(
+      normIdArray(learningAttempt.completed_material_ids, { as: "string" })
     );
 
     const materials = await knex("kmis_materials")
       .select("*")
-      .whereIn(
-        "id",
-        materialOrderIds.map((v) => Number(v))
-      )
+      .whereIn("id", materialOrderIdsNum)
       .whereNull("deleted_at")
-      .orderByRaw(`array_position(?, id)`, [
-        materialOrderIds.map((v) => Number(v)),
-      ]);
+      .orderByRaw(`array_position(?, id)`, [materialOrderIdsNum]);
 
     const materialWithStatus = await Promise.all(
       materials.map(async (material) => {
         const materialDetails = await materialResource(material);
-        const isCompleted = completedMaterialIds.has(String(material.id));
-        return {
-          ...materialDetails,
-          isCompleted,
-        };
+        const isCompleted = completedSet.has(String(material.id));
+        return { ...materialDetails, isCompleted };
       })
     );
 
