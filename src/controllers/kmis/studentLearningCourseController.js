@@ -280,7 +280,6 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
       ])
       .where("kmis_topic_id", id)
       .where("attempt_by", userId)
-      // .forUpdate()
       .first();
     if (!learningAttempt) {
       const response = new WithoutDataResource(
