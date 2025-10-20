@@ -2711,7 +2711,7 @@ exports.getAllContent = async (req, res) => {
 
     const homeNews = await Promise.all(newsRows.map(newsResource));
 
-    // --- Animal widgets (baru) ---
+    // --- Animal widgets ---
     const homeAnimalComposition = await buildHomeAnimalCompositionLocal(knex);
     const homeCompletionProgress = await buildHomeCompletionProgressLocal(
       knex,

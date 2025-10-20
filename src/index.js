@@ -7,6 +7,7 @@ const publicRequestRoute = require("./routes/publicRequest/publicRequestRoute");
 const cmspublicRequestRoute = require("./routes/publicRequest/cmspublicRequestRoute");
 const kmispublicRequestRoute = require("./routes/publicRequest/kmispublicRequestRoute");
 const authRoutes = require("./routes/authRoutes");
+const dashboardRoutes = require("./routes/kmis/dashboardRoutes");
 const categoryRoutes = require("./routes/kmis/categoryRoutes");
 const topicRoutes = require("./routes/kmis/topicRoutes");
 const educatorRoutes = require("./routes/kmis/educatorRoutes");
@@ -37,7 +38,9 @@ function isLinux() {
 }
 
 function resolvePublicBaseUrl(port) {
-  return isLinux() ? "https://api-rimba.exium.my.id" : `http://localhost:${port}`;
+  return isLinux()
+    ? "https://api-rimba.exium.my.id"
+    : `http://localhost:${port}`;
 }
 
 // Middleware
@@ -110,6 +113,9 @@ app.use("/api/cms/legal-document", legalDocumentRoutes);
 //! ======== CMS MODULE ========
 
 //! ======== KMIS MODULE ========
+// Dashboard
+app.use("/api/kmis/dashboard", dashboardRoutes);
+
 // Category
 app.use("/api/kmis/category", categoryRoutes);
 
