@@ -423,7 +423,7 @@ exports.sendOTP = async (req, res) => {
 
   try {
     const user = await knex("users")
-      .select("id", "name", "role_id")
+      .select("id", "name", "role_id", "account_status", "deactivate_at")
       .where({ email })
       .first();
     if (!user) {
@@ -436,7 +436,8 @@ exports.sendOTP = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    if (user.role_id !== 3) {
+    const roleId = Number(user.role_id);
+    if (!Number.isFinite(roleId) || roleId !== 3) {
       const response = new WithoutDataResource(
         403,
         "FORBIDDEN_ROLE",
@@ -532,7 +533,8 @@ exports.verifyOTP = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    if (user.role_id !== 3) {
+    const roleId = Number(user.role_id);
+    if (!Number.isFinite(roleId) || roleId !== 3) {
       const response = new WithoutDataResource(
         403,
         "FORBIDDEN_ROLE",
@@ -597,7 +599,7 @@ exports.resetPassword = async (req, res) => {
   try {
     // Cari user
     const user = await knex("users")
-      .select("id", "email", "role_id")
+      .select("id", "email", "role_id", "account_status", "deactivate_at")
       .where({ email })
       .first();
     if (!user) {
@@ -610,7 +612,8 @@ exports.resetPassword = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    if (user.role_id !== 3) {
+    const roleId = Number(user.role_id);
+    if (!Number.isFinite(roleId) || roleId !== 3) {
       const response = new WithoutDataResource(
         403,
         "FORBIDDEN_ROLE",
