@@ -19,8 +19,8 @@ const connections = {
   linux: {
     host: "localhost",
     port: 5432,
-    user: "postgres",
-    password: "super.admin",
+    user: "user_rimba",
+    password: "password_kuat",
     database: "main_rimba",
   },
 };
