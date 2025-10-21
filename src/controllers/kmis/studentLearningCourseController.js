@@ -912,7 +912,6 @@ exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
     const nowDb = dateHelper.toUTC(new Date().toISOString());
     await knex("kmis_learning_attempts")
       .where("id", attempt.id)
-      .whereNull("quiz_started")
       .update({
         quiz_started: nowDb,
         updated_at: knex.fn.now(),
@@ -1649,7 +1648,7 @@ async function attemptExamResponse(learningAttemptId) {
   // 1) Ambil attempt minimal
   const attempt = await knex("kmis_learning_attempts")
     .where("id", learningAttemptId)
-    .select(["id", "attempt_by", "kmis_topic_id"])
+    .select(["id", "attempt_by", "kmis_topic_id", "quiz_started"])
     .whereNull("deleted_at")
     .first();
 
