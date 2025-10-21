@@ -26,8 +26,7 @@ class StorageServerHelper {
       .toLowerCase();
     switch (env) {
       case "linux":
-        // return "https://doc-rimba.exium.my.id";
-        return "http://192.168.0.100:4001";
+        return "https://doc.rimbaexium.org";
       case "windows":
         return "http://localhost:4001";
     }

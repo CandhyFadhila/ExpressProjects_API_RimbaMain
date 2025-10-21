@@ -38,9 +38,7 @@ function isLinux() {
 }
 
 function resolvePublicBaseUrl(port) {
-  return isLinux()
-    ? "https://api-rimba.exium.my.id"
-    : `http://localhost:${port}`;
+  return isLinux() ? "https://rimbaexium.org" : `http://localhost:${port}`;
 }
 
 // Middleware
