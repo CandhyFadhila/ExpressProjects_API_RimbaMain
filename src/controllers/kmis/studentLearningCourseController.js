@@ -790,15 +790,6 @@ exports.getAllQuizbyTopicId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const nowDb = dateHelper.toUTC(new Date().toISOString());
-    await knex("kmis_learning_attempts")
-      .where("id", attempt.id)
-      .whereNull("quiz_started")
-      .update({
-        quiz_started: nowDb,
-        updated_at: knex.fn.now(),
-      });
-
     const quizzes = await knex("kmis_quiz")
       .where("kmis_topic_id", topic.id)
       .whereNull("deleted_at")
@@ -917,6 +908,15 @@ exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
       );
       return res.status(403).json(response.toResponse());
     }
+
+    const nowDb = dateHelper.toUTC(new Date().toISOString());
+    await knex("kmis_learning_attempts")
+      .where("id", attempt.id)
+      .whereNull("quiz_started")
+      .update({
+        quiz_started: nowDb,
+        updated_at: knex.fn.now(),
+      });
 
     const dataPayload = await attemptExamResponse(id);
 
@@ -1663,6 +1663,7 @@ async function attemptExamResponse(learningAttemptId) {
     id: lp.id,
     attemptUser: lp.attemptUser || null,
     topic: lp.topic || null,
+    quizStarted: lp.quizStarted || null,
   };
 
   // 3) Ambil total_quiz dari topik untuk target panjang array

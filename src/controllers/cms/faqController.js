@@ -22,18 +22,18 @@ exports.index = async (req, res) => {
   const { search } = req.query;
 
   try {
-    let query = knex("cms_animal_categories as category").select("category.*");
+    let query = knex("cms_faqs as faq").select("faq.*");
 
-    applyTrashedScope(query, req, "category.deleted_at");
+    applyTrashedScope(query, req, "faq.deleted_at");
 
     applyJsonbSearch(
       query,
       search,
       [
-        "category.name->>'id'",
-        "category.name->>'en'",
-        "category.description->>'id'",
-        "category.description->>'en'",
+        "faq.question->>'id'",
+        "faq.question->>'en'",
+        "faq.answer->>'id'",
+        "faq.answer->>'en'",
       ],
       {
         mode: "or",
@@ -41,7 +41,7 @@ exports.index = async (req, res) => {
       }
     );
 
-    applyLatestThenTrashed(query, "category.deleted_at", "category.created_at");
+    applyLatestThenTrashed(query, "faq.deleted_at", "faq.created_at");
 
     const paginationInfo = applyPagination(req.query);
 
@@ -57,14 +57,14 @@ exports.index = async (req, res) => {
     }
 
     const serializedData = await Promise.all(
-      result.data.map((category) => faqResource(category))
+      result.data.map((faq) => faqResource(faq))
     );
 
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      "Data kategori satwa berhasil diambil.",
+      "Data FAQ berhasil diambil.",
       {
         data: serializedData,
         pagination: result.pagination,
@@ -73,7 +73,7 @@ exports.index = async (req, res) => {
     return res.status(200).json(response.toResponse());
   } catch (error) {
     logger.error(
-      `| Animal Category Master | - Error function index : ${error.message}`
+      `| FAQ CMS | - Error function index : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -87,7 +87,7 @@ exports.index = async (req, res) => {
 
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
-  const { name, description } = req.body;
+  const { question, answer } = req.body;
 
   try {
     const errors = validationResult(req);
@@ -105,64 +105,64 @@ exports.store = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    const nameNorm = handleLocalizedText(name, {
+    const questionNorm = handleLocalizedText(question, {
       allowPartial: false,
       maxLen: 255,
-      fieldLabel: "name",
+      fieldLabel: "question",
     });
-    if (nameNorm.error) {
+    if (questionNorm.error) {
       const r = new WithoutDataResource(
         422,
         "INVALID_CONTENT_FORMAT",
         "Format Konten Salah",
-        nameNorm.error.message
+        questionNorm.error.message
       );
       return res.status(422).json(r.toResponse());
     }
 
-    const descNorm = handleLocalizedText(description, {
+    const answerNorm = handleLocalizedText(answer, {
       allowPartial: false,
       maxLen: undefined,
-      fieldLabel: "description",
+      fieldLabel: "answer",
     });
-    if (descNorm.error) {
+    if (answerNorm.error) {
       const r = new WithoutDataResource(
         422,
         "INVALID_CONTENT_FORMAT",
         "Format Konten Salah",
-        descNorm.error.message
+        answerNorm.error.message
       );
       return res.status(422).json(r.toResponse());
     }
 
-    const exists = await trx("cms_animal_categories")
+    const exists = await trx("cms_faqs")
       .whereNull("deleted_at")
       .andWhere(function () {
-        this.whereRaw("lower(name->>'id') = lower(?)", [
-          nameNorm.value.id,
-        ]).orWhereRaw("lower(name->>'en') = lower(?)", [nameNorm.value.en]);
+        this.whereRaw("lower(question->>'id') = lower(?)", [
+          questionNorm.value.id,
+        ]).orWhereRaw("lower(question->>'en') = lower(?)", [questionNorm.value.en]);
       })
       .first();
     if (exists) {
       const response = new WithoutDataResource(
         422,
-        "DUPLICATE_TITLE",
+        "DUPLICATE_QUESTION",
         "Duplikat Data",
-        "Nama kategori satwa ini sudah digunakan pada kategori lain."
+        "Pertanyaan FAQ ini sudah digunakan pada data lain."
       );
       return res.status(422).json(response.toResponse());
     }
 
-    await trx("cms_animal_categories").insert({
-      name: { id: nameNorm.value.id, en: nameNorm.value.en },
-      description: { id: descNorm.value.id, en: descNorm.value.en },
+    await trx("cms_faqs").insert({
+      question: { id: questionNorm.value.id, en: questionNorm.value.en },
+      answer: { id: answerNorm.value.id, en: answerNorm.value.en },
     });
 
     await activityLogHelper.logCreate(
       {
         userId: activityLogHelper.fromReq(req),
-        module: "master_data",
-        subject: "List Kategori Satwa",
+        module: "cms",
+        subject: "List FAQ",
       },
       trx
     );
@@ -173,13 +173,13 @@ exports.store = async (req, res) => {
       201,
       "SUCCESS_CREATE_DATA",
       "Berhasil Menyimpan Data",
-      `Data kategori satwa '${nameNorm.value.id}' berhasil ditambahkan.`
+      "Data FAQ berhasil ditambahkan."
     );
     return res.status(201).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
     logger.error(
-      `| Animal Category Master | - Error function store: ${error.message}`
+      `| FAQ CMS | - Error function store: ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -195,32 +195,32 @@ exports.show = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const category = await knex("cms_animal_categories")
+    const faq = await knex("cms_faqs")
       .select("*")
       .where("id", id)
       .first();
-    if (!category) {
+    if (!faq) {
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Data kategori satwa dengan ID '${id}' tidak ditemukan.`
+        `Data FAQ dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
 
-    const data = await faqResource(category);
+    const data = await faqResource(faq);
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      `Detail data kategori satwa '${category.name}' berhasil didapatkan.`,
+      `Detail data FAQ berhasil didapatkan.`,
       data
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     logger.error(
-      `| Animal Category Master | - Error function show: ${error.message}`
+      `| FAQ CMS | - Error function show: ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -234,7 +234,7 @@ exports.show = async (req, res) => {
 
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
-  const { name, description } = req.body;
+  const { question, answer } = req.body;
   const id = req.params.id;
 
   try {
@@ -253,28 +253,28 @@ exports.update = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    const existing = await trx("cms_animal_categories").where("id", id).first();
+    const existing = await trx("cms_faqs").where("id", id).first();
     if (!existing) {
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Data kategori satwa dengan ID '${id}' tidak ditemukan.`
+        `Data FAQ dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
 
-    const exName = isPlainObject(existing.name)
-      ? existing.name
-      : parseJsonSafe(existing.name) ?? { id: "", en: "" };
+    const exQuestion = isPlainObject(existing.question)
+      ? existing.question
+      : parseJsonSafe(existing.question) ?? { id: "", en: "" };
 
-    const exDesc = isPlainObject(existing.description)
-      ? existing.description
-      : parseJsonSafe(existing.description) ?? { id: "", en: "" };
+    const exAnswer = isPlainObject(existing.answer)
+      ? existing.answer
+      : parseJsonSafe(existing.answer) ?? { id: "", en: "" };
 
-    let nextName = exName;
-    if (typeof name !== "undefined") {
-      const norm = handleLocalizedText(name, {
+    let nextQuestion = exQuestion;
+    if (typeof question !== "undefined") {
+      const norm = handleLocalizedText(question, {
         allowPartial: true,
         maxLen: 255,
         fieldLabel: "nama",
@@ -288,18 +288,18 @@ exports.update = async (req, res) => {
         );
         return res.status(422).json(r.toResponse());
       }
-      const n = { ...exName, ...norm.value };
+      const n = { ...exQuestion, ...norm.value };
       // abaikan string kosong yang dikirim
       if (
         Object.prototype.hasOwnProperty.call(norm.value, "id") &&
         String(norm.value.id).trim() === ""
       )
-        n.id = exName.id;
+        n.id = exQuestion.id;
       if (
         Object.prototype.hasOwnProperty.call(norm.value, "en") &&
         String(norm.value.en).trim() === ""
       )
-        n.en = exName.en;
+        n.en = exQuestion.en;
 
       // pastikan id & en akhir tidak kosong
       if (!n.id || !n.en) {
@@ -311,12 +311,12 @@ exports.update = async (req, res) => {
         );
         return res.status(422).json(r.toResponse());
       }
-      nextName = { id: String(n.id).trim(), en: String(n.en).trim() };
+      nextQuestion = { id: String(n.id).trim(), en: String(n.en).trim() };
     }
 
-    let nextDescription = exDesc;
-    if (typeof description !== "undefined") {
-      const norm = handleLocalizedText(description, {
+    let nextAnswer = exAnswer;
+    if (typeof answer !== "undefined") {
+      const norm = handleLocalizedText(answer, {
         allowPartial: true,
         maxLen: undefined, // deskripsi bebas
         fieldLabel: "deskripsi",
@@ -330,17 +330,17 @@ exports.update = async (req, res) => {
         );
         return res.status(422).json(r.toResponse());
       }
-      const d = { ...exDesc, ...norm.value };
+      const d = { ...exAnswer, ...norm.value };
       if (
         Object.prototype.hasOwnProperty.call(norm.value, "id") &&
         String(norm.value.id).trim() === ""
       )
-        d.id = exDesc.id;
+        d.id = exAnswer.id;
       if (
         Object.prototype.hasOwnProperty.call(norm.value, "en") &&
         String(norm.value.en).trim() === ""
       )
-        d.en = exDesc.en;
+        d.en = exAnswer.en;
 
       if (!d.id || !d.en) {
         const r = new WithoutDataResource(
@@ -351,45 +351,45 @@ exports.update = async (req, res) => {
         );
         return res.status(422).json(r.toResponse());
       }
-      nextDescription = { id: String(d.id).trim(), en: String(d.en).trim() };
+      nextAnswer = { id: String(d.id).trim(), en: String(d.en).trim() };
     }
 
-    const nameChanged =
-      (nextName.id ?? "").toLowerCase() !== (exName.id ?? "").toLowerCase() ||
-      (nextName.en ?? "").toLowerCase() !== (exName.en ?? "").toLowerCase();
+    const questionChanged =
+      (nextQuestion.id ?? "").toLowerCase() !== (exQuestion.id ?? "").toLowerCase() ||
+      (nextQuestion.en ?? "").toLowerCase() !== (exQuestion.en ?? "").toLowerCase();
 
-    if (nameChanged) {
-      const duplicate = await trx("cms_animal_categories")
+    if (questionChanged) {
+      const duplicate = await trx("cms_faqs")
         .whereNull("deleted_at")
         .whereNot("id", id)
         .andWhere(function () {
-          this.whereRaw("lower(name->>'id') = lower(?)", [
-            nextName.id,
-          ]).orWhereRaw("lower(name->>'en') = lower(?)", [nextName.en]);
+          this.whereRaw("lower(question->>'id') = lower(?)", [
+            nextQuestion.id,
+          ]).orWhereRaw("lower(question->>'en') = lower(?)", [nextQuestion.en]);
         })
         .first();
       if (duplicate) {
         const response = new WithoutDataResource(
           422,
-          "DUPLICATE_TITLE",
+          "DUPLICATE_QUESTION",
           "Duplikat Data",
-          "Nama kategori satwa (ID/EN) sudah digunakan pada kategori lain."
+          "Pertanyaan FAQ (ID/EN) sudah digunakan pada data lain."
         );
         return res.status(422).json(response.toResponse());
       }
     }
 
-    await trx("cms_animal_categories").where("id", id).update({
-      name: nextName,
-      description: nextDescription,
+    await trx("cms_faqs").where("id", id).update({
+      question: nextQuestion,
+      answer: nextAnswer,
       updated_at: trx.fn.now(),
     });
 
     await activityLogHelper.logUpdate(
       {
         userId: activityLogHelper.fromReq(req),
-        module: "master_data",
-        subject: "List Kategori Satwa",
+        module: "cms",
+        subject: "List FAQ",
       },
       trx
     );
@@ -400,13 +400,13 @@ exports.update = async (req, res) => {
       200,
       "SUCCESS_UPDATE_DATA",
       "Berhasil Memperbarui",
-      `Data kategori satwa '${nextName.id}' berhasil diperbarui.`
+      `Data FAQ '${nextQuestion.id}' berhasil diperbarui.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
     logger.error(
-      `| Animal Category Master | - Error function update : ${error.message}`
+      `| FAQ CMS | - Error function update : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -448,8 +448,8 @@ exports.destroy = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    const existing = await trx("cms_animal_categories")
-      .select("id", "name")
+    const existing = await trx("cms_faqs")
+      .select("id", "question")
       .whereIn("id", ids)
       .whereNull("deleted_at");
     if (existing.length === 0) {
@@ -465,15 +465,15 @@ exports.destroy = async (req, res) => {
 
     const existingIds = existing.map((r) => r.id);
 
-    await trx("cms_animal_categories").whereIn("id", existingIds).update({
+    await trx("cms_faqs").whereIn("id", existingIds).update({
       deleted_at: trx.fn.now(),
     });
 
     await activityLogHelper.logDelete(
       {
         userId: activityLogHelper.fromReq(req),
-        module: "master_data",
-        subject: "List Kategori Satwa",
+        module: "cms",
+        subject: "List FAQ",
       },
       trx
     );
@@ -490,7 +490,7 @@ exports.destroy = async (req, res) => {
   } catch (error) {
     await trx.rollback();
     logger.error(
-      `| Animal Category Master | - Error function destroy : ${error.message}`
+      `| FAQ CMS | - Error function destroy : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -532,8 +532,8 @@ exports.restore = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    const softDeleted = await trx("cms_animal_categories")
-      .select("id", "name") // name: JSONB {id,en}
+    const softDeleted = await trx("cms_faqs")
+      .select("id", "question")
       .whereIn("id", ids)
       .whereNotNull("deleted_at");
     if (softDeleted.length === 0) {
@@ -547,7 +547,7 @@ exports.restore = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    // --- Ambil pasangan name.id / name.en dari record terhapus
+    // --- Ambil pasangan question.id / question.en dari record terhapus
     const parseName = (v) => {
       const obj = isPlainObject(v) ? v : parseJsonSafe(v) || {};
       const id = typeof obj.id === "string" ? obj.id.trim() : "";
@@ -556,28 +556,28 @@ exports.restore = async (req, res) => {
     };
 
     const deletedNames = softDeleted.map((r) => {
-      const n = parseName(r.name);
+      const n = parseName(r.question);
       return { rowId: r.id, ...n };
     });
-    const namesIdLower = deletedNames.map((x) => x.idLower).filter(Boolean);
-    const namesEnLower = deletedNames.map((x) => x.enLower).filter(Boolean);
+    const questionsIdLower = deletedNames.map((x) => x.idLower).filter(Boolean);
+    const questionsEnLower = deletedNames.map((x) => x.enLower).filter(Boolean);
 
     // --- Cek bentrok judul dengan entri aktif (dua bahasa)
     let activeWithSameTitle = [];
-    if (namesIdLower.length || namesEnLower.length) {
-      activeWithSameTitle = await trx("cms_animal_categories")
-        .select("id", "name")
+    if (questionsIdLower.length || questionsEnLower.length) {
+      activeWithSameTitle = await trx("cms_faqs")
+        .select("id", "question")
         .whereNull("deleted_at")
         .andWhere(function () {
           let hasCond = false;
-          if (namesIdLower.length) {
+          if (questionsIdLower.length) {
             hasCond = true;
-            this.whereIn(knex.raw("lower(name->>'id')"), namesIdLower);
+            this.whereIn(knex.raw("lower(question->>'id')"), questionsIdLower);
           }
-          if (namesEnLower.length) {
+          if (questionsEnLower.length) {
             if (hasCond)
-              this.orWhereIn(knex.raw("lower(name->>'en')"), namesEnLower);
-            else this.whereIn(knex.raw("lower(name->>'en')"), namesEnLower);
+              this.orWhereIn(knex.raw("lower(question->>'en')"), questionsEnLower);
+            else this.whereIn(knex.raw("lower(question->>'en')"), questionsEnLower);
           }
         });
     }
@@ -585,7 +585,7 @@ exports.restore = async (req, res) => {
     // Kumpulkan semua "label bentrok" aktif (id/en)
     const conflictActive = new Set();
     for (const row of activeWithSameTitle) {
-      const n = parseName(row.name);
+      const n = parseName(row.question);
       if (n.idLower) conflictActive.add(`id:${n.idLower}`);
       if (n.enLower) conflictActive.add(`en:${n.enLower}`);
     }
@@ -628,7 +628,7 @@ exports.restore = async (req, res) => {
       if (hasActiveConflict || hasBatchDup || emptyBoth) {
         skippedConflicts.push({
           id: r.id,
-          name: { id: r.idLower, en: r.enLower },
+          question: { id: r.idLower, en: r.enLower },
         });
         continue;
       }
@@ -640,7 +640,7 @@ exports.restore = async (req, res) => {
       ) {
         skippedConflicts.push({
           id: r.id,
-          name: { id: r.idLower, en: r.enLower },
+          question: { id: r.idLower, en: r.enLower },
         });
         continue;
       }
@@ -654,7 +654,7 @@ exports.restore = async (req, res) => {
     let restoredCount = 0;
     if (restorable.length > 0) {
       const idsToRestore = restorable.map((r) => r.rowId);
-      await trx("cms_animal_categories")
+      await trx("cms_faqs")
         .whereIn("id", idsToRestore)
         .update({ deleted_at: null, updated_at: trx.fn.now() });
       restoredCount = idsToRestore.length;
@@ -663,8 +663,8 @@ exports.restore = async (req, res) => {
     await activityLogHelper.logRestore(
       {
         userId: activityLogHelper.fromReq(req),
-        module: "master_data",
-        subject: "List Kategori Satwa",
+        module: "cms",
+        subject: "List FAQ",
       },
       trx
     );
@@ -699,7 +699,7 @@ exports.restore = async (req, res) => {
     return res.status(200).json(response.toResponse());
   } catch (error) {
     logger.error(
-      `| Animal Category Master | - Error function restore: ${error.message}`
+      `| FAQ CMS | - Error function restore: ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
