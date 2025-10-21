@@ -21,6 +21,7 @@ const profileRoutes = require("./routes/profileRoutes");
 const newsCategoryRoutes = require("./routes/masterData/newsCategoryRoutes");
 const eventCategoryRoutes = require("./routes/masterData/eventCategoryRoutes");
 const animalCategoryRoutes = require("./routes/masterData/animalCategoryRoutes");
+const faqRoutes = require("./routes/cms/faqRoutes");
 const contentRoutes = require("./routes/cms/contentRoutes");
 const newsRoutes = require("./routes/cms/newsRoutes");
 const eventRoutes = require("./routes/cms/eventRoutes");
@@ -108,6 +109,9 @@ app.use("/api/cms/animal-composition", animalCompositionRoutes);
 
 // Legal Document
 app.use("/api/cms/legal-document", legalDocumentRoutes);
+
+// FAQ
+app.use("/api/cms/faq", faqRoutes);
 //! ======== CMS MODULE ========
 
 //! ======== KMIS MODULE ========

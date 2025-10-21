@@ -21,7 +21,7 @@ const connections = {
     port: 5432,
     user: "postgres",
     password: "super.admin",
-    database: "rimba_main",
+    database: "main_rimba",
   },
 };
 
