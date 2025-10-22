@@ -50,6 +50,7 @@ exports.index = async (req, res) => {
 
     // Ambil semua id user di halaman ini
     const ids = result.data.map((r) => r.id);
+    console.log("Ini adalah id user yang didapat: ", ids);
 
     // Hitung total material per user sekali saja
     const totals = await knex("kmis_materials")
