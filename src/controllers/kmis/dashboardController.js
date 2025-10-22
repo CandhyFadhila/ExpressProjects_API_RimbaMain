@@ -145,6 +145,7 @@ async function getUserAttemptStatsFinished() {
       FROM kmis_learning_attempts
       WHERE deleted_at IS NULL
         AND quiz_attempt_status = 2
+        AND attempt_by IS NOT NULL
         AND created_at >= date_trunc('year', CURRENT_DATE)
         AND created_at <  date_trunc('year', CURRENT_DATE) + interval '1 year'
       GROUP BY 1
@@ -156,25 +157,25 @@ async function getUserAttemptStatsFinished() {
   `);
 
   const monthKeys = [
-    "jan",
-    "feb",
-    "mar",
-    "apr",
-    "may",
-    "jun",
-    "jul",
-    "aug",
-    "sep",
-    "oct",
-    "nov",
-    "dec",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
   ];
-  const result = Object.fromEntries(monthKeys.map((k) => [k, 0]));
+  const obj = Object.fromEntries(monthKeys.map((k) => [k, 0]));
 
   for (const r of rows) {
     const i = (r.mon ?? 1) - 1;
-    result[monthKeys[i]] = Number(r.total) || 0;
+    obj[monthKeys[i]] = Number(r.total) || 0;
   }
 
-  return result;
+  return [obj];
 }
