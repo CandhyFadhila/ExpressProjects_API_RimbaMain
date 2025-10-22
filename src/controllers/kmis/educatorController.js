@@ -49,7 +49,8 @@ exports.index = async (req, res) => {
     }
 
     // Ambil semua id user di halaman ini
-    const ids = result.data.map((r) => r.id);
+    const idsRaw = result.data.map((r) => r.id);
+    const ids = idsRaw.map((v) => Number(v)).filter(Number.isFinite);
 
     // Hitung total material per user sekali saja
     const totals = await knex("kmis_materials as m")
