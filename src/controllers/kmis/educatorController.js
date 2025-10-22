@@ -50,15 +50,16 @@ exports.index = async (req, res) => {
 
     // Ambil semua id user di halaman ini
     const ids = result.data.map((r) => r.id);
-    console.log("Ini adalah id user yang didapat: ", ids);
 
     // Hitung total material per user sekali saja
-    const totals = await knex("kmis_materials")
-      .whereNull("deleted_at")
-      .whereIn(knex.raw("COALESCE(uploaded_by, created_by)"), ids)
-      .select(knex.raw("COALESCE(uploaded_by, created_by) AS owner_id"))
+    const totals = await knex("kmis_materials as m")
+      .whereNull("m.deleted_at")
+      .andWhere(function () {
+        this.whereIn("m.uploaded_by", ids).orWhereIn("m.created_by", ids);
+      })
+      .select(knex.raw("COALESCE(m.uploaded_by, m.created_by) AS owner_id"))
       .count({ total: "*" })
-      .groupByRaw("COALESCE(uploaded_by, created_by)");
+      .groupByRaw("COALESCE(m.uploaded_by, m.created_by)");
 
     const totalMap = new Map(
       totals.map((t) => [Number(t.owner_id), Number(t.total)])

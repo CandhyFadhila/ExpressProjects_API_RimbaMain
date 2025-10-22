@@ -4,19 +4,22 @@ const UserResource = require("../../resources/auth/UserResource");
 async function educatorResource(educator) {
   const user = await knex("users").where("id", educator.id).first();
 
-  const countRow = await knex("kmis_materials")
-    .whereNull("deleted_at")
-    .andWhere((qb) => {
-      qb.where("uploaded_by", user.id).orWhere("created_by", user.id);
-    })
-    .count({ c: "*" })
-    .first();
-
   const pre =
     typeof educator.total_material === "number"
       ? educator.total_material
       : null;
-  const totalMaterial = pre ?? Number(countRow?.c ?? 0);
+
+  let totalMaterial = pre;
+  if (totalMaterial == null) {
+    const countRow = await knex("kmis_materials as m")
+      .whereNull("m.deleted_at")
+      .andWhere(function () {
+        this.where("m.uploaded_by", user.id).orWhere("m.created_by", user.id);
+      })
+      .count({ c: "*" })
+      .first();
+    totalMaterial = Number(countRow?.c ?? 0);
+  }
 
   return {
     id: user.id,
