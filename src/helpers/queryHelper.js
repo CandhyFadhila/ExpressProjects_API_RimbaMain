@@ -246,7 +246,7 @@ function applyPagination(params = {}) {
     !hasLimitKey ||
     rawLimit === undefined ||
     rawLimit === "" ||
-    String(rawLimit).toLowerCase() === "Infinity" ||
+    String(rawLimit).toLowerCase() === "all" ||
     String(rawLimit).toLowerCase() === "*" ||
     Number(rawLimit) === 0 ||
     Number(rawLimit) === -1;
