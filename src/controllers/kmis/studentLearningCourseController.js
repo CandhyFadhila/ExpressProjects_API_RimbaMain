@@ -14,6 +14,7 @@ const {
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
 const { normIdArray } = require("../../helpers/inputNorm");
+const { trackTopicViewsForReq } = require("../../helpers/viewTracker");
 const dateHelper = require("../../helpers/dateHelper");
 const { stripTitlesOnly } = require("../../helpers/credentialHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
@@ -152,6 +153,13 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
+    await trackTopicViewsForReq([topic.id], req);
+
+    const topicAfter = await knex("kmis_topics")
+      .select("*")
+      .where("id", id)
+      .first();
+
     const [materials, materialCountRow, feedbackData, avgRow] =
       await Promise.all([
         knex("kmis_materials")
@@ -212,22 +220,22 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
       avgRow && avgRow.avg != null ? Number(avgRow.avg) : null;
 
     const data = {
-      topic: await topicResource(topic),
+      topic: await topicResource(topicAfter),
+      totalMaterial,
+      feedback,
+      avgFeedbackRate,
       material: materials.map((m) => ({
         id: m.id,
         title: m.title,
         materialType: m.material_types,
       })),
-      totalMaterial,
-      feedback,
-      avgFeedbackRate, // <— tambah di response
     };
 
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      `Detail data topik '${topic.title}' berhasil didapatkan.`,
+      `Detail data topik '${topicAfter.title}' berhasil didapatkan.`,
       data
     );
     return res.status(200).json(response.toResponse());
@@ -910,12 +918,10 @@ exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
     }
 
     const nowDb = dateHelper.toUTC(new Date().toISOString());
-    await knex("kmis_learning_attempts")
-      .where("id", attempt.id)
-      .update({
-        quiz_started: nowDb,
-        updated_at: knex.fn.now(),
-      });
+    await knex("kmis_learning_attempts").where("id", attempt.id).update({
+      quiz_started: nowDb,
+      updated_at: knex.fn.now(),
+    });
 
     const dataPayload = await attemptExamResponse(id);
 
@@ -1565,6 +1571,7 @@ exports.feedback = async (req, res) => {
     await trx("kmis_learning_attempts").where("id", id).update({
       feedback,
       feedback_comment: comment,
+      quiz_attempt_status: QUIZ_STATUS.FINISHED,
       updated_at: trx.fn.now(),
     });
 
@@ -1730,7 +1737,6 @@ async function attemptExamResponse(learningAttemptId) {
   return { learningParticipant, exam };
 }
 
-// TODO: Pindahkan update quiz_attempt_status didalam feedback
 async function handleFinalQuestion(trx, { learningAttemptId, topicId, req }) {
   const aggActive = await trx("kmis_quiz_responses")
     .where("kmis_learning_attempt_id", learningAttemptId)
@@ -1763,11 +1769,6 @@ async function handleFinalQuestion(trx, { learningAttemptId, topicId, req }) {
 
   const score = computeScorePercent(correctCount, totalQuiz, 2);
 
-  let quizAttemptStatus = QUIZ_STATUS.FINISHED;
-  if (answeredCount !== totalQuiz) {
-    quizAttemptStatus = QUIZ_STATUS.ABANDONED;
-  }
-
   await trx("kmis_learning_attempts").where("id", learningAttemptId).update({
     quiz_assessment_status: true,
     quiz_finished: finishedAtDb,
@@ -1780,7 +1781,6 @@ async function handleFinalQuestion(trx, { learningAttemptId, topicId, req }) {
     empty_count: emptyCount,
     score_total: score,
 
-    quiz_attempt_status: quizAttemptStatus,
     updated_at: trx.fn.now(),
   });
 

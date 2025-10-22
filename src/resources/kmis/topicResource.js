@@ -51,6 +51,7 @@ async function topicResource(topic) {
     description: topic.description,
     totalQuiz: topic.total_quiz,
     quizDuration: topic.quiz_duration,
+    totalViews: topic.total_views,
     createdAt: topic.created_at,
     updatedAt: topic.updated_at,
     deletedAt: topic.deleted_at,

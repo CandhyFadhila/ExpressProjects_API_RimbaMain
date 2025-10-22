@@ -30,6 +30,8 @@ const legalDocumentRoutes = require("./routes/cms/legalDocumentRoutes");
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 function isLinux() {
   return (
     String(process.env.PG_ENV || "windows")

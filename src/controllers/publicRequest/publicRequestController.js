@@ -88,11 +88,7 @@ exports.getAllCategory = async (req, res) => {
 
   try {
     let query = knex("kmis_categories as category")
-      .select([
-        "category.id",
-        "category.title",
-        "category.description",
-      ])
+      .select(["category.id", "category.title", "category.description"])
       .whereNull("category.deleted_at")
       .orderBy("category.created_at", "desc");
 
@@ -198,6 +194,7 @@ exports.getAllTopic = async (req, res) => {
         "topic.description",
         "topic.total_quiz",
         "topic.quiz_duration",
+        "topic.total_views",
       ])
       .leftJoin(
         "kmis_categories as category",
@@ -269,6 +266,7 @@ exports.getTopicbyId = async (req, res) => {
         "description",
         "total_quiz",
         "quiz_duration",
+        "total_views",
       ])
       .where("id", id)
       .whereNull("deleted_at")
@@ -321,6 +319,7 @@ exports.getTopicbyCategoryId = async (req, res) => {
         "topic.description",
         "topic.total_quiz",
         "topic.quiz_duration",
+        "topic.total_views",
       ])
       .where("topic.kmis_categories_id", id)
       .leftJoin(
@@ -775,6 +774,12 @@ exports.getMaterialbyId = async (req, res) => {
       );
       return res.status(200).json(response.toResponse());
     }
+
+    // Catat view unik per IP per HARI untuk semua materi yang tampil
+    await trackMaterialViewsForReq(
+      result.data.map((m) => m.id),
+      req
+    );
 
     const data = await materialResource(material);
     const response = new WithDataResource(
@@ -2335,7 +2340,8 @@ exports.getNewsbySlug = async (req, res) => {
 // Animal Composition (TextArray)
 exports.getAllAnimalComposition = async (req, res) => {
   const { search, animalCategoryId } = req.query;
-  const animalCategoryIdAny = animalCategoryId ?? req.query["animalCategoryId[]"];
+  const animalCategoryIdAny =
+    animalCategoryId ?? req.query["animalCategoryId[]"];
 
   try {
     let query = knex("cms_animal_composition as animal")
@@ -2350,9 +2356,14 @@ exports.getAllAnimalComposition = async (req, res) => {
       .whereNull("animal.deleted_at")
       .orderBy("animal.created_at", "desc");
 
-    applyRelationIn(query, "animal.cms_animal_category_id", animalCategoryIdAny, {
-      as: "number",
-    });
+    applyRelationIn(
+      query,
+      "animal.cms_animal_category_id",
+      animalCategoryIdAny,
+      {
+        as: "number",
+      }
+    );
 
     applyJsonbSearch(
       query,
@@ -2659,11 +2670,13 @@ exports.getLegalDocumentbyId = async (req, res) => {
 };
 
 // Content
+// TODO nambah faq
 exports.getAllContent = async (req, res) => {
   try {
     // Content
     const contentRows = await knex("cms_contents as content")
       .select([
+        "content.id",
         "content.type",
         "content.content",
         "content.content_file_ids",
@@ -2681,6 +2694,7 @@ exports.getAllContent = async (req, res) => {
     // Event
     const eventRows = await knex("cms_events as event")
       .select([
+        "event.id",
         "event.cms_event_category_id",
         "event.title",
         "event.description",
@@ -2697,6 +2711,7 @@ exports.getAllContent = async (req, res) => {
     // News
     const newsRows = await knex("cms_news as news")
       .select([
+        "news.id",
         "news.cms_news_category_id",
         "news.thumbnail_ids",
         "news.title",
