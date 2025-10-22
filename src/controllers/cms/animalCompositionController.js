@@ -46,7 +46,7 @@ exports.index = async (req, res) => {
       }
     );
 
-    applyLatestThenTrashed(query, "animal.deleted_at", "animal.created_at");
+    applyLatestThenTrashed(query, "animal.deleted_at", "animal.created_at", "animal.id");
 
     const paginationInfo = applyPagination(req.query);
 

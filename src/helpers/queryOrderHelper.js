@@ -1,21 +1,18 @@
 /**
  * Urutan:
- *   - Baris yang belum terhapus (deleted_at IS NULL) diletakkan di atas,
- *   - Lalu urutkan created_at DESC di dalam masing-masing kelompok,
- *   - Baris yang terhapus (deleted_at IS NOT NULL) diletakkan di bawah.
- *
- * @param {Knex.QueryBuilder} query
- * @param {string} deletedCol   contoh: "topic.deleted_at"
- * @param {string} createdCol   contoh: "topic.created_at"
+ *  - deleted_at IS NULL di atas,
+ *  - created_at DESC,
+ *  - id DESC (tie-breaker agar insert terbaru selalu di atas).
  */
 function applyLatestThenTrashed(
   query,
   deletedCol = "deleted_at",
-  createdCol = "created_at"
+  createdCol = "created_at",
+  idCol = "id"
 ) {
   return query.orderByRaw(
-    "CASE WHEN ?? IS NULL THEN 0 ELSE 1 END ASC, ?? DESC",
-    [deletedCol, createdCol]
+    "CASE WHEN ?? IS NULL THEN 0 ELSE 1 END ASC, ?? DESC, ?? DESC",
+    [deletedCol, createdCol, idCol]
   );
 }
 

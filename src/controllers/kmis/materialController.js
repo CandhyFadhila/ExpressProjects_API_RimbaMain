@@ -59,7 +59,7 @@ exports.index = async (req, res) => {
 
     applySearch(query, search, ["material.title", "topic.title"]);
 
-    applyLatestThenTrashed(query, "material.deleted_at", "material.created_at");
+    applyLatestThenTrashed(query, "material.deleted_at", "material.created_at", "material.id");
 
     const paginationInfo = applyPagination(req.query);
 

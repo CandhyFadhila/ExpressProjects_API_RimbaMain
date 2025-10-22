@@ -37,7 +37,7 @@ exports.index = async (req, res) => {
 
     applySearch(query, search, ["quiz.question"]);
 
-    applyLatestThenTrashed(query, "quiz.deleted_at", "quiz.created_at");
+    applyLatestThenTrashed(query, "quiz.deleted_at", "quiz.created_at", "quiz.id");
 
     const paginationInfo = applyPagination(req.query);
 
