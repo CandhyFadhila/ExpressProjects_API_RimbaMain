@@ -101,9 +101,11 @@ exports.index = async (req, res) => {
     );
 
     const serializedData = await Promise.all(
-      result.data.map((row) =>
-        educatorResource({ ...row, total_material: totalMap.get(row.id) ?? 0 })
-      )
+      result.data.map((row) => {
+        const uidNum = Number(row.id);
+        const ttl = totalMap.get(uidNum) ?? 0;
+        return educatorResource({ ...row, total_material: ttl });
+      })
     );
 
     const response = new WithDataResource(
