@@ -48,12 +48,14 @@ exports.index = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    // Ambil semua id user di halaman ini
+    // --- DEBUG: ID educator di halaman ini ---
     const idsRaw = result.data.map((r) => r.id);
     const ids = idsRaw.map((v) => Number(v)).filter(Number.isFinite);
+    console.log("[educator.index] idsRaw:", idsRaw);
+    console.log("[educator.index] ids (numeric):", ids);
 
     // Hitung total material per user sekali saja
-    const totals = await knex("kmis_materials as m")
+    const totalsQB = knex("kmis_materials as m")
       .whereNull("m.deleted_at")
       .andWhere(function () {
         this.whereIn("m.uploaded_by", ids).orWhereIn("m.created_by", ids);
@@ -61,6 +63,38 @@ exports.index = async (req, res) => {
       .select(knex.raw("COALESCE(m.uploaded_by, m.created_by) AS owner_id"))
       .count({ total: "*" })
       .groupByRaw("COALESCE(m.uploaded_by, m.created_by)");
+
+    // --- DEBUG: SQL & bindings ---
+    const { sql, bindings } = totalsQB.toSQL();
+    console.log("[educator.index] totals SQL:", sql);
+    console.log("[educator.index] totals bindings:", bindings);
+
+    const totals = await totalsQB;
+
+    // --- DEBUG: hasil agregasi ---
+    console.log("[educator.index] totals rows:", totals);
+
+    // --- DEBUG tambahan: hitung terpisah utk memastikan kolom mana yang terpakai ---
+    const dbgUploaded = await knex("kmis_materials as m")
+      .whereNull("m.deleted_at")
+      .whereIn("m.uploaded_by", ids)
+      .count({ c: "*" });
+    const dbgCreated = await knex("kmis_materials as m")
+      .whereNull("m.deleted_at")
+      .whereIn("m.created_by", ids)
+      .count({ c: "*" });
+    console.log("[educator.index] dbg uploaded_by count:", dbgUploaded?.[0]?.c);
+    console.log("[educator.index] dbg created_by count:", dbgCreated?.[0]?.c);
+
+    // --- DEBUG: ambil sampel baris yang match ---
+    const sampleRows = await knex("kmis_materials as m")
+      .select("m.id", "m.created_by", "m.uploaded_by", "m.deleted_at")
+      .whereNull("m.deleted_at")
+      .andWhere(function () {
+        this.whereIn("m.uploaded_by", ids).orWhereIn("m.created_by", ids);
+      })
+      .limit(5);
+    console.log("[educator.index] sample materials:", sampleRows);
 
     const totalMap = new Map(
       totals.map((t) => [Number(t.owner_id), Number(t.total)])
