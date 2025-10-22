@@ -1,4 +1,3 @@
-const { normIdArray } = require("./inputNorm");
 const { toDatabaseUTC } = require("./dateHelper");
 
 function _pickFirstNonEmpty(v) {
@@ -237,10 +236,28 @@ function applyJsonbSearch(queryBuilder, search, exprs, opts = {}) {
 }
 
 // Ini buat pagination
-function applyPagination({ page = 1, limit = 10 }) {
-  const p = Math.max(parseInt(page) || 1, 1);
-  const l = Math.max(parseInt(limit) || 10, 1);
-  return { page: p, limit: l, offset: (p - 1) * l };
+function applyPagination(params = {}) {
+  // deteksi apakah key 'limit' benar-benar dikirim
+  const hasLimitKey = Object.prototype.hasOwnProperty.call(params, "limit");
+  const rawLimit = hasLimitKey ? params.limit : undefined;
+  const rawPage = params.page;
+
+  const isUnlimited =
+    !hasLimitKey ||
+    rawLimit === undefined ||
+    rawLimit === "" ||
+    String(rawLimit).toLowerCase() === "all" ||
+    String(rawLimit).toLowerCase() === "*" ||
+    Number(rawLimit) === 0 ||
+    Number(rawLimit) === -1;
+
+  if (isUnlimited) {
+    return { page: 1, limit: null, offset: 0, unlimited: true };
+  }
+
+  const p = Math.max(parseInt(rawPage, 10) || 1, 1);
+  const l = Math.max(parseInt(rawLimit, 10) || 10, 1);
+  return { page: p, limit: l, offset: (p - 1) * l, unlimited: false };
 }
 
 async function formatPaginationResult(
@@ -248,19 +265,43 @@ async function formatPaginationResult(
   paginationInfo,
   knexInstance
 ) {
-  const { page, limit, offset } = paginationInfo;
+  const { page, limit, offset, unlimited } = paginationInfo;
 
-  // Ambil DATA dari baseQuery + limit/offset (di clone agar base tetap murni)
-  const dataQuery = baseQueryBuilder.clone().limit(limit).offset(offset);
+  // DATA
+  const dataQuery = baseQueryBuilder.clone();
+  if (!unlimited) {
+    dataQuery.limit(limit).offset(offset);
+  }
   const data = await dataQuery;
 
-  // Hitung TOTAL dari baseQuery TANPA limit/offset
+  // TOTAL
   const countWrapped = baseQueryBuilder.clone().clearSelect().clearOrder();
   const [{ count }] = await knexInstance
     .count("*")
     .from(countWrapped.as("subquery"));
-
   const total = parseInt(count, 10) || 0;
+
+  // PAGINATION META/LINKS
+  if (unlimited) {
+    return {
+      data,
+      pagination: {
+        meta: {
+          current_page: 1,
+          last_page: 1,
+          per_page: null,
+          total,
+        },
+        links: {
+          first: null,
+          last: null,
+          prev: null,
+          next: null,
+        },
+      },
+    };
+  }
+
   const lastPage = total === 0 ? 1 : Math.ceil(total / limit);
 
   return {
