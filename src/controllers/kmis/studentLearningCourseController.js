@@ -1773,6 +1773,11 @@ async function handleFinalQuestion(trx, { learningAttemptId, topicId, req }) {
 
   const score = computeScorePercent(correctCount, totalQuiz, 2);
 
+  let quizAttemptStatus = QUIZ_STATUS.FINISHED;
+  if (answeredCount !== totalQuiz) {
+    quizAttemptStatus = QUIZ_STATUS.ABANDONED;
+  }
+
   await trx("kmis_learning_attempts").where("id", learningAttemptId).update({
     quiz_assessment_status: true,
     quiz_finished: finishedAtDb,
@@ -1785,6 +1790,7 @@ async function handleFinalQuestion(trx, { learningAttemptId, topicId, req }) {
     empty_count: emptyCount,
     score_total: score,
 
+    quiz_attempt_status: quizAttemptStatus,
     updated_at: trx.fn.now(),
   });
 
