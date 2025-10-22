@@ -170,12 +170,21 @@ async function getUserAttemptStatsFinished() {
     "Nov",
     "Dec",
   ];
-  const obj = Object.fromEntries(monthKeys.map((k) => [k, 0]));
 
+  // siapkan array 12 bulan diisi 0
+  const totalsByMonth = Array(12).fill(0);
+
+  // isi dari hasil query (mon = 1..12)
   for (const r of rows) {
-    const i = (r.mon ?? 1) - 1;
-    obj[monthKeys[i]] = Number(r.total) || 0;
+    const idx = (r.mon ?? 1) - 1;
+    totalsByMonth[idx] = Number(r.total) || 0;
   }
 
-  return [obj];
+  // bentuk [{ name, value }]
+  const data = monthKeys.map((name, i) => ({
+    name,
+    value: totalsByMonth[i],
+  }));
+
+  return data;
 }
