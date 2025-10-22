@@ -53,14 +53,14 @@ exports.index = async (req, res) => {
 
     // Hitung total material per user sekali saja
     const totals = await knex("kmis_materials")
-      .whereIn("created_by", ids)
       .whereNull("deleted_at")
-      .groupBy("created_by")
-      .select("created_by")
-      .count({ total: "*" });
+      .whereIn(knex.raw("COALESCE(uploaded_by, created_by)"), ids)
+      .select(knex.raw("COALESCE(uploaded_by, created_by) AS owner_id"))
+      .count({ total: "*" })
+      .groupByRaw("COALESCE(uploaded_by, created_by)");
 
     const totalMap = new Map(
-      totals.map((t) => [Number(t.created_by), Number(t.total)])
+      totals.map((t) => [Number(t.owner_id), Number(t.total)])
     );
 
     const serializedData = await Promise.all(

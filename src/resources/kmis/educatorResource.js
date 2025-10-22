@@ -5,8 +5,10 @@ async function educatorResource(educator) {
   const user = await knex("users").where("id", educator.id).first();
 
   const countRow = await knex("kmis_materials")
-    .where("created_by", user.id)
     .whereNull("deleted_at")
+    .andWhere((qb) => {
+      qb.where("uploaded_by", user.id).orWhere("created_by", user.id);
+    })
     .count({ c: "*" })
     .first();
 
