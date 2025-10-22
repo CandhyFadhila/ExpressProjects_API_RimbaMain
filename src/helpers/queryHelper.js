@@ -247,9 +247,7 @@ function applyPagination(params = {}) {
     rawLimit === undefined ||
     rawLimit === "" ||
     String(rawLimit).toLowerCase() === "all" ||
-    String(rawLimit).toLowerCase() === "*" ||
-    Number(rawLimit) === 0 ||
-    Number(rawLimit) === -1;
+    Number(rawLimit) === 0;
 
   if (isUnlimited) {
     return { page: 1, limit: null, offset: 0, unlimited: true };
