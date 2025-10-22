@@ -55,7 +55,7 @@ exports.index = async (req, res) => {
     console.log("[educator.index] ids (numeric):", ids);
 
     // Hitung total material per user sekali saja
-    const totals = knex("kmis_materials as m")
+    const totalsQB = knex("kmis_materials as m")
       .whereNull("m.deleted_at")
       .andWhere(function () {
         this.whereIn("m.uploaded_by", ids).orWhereIn("m.created_by", ids);
@@ -63,6 +63,8 @@ exports.index = async (req, res) => {
       .select(knex.raw("COALESCE(m.uploaded_by, m.created_by) AS owner_id"))
       .count({ total: "*" })
       .groupByRaw("COALESCE(m.uploaded_by, m.created_by)");
+
+    const totals = await totalsQB;
 
     const totalMap = new Map(
       totals.map((t) => [Number(t.owner_id), Number(t.total)])
