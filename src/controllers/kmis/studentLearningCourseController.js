@@ -158,6 +158,7 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
     const topicAfter = await knex("kmis_topics")
       .select("*")
       .where("id", id)
+      .whereNull("deleted_at")
       .first();
 
     const [materials, materialCountRow, feedbackData, avgRow] =
