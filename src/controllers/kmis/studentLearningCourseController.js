@@ -138,6 +138,8 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
   const { id } = req.params;
 
   try {
+    await trackTopicViewsForReq([topic.id], req);
+
     const topic = await knex("kmis_topics")
       .select("*")
       .where("id", id)
@@ -152,14 +154,6 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
       );
       return res.status(200).json(response.toResponse());
     }
-
-    await trackTopicViewsForReq([topic.id], req);
-
-    const topicAfter = await knex("kmis_topics")
-      .select("*")
-      .where("id", id)
-      .whereNull("deleted_at")
-      .first();
 
     const [materials, materialCountRow, feedbackData, avgRow] =
       await Promise.all([
@@ -221,7 +215,7 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
       avgRow && avgRow.avg != null ? Number(avgRow.avg) : null;
 
     const data = {
-      topic: await topicResource(topicAfter),
+      topic: await topicResource(topic),
       totalMaterial,
       feedback,
       avgFeedbackRate,
@@ -236,7 +230,7 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      `Detail data topik '${topicAfter.title}' berhasil didapatkan.`,
+      `Detail data topik '${topic.title}' berhasil didapatkan.`,
       data
     );
     return res.status(200).json(response.toResponse());
