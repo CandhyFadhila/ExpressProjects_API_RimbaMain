@@ -148,7 +148,7 @@ exports.store = async (req, res) => {
         422,
         "DUPLICATE_QUESTION",
         "Duplikat Data",
-        "Pertanyaan FAQ ini sudah digunakan pada data lain."
+        "Pertanyaan FAQ (ID/EN) sudah digunakan, silakan gunakan pertanyaan lain."
       );
       return res.status(422).json(response.toResponse());
     }

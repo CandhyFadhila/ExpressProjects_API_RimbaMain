@@ -99,6 +99,11 @@ router.get(
   publicRequestController.getLegalDocumentbyId
 );
 
+// FAQs
+router.get("/get-all-faq", rateLimiter, publicRequestController.getAllFaq);
+
+router.get("/get-faq/:id", rateLimiter, publicRequestController.getFaqbyId);
+
 // Content
 router.get(
   "/get-all-content",

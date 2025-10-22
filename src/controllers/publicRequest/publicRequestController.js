@@ -26,6 +26,7 @@ const animalCategoryResource = require("../../resources/masterData/animalCategor
 const contentResource = require("../../resources/cms/contentResource");
 const animalCompositionResource = require("../../resources/cms/animalCompositionResource");
 const legalDocumentResource = require("../../resources/cms/legalDocumentResource");
+const faqResource = require("../../resources/cms/faqResource");
 
 // Role
 exports.getAllRole = async (req, res) => {
@@ -2669,8 +2670,116 @@ exports.getLegalDocumentbyId = async (req, res) => {
   }
 };
 
+// FAQs
+exports.getAllFaq = async (req, res) => {
+  const { search } = req.query;
+
+  try {
+    let query = knex("cms_faqs as faq")
+      .select(["faq.id", "faq.question", "faq.answer"])
+      .whereNull("faq.deleted_at")
+      .orderBy("faq.created_at", "desc");
+
+    applyJsonbSearch(
+      query,
+      search,
+      [
+        "faq.question->>'id'",
+        "faq.question->>'en'",
+        "faq.answer->>'id'",
+        "faq.answer->>'en'",
+      ],
+      {
+        mode: "or",
+        split: true,
+      }
+    );
+
+    const paginationInfo = applyPagination(req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((faq) => faqResource(faq))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data FAQ berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAllFaq : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getFaqbyId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const faq = await knex("cms_faqs")
+      .select(["id", "question", "answer"])
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!faq) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data FAQ dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const data = await faqResource(faq);
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Detail data FAQ berhasil didapatkan.",
+      data
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getFaqbyId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
 // Content
-// TODO nambah faq
 exports.getAllContent = async (req, res) => {
   try {
     // Content
@@ -2703,8 +2812,7 @@ exports.getAllContent = async (req, res) => {
         "event.created_at",
       ])
       .whereNull("event.deleted_at")
-      .orderBy("event.created_at", "desc")
-      .limit(3);
+      .orderBy("event.created_at", "desc");
 
     const homeActivities = await Promise.all(eventRows.map(eventResource));
 
@@ -2721,8 +2829,7 @@ exports.getAllContent = async (req, res) => {
         "news.created_at",
       ])
       .whereNull("news.deleted_at")
-      .orderBy("news.created_at", "desc")
-      .limit(3);
+      .orderBy("news.created_at", "desc");
 
     const homeNews = await Promise.all(newsRows.map(newsResource));
 
@@ -2737,12 +2844,19 @@ exports.getAllContent = async (req, res) => {
     const legalDocumentRows = await knex("cms_legal_documents")
       .select(["title", "description", "document_ids", "created_at"])
       .whereNull("deleted_at")
-      .orderBy("created_at", "desc")
-      .limit(4);
+      .orderBy("created_at", "desc");
 
     const homeLegalDocuments = await Promise.all(
       legalDocumentRows.map(legalDocumentResource)
     );
+
+    // FAQs
+    const FAQsRows = await knex("cms_faqs")
+      .select(["id", "question", "answer"])
+      .whereNull("deleted_at")
+      .orderBy("created_at", "desc");
+
+    const FAQs = await Promise.all(FAQsRows.map(faqResource));
 
     if (
       Object.keys(staticContents).length === 0 &&
@@ -2752,13 +2866,14 @@ exports.getAllContent = async (req, res) => {
       homeCompletionProgress.every((m) =>
         Object.values(m).every((v) => v === 0 || v === null)
       ) &&
-      homeLegalDocuments.length === 0
+      homeLegalDocuments.length === 0 &&
+      FAQs.length === 0
     ) {
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        "Belum ada konten, event, berita, komposisi satwa, atau dokumen hukum yang tersedia."
+        "Belum ada konten, event, berita, komposisi satwa, dokumen hukum, atau FAQ yang tersedia."
       );
       return res.status(200).json(response.toResponse());
     }
@@ -2775,6 +2890,7 @@ exports.getAllContent = async (req, res) => {
         homeCompletionProgress,
         homeLegalDocuments,
         homeNews,
+        FAQs,
       }
     );
     return res.status(200).json(response.toResponse());

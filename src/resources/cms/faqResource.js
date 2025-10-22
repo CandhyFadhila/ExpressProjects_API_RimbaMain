@@ -1,8 +1,8 @@
 async function faqResource(faq) {
   return {
     id: faq.id,
-    name: faq.name,
-    description: faq.description,
+    question: faq.question,
+    answer: faq.answer,
     createdAt: faq.created_at,
     updatedAt: faq.updated_at,
     deletedAt: faq.deleted_at
