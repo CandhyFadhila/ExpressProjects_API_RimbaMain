@@ -66,7 +66,7 @@ exports.createAccount = async (req, res) => {
 
     const [user] = await trx("users")
       .insert({
-        role_id: 3,
+        role_id: 4,
         name: name.trim(),
         email: email.trim(),
         password: hashedPassword,
@@ -291,6 +291,13 @@ exports.signInEducator = (req, res) =>
     ability: "educator",
   });
 
+exports.signInMonev = (req, res) =>
+  signInWithContext(req, res, {
+    context: "monev",
+    requiredRole: "Monev",
+    ability: "monev",
+  });
+
 exports.signInStudent = async (req, res) => {
   const studentRole = await knex("roles")
     .select("id", "name")
@@ -312,49 +319,6 @@ exports.signInStudent = async (req, res) => {
     requiredRole: studentRole.name,
     ability: "student",
   });
-};
-
-// ========== GET USER INFO CONTROLLER ==========
-exports.getUserInfo = async (req, res) => {
-  const userId = req.userId;
-
-  try {
-    // Ambil data user dari database berdasarkan userId
-    const user = await knex("users").where({ id: userId }).first();
-    if (!user) {
-      const response = new WithoutDataResource(
-        401, // HTTP Status Code: Unauthorized
-        "ACCOUNT_NOT_FOUND",
-        "Akses Ditolak",
-        "Maaf, akun pengguna terkait tidak ditemukan."
-      );
-      logger.info(`| GetUserInfo | - Account not found for userId: ${userId}`);
-      return res.status(401).json(response.toResponse());
-    }
-
-    logger.info(
-      `| GetUserInfo | - User info fetched for userId: ${userId}, at ${new Date().toISOString()}`
-    );
-
-    const serialized = await UserResource(user);
-    const response = new WithDataResource(
-      200, // HTTP Status Code: OK
-      "SUCCESS_GET_USER_INFO",
-      "Berhasil Mendapatkan Data",
-      `Data pengguna ${user.name}, berhasil didapatkan.`,
-      { user: serialized }
-    );
-    res.status(200).json(response.toResponse());
-  } catch (error) {
-    logger.error(`| Auth | - Error function getUserInfo: ${error.message}`);
-    const response = new WithoutDataResource(
-      500, // HTTP Status Code: Internal Server Error
-      "SERVER_ERROR",
-      "Server Sedang Error",
-      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
-    );
-    res.status(500).json(response.toResponse());
-  }
 };
 
 // ========== LOGOUT CONTROLLER ==========
@@ -437,7 +401,7 @@ exports.sendOTP = async (req, res) => {
     }
 
     const roleId = Number(user.role_id);
-    if (!Number.isFinite(roleId) || roleId !== 3) {
+    if (!Number.isFinite(roleId) || roleId !== 4) {
       const response = new WithoutDataResource(
         403,
         "FORBIDDEN_ROLE",
@@ -534,7 +498,7 @@ exports.verifyOTP = async (req, res) => {
     }
 
     const roleId = Number(user.role_id);
-    if (!Number.isFinite(roleId) || roleId !== 3) {
+    if (!Number.isFinite(roleId) || roleId !== 4) {
       const response = new WithoutDataResource(
         403,
         "FORBIDDEN_ROLE",
@@ -613,7 +577,7 @@ exports.resetPassword = async (req, res) => {
     }
 
     const roleId = Number(user.role_id);
-    if (!Number.isFinite(roleId) || roleId !== 3) {
+    if (!Number.isFinite(roleId) || roleId !== 4) {
       const response = new WithoutDataResource(
         403,
         "FORBIDDEN_ROLE",

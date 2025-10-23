@@ -504,7 +504,7 @@ exports.getAllUserStudent = async (req, res) => {
   try {
     let query = knex("users as user")
       .where("user.account_status", 2)
-      .where("user.role_id", 3)
+      .where("user.role_id", 4)
       .leftJoin("roles as role", "user.role_id", "role.id")
       .select([
         "user.name",

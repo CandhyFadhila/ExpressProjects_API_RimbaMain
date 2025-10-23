@@ -11,7 +11,6 @@ exports.dashboardInfo = async (req, res) => {
     const totalMaterial = await getInfoMaterial();
     const totalQuiz = await getInfoQuiz();
     const totalUserAttemptParticipant = await getInfoUserAttempt();
-    const averageScoreTotal = await getAvgScoreTotal();
     const averageFeedback = await getAvgFeedbackRate();
     const userStatsAttemptFinished = await getUserAttemptStatsFinished();
 
@@ -27,7 +26,6 @@ exports.dashboardInfo = async (req, res) => {
         totalMaterial,
         totalQuiz,
         totalUserAttemptParticipant,
-        averageScoreTotal,
         averageFeedback,
         userStatsAttemptFinished,
       }
@@ -60,7 +58,7 @@ async function getInfoEducator() {
 
 async function getInfoStudent() {
   const row = await knex("users")
-    .where("role_id", 3)
+    .where("role_id", 4)
     .whereNull("deleted_at")
     .count({ total: "id" })
     .first();
@@ -106,18 +104,6 @@ async function getInfoUserAttempt() {
     .first();
 
   const value = Number(row?.total ?? 0);
-  return { value };
-}
-
-async function getAvgScoreTotal() {
-  const row = await knex("kmis_learning_attempts")
-    .whereNull("deleted_at")
-    .avg({ avg_score: "score_total" })
-    .first();
-
-  const average = row?.avg_score == null ? 0 : Number(row.avg_score);
-  const value = Number(average.toFixed(2));
-
   return { value };
 }
 

@@ -17,7 +17,7 @@ router.use(
 
 router.get(
   "/get-user-profile",
-  requireAnyAbility(["super_admin", "educator", "student"]),
+  requireAnyAbility(["super_admin", "educator", "student", "monev"]),
   profileController.getUserProfile
 );
 
@@ -32,7 +32,7 @@ router.patch(
   uploadMaterialFields,
   profileValidator,
   validate,
-  requireAnyAbility(["super_admin", "educator", "student"]),
+  requireAnyAbility(["super_admin", "educator", "student", "monev"]),
   profileController.updateUserData
 );
 

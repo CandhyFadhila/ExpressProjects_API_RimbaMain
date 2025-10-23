@@ -13,11 +13,10 @@ const {
 const validate = require("../middlewares/validate");
 const authMiddleware = require("../middlewares/authMiddleware");
 const rateLimiter = require("../middlewares/rateLimitMiddleware");
-const requireAbility = require("../middlewares/requireAbility");
 const multer = require("multer");
 const upload = multer();
 
-// 1) Super Admin SSO (tanpa forgot password routes)
+// 1) Super Admin SSO Only (tanpa forgot password routes)
 router.post(
   "/sso/signin",
   rateLimiter,
@@ -25,15 +24,8 @@ router.post(
   loginValidator,
   (req, res) => authController.signInAdminSSO(req, res)
 );
-router.get(
-  "/sso/user-info",
-  rateLimiter,
-  authMiddleware,
-  requireAbility("super_admin"),
-  authController.getUserInfo
-);
 
-// 2) Educator
+// 2) Educator Only
 router.post(
   "/admin/signin",
   rateLimiter,
@@ -41,43 +33,25 @@ router.post(
   loginValidator,
   (req, res) => authController.signInEducator(req, res)
 );
-// Reset Password via OTP
+
+// 3) Monev Only
 router.post(
-  "/admin/send-otp",
+  "/monev/signin",
   rateLimiter,
   upload.none(),
-  sendOTPValidator,
-  validate,
-  authController.sendOTP
-);
-router.post(
-  "/admin/verify-otp",
-  rateLimiter,
-  upload.none(),
-  verifyOTPValidator,
-  validate,
-  authController.verifyOTP
-);
-router.post(
-  "/admin/reset-password",
-  rateLimiter,
-  upload.none(),
-  resetPasswordValidator,
-  validate,
-  authController.resetPassword
-);
-router.get(
-  "/admin/user-info",
-  rateLimiter,
-  authMiddleware,
-  requireAbility("educator"),
-  authController.getUserInfo
+  loginValidator,
+  (req, res) => authController.signInMonev(req, res)
 );
 
-// 3) Student
-router.post("/signin", rateLimiter, upload.none(), loginValidator, (req, res) =>
-  authController.signInStudent(req, res)
+// 4) Student Only
+router.post(
+  "/signin", 
+  rateLimiter, 
+  upload.none(), 
+  loginValidator, 
+  (req, res) => authController.signInStudent(req, res)
 );
+
 router.post(
   "/signup",
   rateLimiter,
@@ -86,8 +60,14 @@ router.post(
   validate,
   authController.createAccount
 );
-router.post("/oauth", rateLimiter, authController.createOrLoginWithOauth);
-// Reset Password via OTP
+
+router.post(
+  "/oauth", 
+  rateLimiter, 
+  authController.createOrLoginWithOauth
+);
+
+// Universal Routes
 router.post(
   "/send-otp",
   rateLimiter,
@@ -96,6 +76,7 @@ router.post(
   validate,
   authController.sendOTP
 );
+
 router.post(
   "/verify-otp",
   rateLimiter,
@@ -104,6 +85,7 @@ router.post(
   validate,
   authController.verifyOTP
 );
+
 router.post(
   "/reset-password",
   rateLimiter,
@@ -112,13 +94,7 @@ router.post(
   validate,
   authController.resetPassword
 );
-router.get(
-  "/user-info",
-  rateLimiter,
-  authMiddleware,
-  requireAbility("student"),
-  authController.getUserInfo
-);
+
 router.get("/signout", rateLimiter, authMiddleware, authController.logout);
 
 module.exports = router;

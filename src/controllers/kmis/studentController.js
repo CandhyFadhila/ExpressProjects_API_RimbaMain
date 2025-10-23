@@ -27,7 +27,7 @@ exports.index = async (req, res) => {
   try {
     let query = knex("users as user")
       .leftJoin("roles as role", "user.role_id", "role.id")
-      .where("user.role_id", 3)
+      .where("user.role_id", 4)
       .select("user.*")
       .orderBy("user.created_at", "desc");
 
@@ -157,7 +157,7 @@ exports.store = async (req, res) => {
       .insert({
         name,
         email,
-        role_id: 3,
+        role_id: 4,
         account_status: 2,
         password: passwordHash,
       })
@@ -231,7 +231,7 @@ exports.show = async (req, res) => {
     const user = await knex("users")
       .select("*")
       .where("id", id)
-      .where("role_id", 3)
+      .where("role_id", 4)
       .first();
     if (!user) {
       const response = new WithoutDataResource(
@@ -288,7 +288,7 @@ exports.update = async (req, res) => {
 
     const existing = await trx("users")
       .where("id", id)
-      .where("role_id", 3)
+      .where("role_id", 4)
       .first();
     if (!existing) {
       const response = new WithoutDataResource(
@@ -421,7 +421,7 @@ exports.destroy = async (req, res) => {
 
     const alreadyDeleted = await trx("users")
       .whereIn("id", ids)
-      .where("role_id", 3)
+      .where("role_id", 4)
       .where("account_status", 3)
       .whereNotNull("deactivate_at")
       .select("id", "name");
@@ -447,7 +447,7 @@ exports.destroy = async (req, res) => {
 
     const existing = await trx("users")
       .whereIn("id", ids)
-      .where("role_id", 3)
+      .where("role_id", 4)
       .whereNot("account_status", 3)
       .select("id", "name");
     if (existing.length === 0) {
@@ -534,7 +534,7 @@ exports.restore = async (req, res) => {
 
     const alreadyRestored = await trx("users")
       .whereIn("id", ids)
-      .where("role_id", 3)
+      .where("role_id", 4)
       .where("account_status", 2)
       .whereNull("deleted_at")
       .select("id", "name");
@@ -561,7 +561,7 @@ exports.restore = async (req, res) => {
     const softDeleted = await trx("users")
       .select("id", "email")
       .whereIn("id", ids)
-      .where("role_id", 3)
+      .where("role_id", 4)
       .where("account_status", 3)
       .whereNotNull("deleted_at");
     if (softDeleted.length === 0) {
@@ -709,7 +709,7 @@ exports.deactivateAccount = async (req, res) => {
 
     const alreadyInactive = await trx("users")
       .whereIn("id", ids)
-      .where("role_id", 3)
+      .where("role_id", 4)
       .where("account_status", 3)
       .select("id", "name");
     if (alreadyInactive.length > 0) {
@@ -736,7 +736,7 @@ exports.deactivateAccount = async (req, res) => {
     const candidates = await trx("users")
       .select("id", "email")
       .whereIn("id", ids)
-      .where("role_id", 3)
+      .where("role_id", 4)
       .whereNull("deleted_at")
       .whereNot("account_status", 3);
     if (candidates.length === 0) {
@@ -834,7 +834,7 @@ exports.activateAccount = async (req, res) => {
 
     const alreadyActive = await trx("users")
       .whereIn("id", ids)
-      .where("role_id", 3)
+      .where("role_id", 4)
       .where("account_status", 2)
       .select("id", "name");
     if (alreadyActive.length > 0) {
@@ -860,7 +860,7 @@ exports.activateAccount = async (req, res) => {
     const candidates = await trx("users")
       .select("id")
       .whereIn("id", ids)
-      .where("role_id", 3)
+      .where("role_id", 4)
       .whereNull("deleted_at")
       .whereNot("account_status", 2);
     if (candidates.length === 0) {

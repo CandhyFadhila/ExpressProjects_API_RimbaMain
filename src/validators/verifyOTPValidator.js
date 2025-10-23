@@ -16,9 +16,6 @@ exports.verifyOTPValidator = [
       "OTP tidak boleh kosong, silahkan masukkan kode OTP yang berasal dari email yang Anda terima."
     )
     .bail()
-    .isNumeric()
-    .withMessage("Kode OTP yang valid harus berupa angka.")
-    .bail()
     .isLength({ min: 6, max: 6 })
     .withMessage("Kode OTP harus terdiri dari 6 digit."),
 ];
