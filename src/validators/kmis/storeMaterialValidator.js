@@ -1,38 +1,7 @@
 const { body } = require("express-validator");
 const knex = require("../../config/database");
-const { hasAbility } = require("../../middlewares/requireAbility");
 
 exports.storeMaterialValidator = [
-  // body("uploadedBy").custom(async (value, { req }) => {
-  //   const isSuperAdmin = hasAbility(req, "super_admin");
-  //   const isEducator = hasAbility(req, "educator");
-
-  //   const raw = value == null ? "" : String(value).trim();
-
-  //   if (!isEducator && isSuperAdmin && raw === "") {
-  //     throw new Error("Pengajar wajib diisi.");
-  //   }
-
-  //   if (raw === "") return true;
-
-  //   const idNum = Number(raw);
-  //   if (!Number.isInteger(idNum) || idNum <= 0) {
-  //     throw new Error("Pengajar harus berupa angka.");
-  //   }
-
-  //   const user = await knex("users")
-  //     .where("id", idNum)
-  //     .where("role_id", 2)
-  //     .whereNull("deleted_at")
-  //     .first();
-  //   if (!user) {
-  //     throw new Error(
-  //       "Pengguna pengajar yang Anda pilih tidak ditemukan atau sudah dihapus."
-  //     );
-  //   }
-  //   return true;
-  // }),
-
   // === materialType (wajib) + normalisasi ===
   body("materialType")
     .notEmpty()

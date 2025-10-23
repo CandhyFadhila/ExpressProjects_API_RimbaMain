@@ -1,11 +1,7 @@
 const { validationResult } = require("express-validator");
 const knex = require("../../config/database");
 const logger = require("../../utils/logger");
-const {
-  toArray,
-  normJsonbArray,
-  normIdArray,
-} = require("../../helpers/inputNorm");
+const { normJsonbArray, normIdArray } = require("../../helpers/inputNorm");
 const { asJsonb } = require("../../helpers/dbJson");
 const {
   applyRelationIn,
@@ -13,7 +9,7 @@ const {
   applyPagination,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
-const { hasAbility } = require("../../middlewares/requireAbility");
+const { toYoutubeEmbed } = require("../../helpers/toYoutubeEmbed");
 const documentHelper = require("../../helpers/documentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
@@ -59,7 +55,12 @@ exports.index = async (req, res) => {
 
     applySearch(query, search, ["material.title", "topic.title"]);
 
-    applyLatestThenTrashed(query, "material.deleted_at", "material.created_at", "material.id");
+    applyLatestThenTrashed(
+      query,
+      "material.deleted_at",
+      "material.created_at",
+      "material.id"
+    );
 
     const paginationInfo = applyPagination(req.query);
 
@@ -132,6 +133,10 @@ exports.store = async (req, res) => {
 
     const coverFiles = req.files?.materialCovers || [];
     const materiFiles = req.files?.materialFiles || [];
+    const normalizedUrl =
+      type === "video" && materialUrl
+        ? toYoutubeEmbed(materialUrl)
+        : materialUrl;
 
     const MIME_ALIAS = {
       "application/pdf": "PDF",
@@ -249,22 +254,22 @@ exports.store = async (req, res) => {
     const coverIds = coverFromBody.length ? coverFromBody : uploadedCoverIds;
     const fileIds = filesFromBody.length ? filesFromBody : uploadedFileIds;
 
-    const isSuperAdmin = hasAbility(req, "super_admin");
-    const isEducator = hasAbility(req, "educator");
-    const uploadedByBody = Number(req.body?.uploadedBy);
+    // const isSuperAdmin = hasAbility(req, "super_admin");
+    // const isEducator = hasAbility(req, "educator");
+    // const uploadedByBody = Number(req.body?.uploadedBy);
 
-    let uploadedBy;
-    let notes = "";
-    if (isEducator && !isSuperAdmin) {
-      uploadedBy = Number(userId);
-      notes = `Materi diunggah oleh akun pengajar.`;
-    } else {
-      uploadedBy =
-        Number.isInteger(uploadedByBody) && uploadedByBody > 0
-          ? uploadedByBody
-          : Number(userId);
-      notes = `Materi diunggah oleh akun super admin yang mengatasnamakan akun pengajar.`;
-    }
+    // let uploadedBy;
+    // let notes = "";
+    // if (isEducator && !isSuperAdmin) {
+    //   uploadedBy = Number(userId);
+    //   notes = `Materi diunggah oleh akun pengajar.`;
+    // } else {
+    //   uploadedBy =
+    //     Number.isInteger(uploadedByBody) && uploadedByBody > 0
+    //       ? uploadedByBody
+    //       : Number(userId);
+    //   notes = `Materi diunggah oleh akun super admin yang mengatasnamakan akun pengajar.`;
+    // }
 
     await trx("kmis_materials")
       .insert({
@@ -275,7 +280,7 @@ exports.store = async (req, res) => {
         material_types: type,
         title,
         description,
-        material_data: materialUrl ?? null,
+        material_data: normalizedUrl ?? null,
         materials_file_ids: fileIds?.length ? asJsonb(fileIds) : null,
         materials_cover_ids: coverIds?.length ? asJsonb(coverIds) : null,
         is_public: typeof isPublic === "boolean" ? isPublic : undefined,
@@ -287,7 +292,7 @@ exports.store = async (req, res) => {
         userId: activityLogHelper.fromReq(req),
         module: "kmis",
         subject: "List Materi",
-        notes,
+        // notes,
       },
       trx
     );
@@ -414,6 +419,10 @@ exports.update = async (req, res) => {
 
     const coverFiles = req.files?.materialCovers || [];
     const materiFiles = req.files?.materialFiles || [];
+    const normalizedUrl =
+      type === "video" && materialUrl
+        ? toYoutubeEmbed(materialUrl)
+        : materialUrl;
 
     const MIME_ALIAS = {
       "application/pdf": "PDF",
@@ -590,7 +599,7 @@ exports.update = async (req, res) => {
         material_types: type || existing.material_types,
         title: title ?? existing.title,
         description: description ?? existing.description,
-        material_data: materialUrl ?? existing.material_data,
+        material_data: normalizedUrl ?? existing.material_data,
         materials_cover_ids: asJsonb(newCoverIds),
         materials_file_ids: asJsonb(newFileIds),
         is_public:
