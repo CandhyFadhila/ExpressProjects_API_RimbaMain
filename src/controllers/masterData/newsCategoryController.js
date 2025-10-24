@@ -144,9 +144,10 @@ exports.store = async (req, res) => {
       })
       .first();
     if (exists) {
+      await trx.rollback();
       const response = new WithoutDataResource(
         422,
-        "DUPLICATE_TITLE",
+        "DUPLICATE_NAME",
         "Duplikat Data",
         "Nama kategori berita ini sudah digunakan pada kategori lain."
       );
@@ -371,7 +372,7 @@ exports.update = async (req, res) => {
       if (duplicate) {
         const response = new WithoutDataResource(
           422,
-          "DUPLICATE_TITLE",
+          "DUPLICATE_NAME",
           "Duplikat Data",
           "Nama kategori berita (ID/EN) sudah digunakan pada kategori lain."
         );
