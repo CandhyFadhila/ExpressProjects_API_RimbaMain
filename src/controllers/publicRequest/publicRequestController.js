@@ -2792,11 +2792,16 @@ exports.getAllContent = async (req, res) => {
         knex.raw(`"content"."order" as ord`), // quote kolom "order"
       ])
       .whereNull("content.deleted_at")
-      .orderBy(knex.raw(`"content"."order"`), "asc");
+      // .orderBy(knex.raw(`"content"."order"`), "asc");
+      .orderBy([
+        { column: knex.raw(`"content"."order"`), order: "asc" },
+        { column: "content.id", order: "asc" },
+      ]);
 
     const staticContents = {};
     for (const row of contentRows) {
-      const key = `${row.ord}`;
+      // const key = `${row.ord}`;
+      const key = String(row.id);
       staticContents[key] = await contentResource(row);
     }
 

@@ -1,0 +1,854 @@
+export const staticContents = {
+  1: {
+    id: 1,
+    type: "Image",
+    content: `${IMAGES_PATH}/lp/home/hero-bg.jpg`,
+  },
+  2: {
+    id: 2,
+    type: "Text",
+    content: {
+      "id": "Program Koridor Ekosistem",
+      "en": "Ecosystem Corridor Program",
+    },
+  },
+  3: {
+    id: 3,
+    type: "Text",
+    content: {
+      "id": "Mewujudkan ekonomi hijau di koridor ekosisstem Riau, Jambi dan Sumatera Barat",
+      "en": "Creating a green economy in the Riau, Jambi, and Sumatera Barat Ecosystem Corridor",
+    },
+  },
+  4: {
+    id: 4,
+    type: "Text",
+    content: {
+      "id": "Merupakan kawasan yang berfungsi lindung di bentang alam Riau, Jambi, dan Sumatera Barat (RIMBA). Kawasan seluas 3,8 juta hektar ini dikelola melalui mempertahankan, melestarikan, dan meningkatkan fungsi koridor ekosistem yang menghubungkan sembilan kawasan lindung. Kawasan ini berfungsi sebagai koridor satwa Gajah, Harimau, dan beragam jenis burung.",
+      "en": "This protected area spans the Riau, Jambi, and West Sumatra (RIMBA) landscape. This 3.8 million-hectare area is managed by maintaining, preserving, and enhancing the ecosystem corridors connecting nine protected areas. These areas serve as habitats for elephants, tigers, and various bird species.",
+    },
+  },
+  5: { id: 5, type: "Image", content: `${IMAGES_PATH}/default-gallery/1.jpg` },
+  6: { id: 6, type: "Image", content: `${IMAGES_PATH}/default-gallery/2.jpg` },
+  7: { id: 7, type: "Image", content: `${IMAGES_PATH}/default-gallery/3.jpg` },
+  8: { id: 8, type: "Image", content: `${IMAGES_PATH}/default-gallery/4.jpg` },
+  9: { id: 9, type: "Image", content: `${IMAGES_PATH}/default-gallery/5.jpg` },
+  10: {
+    id: 10,
+    type: "Image",
+    content: `${IMAGES_PATH}/default-gallery/6.jpg`,
+  },
+  11: {
+    id: 11,
+    type: "Image",
+    content: `${IMAGES_PATH}/default-gallery/7.jpg`,
+  },
+  12: {
+    id: 12,
+    type: "Image",
+    content: `${IMAGES_PATH}/default-gallery/8.jpg`,
+  },
+  13: {
+    id: 13,
+    type: "Image",
+    content: `${IMAGES_PATH}/default-gallery/9.jpg`,
+  },
+  14: {
+    id: 14,
+    type: "Image",
+    content: `${IMAGES_PATH}/default-gallery/10.jpg`,
+  },
+  15: {
+    id: 15,
+    type: "Text",
+    content: {
+      "id": "Nilai Strategi Proyek RIMBA",
+      "en": "RIMBA Project Strategy Value",
+    },
+  },
+  16: {
+    id: 16,
+    type: "Text",
+    content: { "id": "Proyek apa ini?", "en": "What is this project?" },
+  },
+  17: {
+    id: 17,
+    type: "Text",
+    content: {
+      "id": "Proyek RIMBA adalah kerjasama antara Pemerintah Indonesia dengan Global Environment Facility (GEF) melalui United Nations Environment Programme (UNEP) dengan Executing Agency Direktorat Jenderal Tata Ruang Kementerian ATR/BPN.",
+      "en": "The RIMBA project is a collaboration between the Indonesian Government and the Global Environment Facility (GEF) through the United Nations Environment Programme (UNEP) with the Executing Agency of the Directorate General of Spatial Planning, Ministry of Agrarian Affairs and Spatial Planning/National Land Agency (ATR/BPN).",
+    },
+  },
+  18: {
+    id: 18,
+    type: "Text",
+    content: {
+      "id": "USD 9.053.638 atau setara dengan Rp 135.804.570.000",
+      "en": "USD 9.053.638 or equivalent to Rp 135.804.570.000",
+    },
+  },
+  19: {
+    id: 19,
+    type: "Text",
+    content: { "id": "Besaran Nilai Hibah", "en": "Grant Value" },
+  },
+  20: {
+    id: 20,
+    type: "Text",
+    content: {
+      "id": "PCA/2021/4031 antara UNEP dan Kementerian ATR/BPN",
+      "en": "PCA/2021/4031 between UNEP and Ministry of ATR/BPN",
+    },
+  },
+  21: {
+    id: 21,
+    type: "Text",
+    content: {
+      "id": "Project Cooperation Agreement (PCA)",
+      "en": "Project Cooperation Agreement (PCA)",
+    },
+  },
+  22: {
+    id: 22,
+    type: "Text",
+    content: { "id": "Tahun 2024 sampai 2028", "en": "Year 2024 to 2028" },
+  },
+  23: {
+    id: 23,
+    type: "Text",
+    content: {
+      "id": "Periode Implementasi Proyek",
+      "en": "Project Implementation Period",
+    },
+  },
+  24: {
+    id: 24,
+    type: "Text",
+    content: {
+      "id": "Rangkaian Kegiatan Kami di Koridor Ekosistem RIMBA",
+      "en": "Our RIMBA Ecosystem Corridor Activities",
+    },
+  },
+  25: {
+    id: 25,
+    type: "Text",
+    content: {
+      "id": "Meningkatkan Kualitas Hidup dan Pemberdayaan Masyarakat Melalui Inisiatif-Inisiatif Unggul dan Berkelanjutan",
+      "en": "Increasing Quality of Life and Community Empowerment Through Innovative and Sustainable Initiatives",
+    },
+  },
+  26: {
+    id: 26,
+    type: "Text",
+    content: { "id": "Lokasi Kami", "en": "Our Location" },
+  },
+  27: {
+    id: 27,
+    type: "Text",
+    content: { "id": "Lokasi Kami", "en": "Our Location" },
+  },
+  28: {
+    id: 28,
+    type: "Text",
+    content: { "id": "3.8 Juta ha", "en": "3.8 Million ha" },
+  },
+  29: {
+    id: 29,
+    type: "Text",
+    content: { "id": "9 Area Unit Pengelolaan", "en": "9 Management Unit Areas" },
+  },
+  30: { id: 30, type: "Text", content: { "id": "Riau", "en": "Riau" } },
+  31: {
+    id: 31,
+    type: "TextArray",
+    content: [
+      { "id": "Kampar", "en": "Kampar" },
+      { "id": "Kuantan Singing", "en": "Kuantan Singing" },
+      { "id": "Indagri Hulu", "en": "Indagri Hulu" },
+      { "id": "Indagri Hilir", "en": "Indagri Hilir" },
+    ],
+  },
+  32: {
+    id: 32,
+    type: "Text",
+    content: { "id": "Sumatra Barat", "en": "Sumatra Barat" },
+  },
+  33: {
+    id: 33,
+    type: "TextArray",
+    content: [
+      { "id": "Kampar", "en": "Kampar" },
+      { "id": "Kuantan Singing", "en": "Kuantan Singing" },
+      { "id": "Indagri Hulu", "en": "Indagri Hulu" },
+      { "id": "Indagri Hilir", "en": "Indagri Hilir" },
+    ],
+  },
+  34: { id: 34, type: "Text", content: { "id": "Jambi", "en": "Jambi" } },
+  35: {
+    id: 35,
+    type: "TextArray",
+    content: [
+      { "id": "Kampar", "en": "Kampar" },
+      { "id": "Kuantan Singing", "en": "Kuantan Singing" },
+      { "id": "Indagri Hulu", "en": "Indagri Hulu" },
+      { "id": "Indagri Hilir", "en": "Indagri Hilir" },
+    ],
+  },
+  36: {
+    id: 36,
+    type: "Text",
+    content: {
+      "id": "Dampak Nyata Program Koridor RIMBA untuk Lingkungan",
+      "en": "Real Impact of RIMBA Ecosystem Corridor for Environment",
+    },
+  },
+  37: {
+    id: 37,
+    type: "Text",
+    content: {
+      "id": "Melindungi 3,8 juta hektar bentang alam di Riau, Jambi, dan Sumatera Barat, menjadi koridor Gajah, Harimau, dan berbagai jenis burung, sekaligus menjaga fungsi ekosistem penting.",
+      "en": "Protecting 3.8 million hectares of nature in Riau, Jambi, and Sumatra Barat, becoming a corridor for elephants, tigers, and various bird species, while preserving important ecosystem functions.",
+    },
+  },
+  38: {
+    id: 38,
+    type: "Text",
+    content: {
+      "id": "50+",
+      "en": "50+",
+    },
+  },
+  39: {
+    id: 39,
+    type: "Text",
+    content: {
+      "id": "Desa & komunitas lokal terlibat dalam proyek konservasi",
+      "en": "Villages and local communities involved in conservation projects",
+    },
+  },
+  40: {
+    id: 40,
+    type: "Text",
+    content: {
+      "id": "15,000+ ha",
+      "en": "15,000+ ha",
+    },
+  },
+  41: {
+    id: 41,
+    type: "Text",
+    content: {
+      "id": "Hutan primer & sekunder direhabilitasi, meningkatkan kualitas ekosistem",
+      "en": "Primary and secondary forests are rehabilitated, enhancing ecosystem quality",
+    },
+  },
+  42: {
+    id: 42,
+    type: "Text",
+    content: {
+      "id": "500+",
+      "en": "500+",
+    },
+  },
+  43: {
+    id: 43,
+    type: "Text",
+    content: {
+      "id": "Satwa liar dipantau & dilindungi (Gajah, Harimau, Burung, dll.)",
+      "en": "Wildlife is monitored and protected (elephants, tigers, birds, etc.)",
+    },
+  },
+  44: {
+    id: 44,
+    type: "Text",
+    content: {
+      "id": "1200+",
+      "en": "1200+",
+    },
+  },
+  45: {
+    id: 45,
+    type: "Text",
+    content: {
+      "id": "Individu mendapatkan manfaat langsung dari program pemberdayaan masyarakat",
+      "en": "Individuals receive direct benefits from the community empowerment program",
+    },
+  },
+  46: {
+    id: 46,
+    type: "Text",
+    content: {
+      "id": "Komposisi Satwa",
+      "en": "Animal Composition",
+    },
+  },
+  47: {
+    id: 47,
+    type: "Text",
+    content: {
+      "id": "Persentase Penyelesaian Program RIMBA",
+      "en": "RIMBA Program Completion Percentage",
+    },
+  },
+
+  // INI ANOMALI //
+
+  50: {
+    id: 50,
+    type: "Text",
+    content: {
+      "id": "Dokumen Hukum",
+      "en": "Legal Document",
+    },
+  },
+  51: {
+    id: 51,
+    type: "Text",
+    content: {
+      "id": "Menyajikan informasi hukum yang jelas, akurat, dan mudah dipahami untuk semua pemangku kepentingan.",
+      "en": "Presenting clear, accurate, and easy-to-understand legal information for all stakeholders.",
+    },
+  },
+  52: {
+    id: 52,
+    type: "Text",
+    content: {
+      "id": "Berita dan Catatan Lapangan",
+      "en": "News and Field Notes",
+    },
+  },
+  53: {
+    id: 53,
+    type: "Text",
+    content: {
+      "id": "Mitra",
+      "en": "Partners",
+    },
+  },
+  54: {
+    id: 54,
+    type: "Text",
+    content: {
+      "id": "Proyek RIMBA mendapatkan persetujuan GEF Executive Director pada 13 Februari 2020 dengan nilai dana sebesar USD 9.431.763, dengan durasi proyek selama 72 bulan. Perjanjian kerjasama proyek (Project Cooperation Agreement) ditandatangani oleh Dirjen Tata Ruang dari Kementrian Agraria dan Tata Ruang (ATR) dan United Nations Environment Programme (UNEP) pada 30 Juni 2022.",
+      "en": "The RIMBA project received approval from the GEF Executive Director on February 13, 2020, with a funding value of USD 9,431,763 and a project duration of 72 months. The Project Cooperation Agreement was signed by the Director General of Spatial Planning of the Ministry of Agrarian Affairs and Spatial Planning (ATR) and the United Nations Environment Programme (UNEP) on June 30, 2022.",
+    },
+  },
+  55: {
+    id: 55,
+    type: "ImageArray",
+    content: [
+      `${IMAGES_PATH}/lp/home/logo-ipsum-1.png`,
+      `${IMAGES_PATH}/lp/home/logo-ipsum-2.png`,
+      `${IMAGES_PATH}/lp/home/logo-ipsum-3.png`,
+      `${IMAGES_PATH}/lp/home/logo-ipsum-1.png`,
+      `${IMAGES_PATH}/lp/home/logo-ipsum-2.png`,
+      `${IMAGES_PATH}/lp/home/logo-ipsum-3.png`,
+    ],
+  },
+  56: {
+    id: 56,
+    type: "ImageArray",
+    content: [
+      `${IMAGES_PATH}/lp/home/logo-ipsum-1.png`,
+      `${IMAGES_PATH}/lp/home/logo-ipsum-2.png`,
+      `${IMAGES_PATH}/lp/home/logo-ipsum-3.png`,
+      `${IMAGES_PATH}/lp/home/logo-ipsum-1.png`,
+      `${IMAGES_PATH}/lp/home/logo-ipsum-2.png`,
+      `${IMAGES_PATH}/lp/home/logo-ipsum-3.png`,
+    ],
+  },
+  57: {
+    id: 57,
+    type: "Text",
+    content: {
+      "id": "Kementerian Agraria dan Tata Ruang Badan Pertanahan Nasional",
+      "en": "Ministry of Agrarian Affairs and Spatial Planning National Land Administration",
+    },
+  },
+  58: {
+    id: 58,
+    type: "Text",
+    content: {
+      "id": "info@rimba.com",
+      "en": "info@rimba.com",
+    },
+  },
+  59: {
+    id: 59,
+    type: "Text",
+    content: {
+      "id": "021-777-788",
+      "en": "021-777-788",
+    },
+  },
+  60: {
+    id: 60,
+    type: "Text",
+    content: {
+      "id": "Jl. Sisingamangaraja No. 2, Kebayoran Baru, Jakarta 12110",
+      "en": "Jl. Sisingamangaraja No. 2, Kebayoran Baru, Jakarta 12110",
+    },
+  },
+  61: {
+    id: 61,
+    type: "Link",
+    content: "https://facebook.com",
+  },
+  62: {
+    id: 62,
+    type: "Link",
+    content: "https://instagram.com",
+  },
+  63: {
+    id: 63,
+    type: "Link",
+    content: "https://x.com",
+  },
+  64: {
+    id: 64,
+    type: "Link",
+    content: "https://youtube.com",
+  },
+  65: {
+    id: 65,
+    type: "Text",
+    content: {
+      "id": "Dokumen dan Informasi Hukum",
+      "en": "Legal Documents and Informations",
+    },
+  },
+  66: {
+    id: 66,
+    type: "Text",
+    content: {
+      "id": "Program Koridor RIMBA",
+      "en": "RIMBA Ecosystem Corridor Program",
+    },
+  },
+  67: {
+    id: 67,
+    type: "Text",
+    content: {
+      "id": "Tujuan Program",
+      "en": "Program Objectives",
+    },
+  },
+  68: {
+    id: 68,
+    type: "Text",
+    content: {
+      "id": "Program Koridor RIMBA membantu Pemerintah Indonesia dalam menerapkan transisi ekonomi hijau dengan emisi rendah karbon serta melaksanakan peta jalan penyelamatan ekosistem di tiga provinsi: Riau, Jambi, dan Sumatera Barat.",
+      "en": "The RIMBA Corridor Program assists the Indonesian Government in implementing a green economy transition with low carbon emissions and implementing an ecosystem rescue roadmap in three provinces: Riau, Jambi, and West Sumatra.",
+    },
+  },
+  69: {
+    id: 69,
+    type: "Text",
+    content: {
+      "id": "Melestarikan Keanekaragaman Hayati",
+      "en": "Preserving Diversity of Life",
+    },
+  },
+  70: {
+    id: 70,
+    type: "Text",
+    content: {
+      "id": "Meningkatkan fungsi koridor ekosistem untuk menjaga keberlangsungan satwa dan habitatnya.",
+      "en": "Increasing the function of the ecosystem corridor to preserve the survival of wildlife and their habitats.",
+    },
+  },
+  71: {
+    id: 71,
+    type: "Text",
+    content: {
+      "id": "Perlindungan Alam",
+      "en": "Preserving Nature",
+    },
+  },
+  72: {
+    id: 72,
+    type: "Text",
+    content: {
+      "id": "Meningkatkan cadangan karbon melalui perlindungan dan pemulihan ekosistem.",
+      "en": "Increasing carbon storage by preserving and recovering ecosystems.",
+    },
+  },
+  73: {
+    id: 73,
+    type: "Text",
+    content: {
+      "id": "Tata Ruang Berkelanjutan",
+      "en": "Sustainable Spatial Planning",
+    },
+  },
+  74: {
+    id: 74,
+    type: "Text",
+    content: {
+      "id": "Menjadikan rencana tata ruang sebagai instrumen pembangunan ekonomi hijau.",
+      "en": "Making spatial planning a tool for sustainable economic development.",
+    },
+  },
+  75: {
+    id: 75,
+    type: "Text",
+    content: {
+      "id": "Manajemen Lanskap",
+      "en": "Land Management",
+    },
+  },
+  76: {
+    id: 76,
+    type: "Text",
+    content: {
+      "id": "Mengembangkan tata kelola bentang alam yang kolaboratif dan menyeluruh.",
+      "en": "Developing collaborative and comprehensive land management.",
+    },
+  },
+  77: {
+    id: 77,
+    type: "Text",
+    content: {
+      "id": "Strategi Untuk Mencapai Tujuan",
+      "en": "Strategies to Achieve Objectives",
+    },
+  },
+  78: {
+    id: 78,
+    type: "Image",
+    content: `${IMAGES_PATH}/lp/dummy.png`,
+  },
+  79: {
+    id: 79,
+    type: "Text",
+    content: {
+      "id": "Penguatan Kelembagaan",
+      "en": "Strengthening Institutions",
+    },
+  },
+  80: {
+    id: 80,
+    type: "Text",
+    content: {
+      "id": "Membentuk kerangka kelembagaan yang berkelanjutan dan efektif untuk pengelolaan sumber daya alam dalam mendukung ekonomi hijau.",
+      "en": "Building a sustainable and effective framework for managing natural resources to support green economy.",
+    },
+  },
+  81: {
+    id: 81,
+    type: "Image",
+    content: `${IMAGES_PATH}/lp/dummy.png`,
+  },
+  82: {
+    id: 82,
+    type: "Text",
+    content: {
+      "id": "Demonstrasi Ekonomi Hijau",
+      "en": "Green Economy Demonstration",
+    },
+  },
+  83: {
+    id: 83,
+    type: "Text",
+    content: {
+      "id": "Menerapkan praktik ekonomi hijau di tingkat tapak sebagai contoh nyata transformasi ekonomi berkelanjutan yang inklusif dan adaptif.",
+      "en": "Implementing green economy practices at the grassroots level as a concrete example of sustainable transformation that is inclusive and adaptable.",
+    },
+  },
+  84: {
+    id: 84,
+    type: "Image",
+    content: `${IMAGES_PATH}/lp/dummy.png`,
+  },
+  85: {
+    id: 85,
+    type: "Text",
+    content: {
+      "id": "Monitoring & Pembelajaran",
+      "en": "Monitoring & Learning",
+    },
+  },
+  86: {
+    id: 86,
+    type: "Text",
+    content: {
+      "id": "Mengembangkan sistem pemantauan dan evaluasi berbasis data serta berbagi pembelajaran untuk meningkatkan efektivitas program berkelanjutan.",
+      "en": "Developing monitoring and evaluation systems based on data and sharing learning to improve the effectiveness of sustainable programs.",
+    },
+  },
+  87: {
+    id: 87,
+    type: "Text",
+    content: {
+      "id": "Progress Perjalanan Program",
+      "en": "Program Journey Progress",
+    },
+  },
+  88: {
+    id: 88,
+    type: "Text",
+    content: {
+      "id": "Kesepakatan Dibangun",
+      "en": "Agreement Built",
+    },
+  },
+  89: {
+    id: 89,
+    type: "TextArray",
+    content: [
+      {
+        "id": "Project Cooperation Agreement (PCA) antara Kementerian ATR/BPN dan UNEP-GEF disepakati pada Juni 2021.",
+        "en": "Project Cooperation Agreement (PCA) between Ministry of ATR/BPN and UNEP-GEF agreed on June 2021.",
+      },
+    ],
+  },
+  90: {
+    id: 90,
+    type: "Text",
+    content: {
+      "id": "Fase Persiapan (Juli 2021 - Mei 2023)",
+      "en": "Preparation Phase (July 2021 - May 2023)",
+    },
+  },
+  91: {
+    id: 91,
+    type: "TextArray",
+    content: [
+      {
+        "id": "Project Management Unit (PMU) RIMBA dibentuk pada 2022.",
+        "en": "Project Management Unit (PMU) RIMBA established in 2022.",
+      },
+      {
+        "id": "Review baseline dan Inception Workshop",
+        "en": "Review baseline and Inception Workshop",
+      },
+      {
+        "id": "Project Implementation Unit (PIU) RIMBA dibentuk pada 2023.",
+        "en": "Project Implementation Unit (PIU) RIMBA established in 2023.",
+      },
+    ],
+  },
+  92: {
+    id: 92,
+    type: "Text",
+    content: {
+      "id": "Januari - Juni 2024 Pengadaan",
+      "en": "January - June 2024 Procurement",
+    },
+  },
+  93: {
+    id: 93,
+    type: "TextArray",
+    content: [
+      {
+        "id": "Proses kontraktual (bidding) dan swakelola kerja asma dengan universitas serta NGO.",
+        "en": "Contractual (bidding) and swakelola kerja asma with universities and NGOs.",
+      },
+    ],
+  },
+  94: {
+    id: 94,
+    type: "Text",
+    content: {
+      "id": "Juli-Desember 2024",
+      "en": "July-December 2024",
+    },
+  },
+  95: {
+    id: 95,
+    type: "Text",
+    content: [
+      {
+        "id": "Focus Group Discussion (FGD) dengan multi-stakeholders.",
+        "en": "Focus Group Discussion (FGD) with multi-stakeholders.",
+      },
+      {
+        "id": "Menyusun rencana tata ruang khususnya KSN.",
+        "en": "Drafting specific spatial planning such as KSN.",
+      },
+      {
+        "id": "Menyusun roadmap kelembagaan dan kajia pendukung untuk pemantapan Program Koridor RIMBA.",
+        "en": "Drafting institutional and supporting roadmap for implementation of the RIMBA Corridor Program.",
+      },
+    ],
+  },
+  96: {
+    id: 96,
+    type: "Text",
+    content: {
+      "id": "Fase Implementasi",
+      "en": "Implementation Phase",
+    },
+  },
+  97: {
+    id: 97,
+    type: "TextArray",
+    content: [
+      {
+        "id": "Pelaksanaan program utama dan demonstrasi ekonomi hijau di Kawasan Koridor RIMBA.",
+        "en": "Main program implementation and green economy demonstration at the RIMBA Corridor.",
+      },
+    ],
+  },
+  98: {
+    id: 98,
+    type: "Text",
+    content: {
+      "id": "Indicator Capaian Program",
+      "en": "Program Achievement Indicator",
+    },
+  },
+  99: {
+    id: 99,
+    type: "Image",
+    content: `${IMAGES_PATH}/lp/dummy.png`,
+  },
+  100: {
+    id: 100,
+    type: "Text",
+    content: {
+      "id": "Peningkatan Tutupan Hutan",
+      "en": "Forest Closure Increase",
+    },
+  },
+  101: {
+    id: 101,
+    type: "Text",
+    content: {
+      "id": "Tutupan hutan meningkat hingga 14%, memperkuat ekosistem dan menjaga keberlanjutan lingkungan.",
+      "en": "Forest closure increased to 14%, strengthening ecosystem and ensuring sustainable environment.",
+    },
+  },
+  102: {
+    id: 102,
+    type: "Image",
+    content: `${IMAGES_PATH}/lp/dummy.png`,
+  },
+  103: {
+    id: 103,
+    type: "Text",
+    content: {
+      "id": "Pengurangan Emisi Gas RUmah Kaca",
+      "en": "Decrease in Gas Emissions from Glass Houses",
+    },
+  },
+  104: {
+    id: 104,
+    type: "Text",
+    content: {
+      "id": "Kawasan RIMBA berhasil menurunkan emisi hingga 2%, berkontribusi pada mitigasi perubahan iklim.",
+      "en": "RIMBA corridor successfully reduced emissions to 2%, contributing to climate mitigation.",
+    },
+  },
+  105: {
+    id: 105,
+    type: "Image",
+    content: `${IMAGES_PATH}/lp/dummy.png`,
+  },
+  106: {
+    id: 106,
+    type: "Text",
+    content: {
+      "id": "Pekerjaan Berbasis Ekonomi Hijau",
+      "en": "Green Economy Based Jobs",
+    },
+  },
+  107: {
+    id: 107,
+    type: "Text",
+    content: {
+      "id": "Sebanyak 700 keluarga memperoleh pekerjaan baru yang ramah lingkungan dan berkelanjutan.",
+      "en": "700 families received new jobs that are environmentally friendly and sustainable.",
+    },
+  },
+  108: {
+    id: 108,
+    type: "Image",
+    content: `${IMAGES_PATH}/lp/dummy.png`,
+  },
+  109: {
+    id: 109,
+    type: "Text",
+    content: {
+      "id": "Konektivitas Habitat Hutan",
+      "en": "Habitat Connectivity",
+    },
+  },
+  110: {
+    id: 110,
+    type: "Text",
+    content: {
+      "id": "Konektivitas habitat meningkat hingga 30%, mendukung kelestarian keanekaragaman hayati.",
+      "en": "Habitat connectivity increased to 30%, supporting biodiversity conservation.",
+    },
+  },
+  111: {
+    id: 111,
+    type: "Text",
+    content: {
+      "id": "Struktur Organisasi",
+      "en": "Organization Structure",
+    },
+  },
+  112: {
+    id: 112,
+    type: "Image",
+    content: `${IMAGES_PATH}/lp/about-us/rimba-corridor-program/organizational-structure.svg`,
+  },
+  113: {
+    id: 113,
+    type: "Text",
+    content: {
+      "id": "Kegiatan",
+      "en": "Activities",
+    },
+  },
+  114: {
+    id: 114,
+    type: "Text",
+    content: {
+      "id": "Berita dan Catatan Lapangan",
+      "en": "News and Field Notes",
+    },
+  },
+  115: {
+    id: 115,
+    type: "Text",
+    content: {
+      "id": "Mitra",
+      "en": "Partners",
+    },
+  },
+  116: {
+    id: 116,
+    type: "Text",
+    content: {
+      "id": "Portal Ilmu, Gerbang Kesuksesan",
+      "en": "Portal of Knowledge, Gateway to Success",
+    },
+  },
+  117: {
+    id: 117,
+    type: "Text",
+    content: {
+      "id": "Tempat belajar online yang seru dan mudah diakses. Yuk, belajar bareng dan jadi versi terbaik dari diri kamu!",
+      "en": "Fun and easy-to-access online learning platform. Learn together and become the best version of yourself!",
+    },
+  },
+  118: {
+    id: 118,
+    type: "Text",
+    content: {
+      "id": "Semua Kursus Ada di Sini!",
+      "en": "All Courses Are Here!",
+    },
+  },
+  119: {
+    id: 119,
+    type: "Text",
+    content: {
+      "id": "Mau belajar hal baru atau tingkatkan skill? Cari kursus favoritmu dan mulai petualangan belajar hari ini.",
+      "en": "Want to learn something new or upgrade your skills? Find your favorite course and start your learning adventure today.",
+    },
+  },
+};
