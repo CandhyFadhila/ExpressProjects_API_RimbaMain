@@ -30,6 +30,7 @@ const newsRoutes = require("./routes/cms/newsRoutes");
 const eventRoutes = require("./routes/cms/eventRoutes");
 const animalCompositionRoutes = require("./routes/cms/animalCompositionRoutes");
 const legalDocumentRoutes = require("./routes/cms/legalDocumentRoutes");
+const monevUserRoutes = require("./routes/monev/monevUserRoutes");
 
 const app = express();
 
@@ -152,6 +153,13 @@ app.use("/api/kmis/learning-course", learningAttemptRoutes);
 app.use("/api/kmis/exam", quizAttemptRoutes);
 //? Student Area
 //! ======== KMIS MODULE ========
+
+//! ======== MONEV MODULE ========
+// Monev User
+app.use("/api/monev/user", monevUserRoutes);
+
+
+//! ======== MONEV MODULE ========
 
 //! ======== MASTER DATA MODULE ========
 // News Category

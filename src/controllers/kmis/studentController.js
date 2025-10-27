@@ -33,7 +33,7 @@ exports.index = async (req, res) => {
 
     applyTrashedScope(query, req, "user.deleted_at");
 
-    applySearch(query, search, ["user.name", "role.name"]);
+    applySearch(query, search, ["user.name", "user.email"]);
 
     const paginationInfo = applyPagination(req.query);
 
