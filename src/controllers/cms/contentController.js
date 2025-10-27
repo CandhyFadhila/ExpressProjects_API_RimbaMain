@@ -484,7 +484,7 @@ exports.update = async (req, res) => {
       );
     }
 
-    const existing = await trx("cms_contents").where("order", id).first();
+    const existing = await trx("cms_contents").where("id", id).first();
     if (!existing) {
       const response = new WithoutDataResource(
         200,
