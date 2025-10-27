@@ -232,7 +232,7 @@ exports.store = async (req, res) => {
         422,
         "DUPLICATE_TITLE",
         "Duplikat Data",
-        `Judul materi '${title}' sudah digunakan oleh topik ini. Silakan gunakan judul lain atau topik lain.`
+        `Judul materi '${title}' sudah digunakan oleh materi ini. Silakan gunakan judul lain.`
       );
       return res.status(422).json(response.toResponse());
     }
@@ -408,7 +408,7 @@ exports.update = async (req, res) => {
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Data topik dengan ID '${id}' tidak ditemukan.`
+        `Data materi dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
@@ -587,7 +587,7 @@ exports.update = async (req, res) => {
         422,
         "DUPLICATE_TITLE",
         "Duplikat Data",
-        `Judul '${title}' sudah digunakan pada topik lain.`
+        `Judul '${title}' sudah digunakan pada materi lain.`
       );
       return res.status(422).json(response.toResponse());
     }

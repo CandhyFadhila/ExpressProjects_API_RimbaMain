@@ -21,6 +21,9 @@ const profileRoutes = require("./routes/profileRoutes");
 const newsCategoryRoutes = require("./routes/masterData/newsCategoryRoutes");
 const eventCategoryRoutes = require("./routes/masterData/eventCategoryRoutes");
 const animalCategoryRoutes = require("./routes/masterData/animalCategoryRoutes");
+const activityCategoryRoutes = require("./routes/masterData/activityCategoryRoutes");
+const picDivisionRoutes = require("./routes/masterData/picDivisionRoutes");
+const monevDashboardRoutes = require("./routes/masterData/monevDashboardRoutes");
 const faqRoutes = require("./routes/cms/faqRoutes");
 const contentRoutes = require("./routes/cms/contentRoutes");
 const newsRoutes = require("./routes/cms/newsRoutes");
@@ -159,6 +162,15 @@ app.use("/api/master-data/event-category", eventCategoryRoutes);
 
 // Animal Category
 app.use("/api/master-data/animal-category", animalCategoryRoutes);
+
+// Activity Category
+app.use("/api/master-data/activity-category", activityCategoryRoutes);
+
+// PIC Division
+app.use("/api/master-data/pic-division", picDivisionRoutes);
+
+// Monev Dashboard Management
+app.use("/api/master-data/monev-dashboard", monevDashboardRoutes);
 //! ======== MASTER DATA MODULE ========
 
 // Jalankan server
