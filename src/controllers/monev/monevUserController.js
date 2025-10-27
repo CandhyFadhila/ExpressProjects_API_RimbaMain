@@ -48,21 +48,8 @@ exports.index = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const picUidRows = await knex("monev_pic_divisions as d")
-      .whereNull("d.deleted_at")
-      .whereNotNull("d.user_pic")
-      .select(knex.raw("jsonb_array_elements_text(d.user_pic) as uid"));
-
-    const picSet = new Set(
-      picUidRows.map((r) => Number(r.uid)).filter(Number.isFinite)
-    );
-
     const serializedData = await Promise.all(
-      result.data.map(async (row) => {
-        const uidNum = Number(row.id);
-        const isPic = picSet.has(uidNum);
-        return monevUserResource({ userRow: row, isPic });
-      })
+      result.data.map((user) => monevUserResource(user))
     );
 
     const response = new WithDataResource(
@@ -239,22 +226,7 @@ exports.show = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const isPicRow = await knex("monev_pic_divisions as d")
-      .whereNull("d.deleted_at")
-      .whereNotNull("d.user_pic")
-      .whereRaw(
-        `EXISTS (
-          SELECT 1
-          FROM jsonb_array_elements_text(d.user_pic) v
-          WHERE v::bigint = ?
-        )`,
-        [user.id]
-      )
-      .first();
-
-    const isPic = Boolean(isPicRow);
-
-    const data = await monevUserResource({ userRow: user, isPic });
+    const data = await monevUserResource(user);
     const displayName = stripTitlesOnly(user.name);
     const response = new WithDataResource(
       200,

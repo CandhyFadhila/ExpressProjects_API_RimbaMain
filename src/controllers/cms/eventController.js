@@ -910,15 +910,15 @@ async function validateFilesQuotaAndTypesOnUpdate({
   }
 
   // Sudah penuh tapi masih ada file yang dikirim
-  if (remaining === 0) {
-    return {
-      ok: false,
-      http: 422,
-      code: "MAX_CAPACITY",
-      title: "Kapasitas Sudah Penuh",
-      desc: "Kapasitas file untuk data ini sudah terpenuhi. Tidak ada slot tersisa.",
-    };
-  }
+  // if (remaining === 0) {
+  //   return {
+  //     ok: false,
+  //     http: 422,
+  //     code: "MAX_CAPACITY",
+  //     title: "Kapasitas Sudah Penuh",
+  //     desc: "Kapasitas file untuk data ini sudah terpenuhi. Tidak ada slot tersisa.",
+  //   };
+  // }
 
   // Jika payload melebihi sisa slot → kembalikan info berapa yang boleh
   if (incomingCount > remaining) {

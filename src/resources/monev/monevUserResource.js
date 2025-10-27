@@ -9,7 +9,6 @@ async function monevUserResource({ userRow, isPic }) {
   return {
     id: user.id,
     user: user ? await UserResource(user) : null,
-    isPic: Boolean(isPic),
     createdAt: user.created_at,
     updatedAt: user.updated_at,
     deletedAt: user.deleted_at,
