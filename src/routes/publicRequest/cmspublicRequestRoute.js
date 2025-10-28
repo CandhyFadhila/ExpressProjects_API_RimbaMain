@@ -111,16 +111,4 @@ router.get(
   publicRequestController.getAllContent
 );
 
-router.get(
-  "/get-content/:id",
-  rateLimiter,
-  publicRequestController.getContentbyOrder
-);
-
-router.post(
-  "/get-content-hero",
-  rateLimiter,
-  publicRequestController.getContentHero
-);
-
 module.exports = router;

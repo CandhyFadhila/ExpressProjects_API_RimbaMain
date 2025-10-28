@@ -3,8 +3,14 @@ const {
   normJsonbArray,
   isPlainObject,
 } = require("../../helpers/inputNorm");
+const {
+  resolveArrayRelations,
+} = require("../../helpers/resolveArrayRelations");
+const documentResource = require("../../resources/doc/documentResource");
 
-async function contentResource(row) {
+async function contentResource(row, opts = {}) {
+  const { withImage = false } = opts;
+
   const type = String(row.type || "").toLowerCase();
   const raw = row.content;
   let normalized = raw;
@@ -35,11 +41,21 @@ async function contentResource(row) {
     }
   }
 
-  return {
+  let image;
+  if (withImage) {
+    image = await resolveArrayRelations(
+      row.content_file_ids,
+      "documents",
+      documentResource
+    );
+  }
+
+  const base = {
     id: row.id,
     type: row.type,
-    content: normalized
+    content: normalized,
   };
+  return withImage ? { ...base, image } : base;
 }
 
 module.exports = contentResource;

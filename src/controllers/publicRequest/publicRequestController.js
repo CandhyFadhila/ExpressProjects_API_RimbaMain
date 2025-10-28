@@ -2781,6 +2781,10 @@ exports.getFaqbyId = async (req, res) => {
 
 // Content
 exports.getAllContent = async (req, res) => {
+  const cmsRaw = req.query?.cms;
+  const withImage =
+    cmsRaw === true || cmsRaw === "true" || cmsRaw === 1 || cmsRaw === "1";
+
   try {
     // Content
     const contentRows = await knex("cms_contents as content")
@@ -2789,10 +2793,9 @@ exports.getAllContent = async (req, res) => {
         "content.type",
         "content.content",
         "content.content_file_ids",
-        knex.raw(`"content"."order" as ord`), // quote kolom "order"
+        knex.raw(`"content"."order" as ord`),
       ])
       .whereNull("content.deleted_at")
-      // .orderBy(knex.raw(`"content"."order"`), "asc");
       .orderBy([
         { column: knex.raw(`"content"."order"`), order: "asc" },
         { column: "content.id", order: "asc" },
@@ -2800,9 +2803,8 @@ exports.getAllContent = async (req, res) => {
 
     const staticContents = {};
     for (const row of contentRows) {
-      // const key = `${row.ord}`;
       const key = String(row.id);
-      staticContents[key] = await contentResource(row);
+      staticContents[key] = await contentResource(row, { withImage });
     }
 
     // Event
@@ -2902,128 +2904,6 @@ exports.getAllContent = async (req, res) => {
   } catch (error) {
     logger.error(
       `| Public Request | - Error function getAllContent : ${error.message}`
-    );
-    const response = new WithoutDataResource(
-      500,
-      "SERVER_ERROR",
-      "Server Sedang Error",
-      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
-    );
-    return res.status(500).json(response.toResponse());
-  }
-};
-
-exports.getContentbyOrder = async (req, res) => {
-  const ord = Number(req.params.id);
-  if (!Number.isInteger(ord) || ord < 0) {
-    const response = new WithoutDataResource(
-      422,
-      "FAILED_VALIDATION",
-      "Format Data Tidak Sesuai Ketentuan",
-      "Parameter order harus bilangan bulat >= 0."
-    );
-    return res.status(422).json(response.toResponse());
-  }
-
-  try {
-    const row = await knex("cms_contents as content")
-      .select([
-        "content.type",
-        "content.content",
-        "content.content_file_ids",
-        knex.raw(`"content"."order" as ord`),
-      ])
-      .whereRaw(`"content"."order" = ?`, [ord]) // quote kolom "order"
-      .whereNull("content.deleted_at")
-      .orderBy("content.created_at", "desc")
-      .first();
-
-    if (!row) {
-      const response = new WithoutDataResource(
-        200,
-        "DATA_NOT_FOUND",
-        "Data Tidak Ditemukan",
-        `Konten dengan order '${ord}' tidak ditemukan.`
-      );
-      return res.status(200).json(response.toResponse());
-    }
-
-    const serialized = await contentResource(row);
-
-    const payload = { [String(row.ord)]: serialized };
-
-    const response = new WithDataResource(
-      200,
-      "SUCCESS_GET_DATA",
-      "Berhasil Mengambil Data",
-      "Data konten berdasarkan order berhasil diambil.",
-      payload
-    );
-    return res.status(200).json(response.toResponse());
-  } catch (error) {
-    logger.error(
-      `| Public Request | - Error function getContentbyOrder : ${error.message}`
-    );
-    const response = new WithoutDataResource(
-      500,
-      "SERVER_ERROR",
-      "Server Sedang Error",
-      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
-    );
-    return res.status(500).json(response.toResponse());
-  }
-};
-
-exports.getContentHero = async (req, res) => {
-  let orderIds = [
-    ...new Set(
-      normIdArray(req.body?.orderIds ?? req.query?.orderIds, { as: "number" })
-    ),
-  ].filter((n) => Number.isInteger(n) && n >= 0);
-
-  if (orderIds.length === 0) orderIds = [1, 2, 3, 4, 5];
-
-  try {
-    const rows = await knex("cms_contents as content")
-      .select([
-        "content.type",
-        "content.content",
-        "content.content_file_ids",
-        knex.raw(`"content"."order" as ord`), // quote kolom "order"
-      ])
-      .whereIn(knex.raw(`"content"."order"`), orderIds)
-      .whereNull("content.deleted_at")
-      .orderBy(knex.raw(`"content"."order"`), "asc");
-
-    const payload = {};
-    for (const row of rows) {
-      const key = String(row.ord);
-      if (!payload[key]) {
-        payload[key] = await contentResource(row);
-      }
-    }
-
-    if (Object.keys(payload).length === 0) {
-      const response = new WithoutDataResource(
-        200,
-        "DATA_NOT_FOUND",
-        "Data Tidak Ditemukan",
-        "Belum ada konten hero yang tersedia."
-      );
-      return res.status(200).json(response.toResponse());
-    }
-
-    const response = new WithDataResource(
-      200,
-      "SUCCESS_GET_DATA",
-      "Berhasil Mengambil Data",
-      "Data konten hero berhasil diambil.",
-      payload
-    );
-    return res.status(200).json(response.toResponse());
-  } catch (error) {
-    logger.error(
-      `| Public Request | - Error function getAllContentHero : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
