@@ -4,7 +4,7 @@ const ALLOWED_CONTRACT_TYPES = Object.freeze([
   "Swakelola 1",
   "Swakelola 2",
   "Swakelola 3",
-  "Contractual",
+  "Kontraktual",
 ]);
 
 exports.updateActivityPackageValidator = [

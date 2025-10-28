@@ -642,7 +642,7 @@ export const staticContents = {
     content: [
       {
         "id": "Proses kontraktual (bidding) dan swakelola kerja asma dengan universitas serta NGO.",
-        "en": "Contractual (bidding) and swakelola kerja asma with universities and NGOs.",
+        "en": "Kontraktual (bidding) and swakelola kerja asma with universities and NGOs.",
       },
     ],
   },

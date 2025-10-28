@@ -408,10 +408,7 @@ async function autoCreateTargets(trx, pkgId, startedMonth, finishedMonth) {
 
   const rows = months.map((m) => ({
     monev_activity_packages_id: pkgId,
-    month: m,
-    budget_target: null,
-    physical_target: null,
-    description: null,
+    month: m
   }));
 
   await trx("monev_targets").insert(rows);
@@ -430,9 +427,7 @@ async function autoCreateMonthlyRealizations(
   const rows = months.map((m) => ({
     monev_activity_packages_id: pkgId,
     month: m,
-    progress: 0,
-    description: null,
-    problem: null,
+    progress: 0
   }));
 
   await trx("monev_monthly_realizations").insert(rows);

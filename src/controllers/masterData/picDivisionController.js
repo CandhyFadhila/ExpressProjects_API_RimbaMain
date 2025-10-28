@@ -579,3 +579,96 @@ exports.restore = async (req, res) => {
     res.status(500).json(response.toResponse());
   }
 };
+
+// TODO: Tambahkan validasi yang bisa edit user pic adalah role SSO/Monev
+exports.assignPic = async (req, res) => {
+  const trx = await knex.transaction();
+  const { userIds } = req.body;
+  const id = req.params.id;
+
+  const rawUserIds = normIdArray(userIds, { as: "number" }).filter(
+    Number.isFinite
+  );
+  const uniqueUserIds = [...new Set(rawUserIds)];
+
+  try {
+    const existing = await trx("monev_pic_divisions").where("id", id).first();
+    if (!existing) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data divisi dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    if (uniqueUserIds.includes(1)) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "FORBIDDEN_USER_ID",
+        "User Tidak Diizinkan",
+        "User dengan ID 1 (super admin) tidak boleh ditetapkan sebagai PIC."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
+    if (uniqueUserIds.length > 0) {
+      const foundIds = await trx("users")
+        .whereIn("id", uniqueUserIds)
+        .pluck("id");
+      const foundSet = new Set(foundIds.map(Number));
+      const missing = uniqueUserIds.filter((id) => !foundSet.has(id));
+      if (missing.length > 0) {
+        await trx.rollback();
+        const response = new WithoutDataResource(
+          422,
+          "INVALID_USER_IDS",
+          "Pengguna Tidak Ditemukan",
+          `Beberapa userIds tidak valid: ${missing.join(", ")}.`
+        );
+        return res.status(422).json(response.toResponse());
+      }
+    }
+
+    await trx("monev_pic_divisions")
+      .where("id", id)
+      .update({
+        user_pic: asJsonb(uniqueUserIds),
+        updated_at: trx.fn.now(),
+      });
+
+    await activityLogHelper.logUpdate(
+      {
+        userId: activityLogHelper.fromReq(req),
+        module: "master_data",
+        subject: "List Kategori Divisi PIC",
+      },
+      trx
+    );
+
+    await trx.commit();
+
+    const response = new WithoutDataResource(
+      200,
+      "SUCCESS_UPDATE_DATA",
+      "Berhasil Memperbarui",
+      `Data divisi '${title}' berhasil diperbarui.`
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    await trx.rollback();
+    logger.error(
+      `| PIC Division MONEV | - Error function update : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem. Silakan coba lagi nanti."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};

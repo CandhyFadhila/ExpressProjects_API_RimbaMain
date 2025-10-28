@@ -58,4 +58,11 @@ router.patch(
   picDivisionController.restore
 );
 
+router.patch(
+  "/assign/:id",
+  requirePermission(["edit.master_data"]),
+  upload.none(),
+  picDivisionController.assignPic
+);
+
 module.exports = router;

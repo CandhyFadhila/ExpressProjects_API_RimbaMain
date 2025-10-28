@@ -32,6 +32,7 @@ const animalCompositionRoutes = require("./routes/cms/animalCompositionRoutes");
 const legalDocumentRoutes = require("./routes/cms/legalDocumentRoutes");
 const monevUserRoutes = require("./routes/monev/monevUserRoutes");
 const activityPackageRoutes = require("./routes/monev/activityPackageRoutes");
+const targetRoutes = require("./routes/monev/targetRoutes");
 
 const app = express();
 
@@ -162,6 +163,8 @@ app.use("/api/monev/user", monevUserRoutes);
 // Monev Activity Package
 app.use("/api/monev/activity-package", activityPackageRoutes);
 
+// Monev Target
+app.use("/api/monev/target", targetRoutes);
 //! ======== MONEV MODULE ========
 
 //! ======== MASTER DATA MODULE ========
