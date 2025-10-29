@@ -364,6 +364,9 @@ exports.update = async (req, res) => {
   }
 };
 
+// TODO: Nambah delete disini (hard delete)
+// Hapus data secara permanen semua id monev_activity_packages terkait. Termasuk tabel monev_targets, monev_target_pending_updates, monev_monthly_realizations, monev_monthly_realization_pending_updates
+
 /**
  * Enumerasi nama bulan Indonesia ("MMMM") inklusif dari start..end
  * - start/end boleh ISO Z/offset atau naive 'YYYY-MM-DD'

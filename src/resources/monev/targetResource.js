@@ -1,18 +1,20 @@
 const knex = require("../../config/database");
-const activityPackageResource = require("./activityPackageResource");
+const UserResource = require("../auth/UserResource");
 
 async function targetResource(target) {
-  const activityPackage = target.monev_activity_packages_id
-    ? await knex("monev_activity_packages")
-        .where("id", target.monev_activity_packages_id)
-        .first()
-    : null;
+  const [validatedUser, editedUser] = await Promise.all([
+    target.validate_by
+      ? knex("users").where("id", target.validate_by).first()
+      : null,
+    target.edited_by
+      ? knex("users").where("id", target.edited_by).first()
+      : null
+  ]);
 
   return {
     id: target.id,
-    activityPackage: activityPackage
-      ? await activityPackageResource(activityPackage)
-      : null,
+    validatedUser: validatedUser ? await UserResource(validatedUser) : null,
+    editedUser: editedUser ? await UserResource(editedUser) : null,
     month: target.month,
     budgedTarget: target.budged_target,
     physicalTarget: target.physical_target,

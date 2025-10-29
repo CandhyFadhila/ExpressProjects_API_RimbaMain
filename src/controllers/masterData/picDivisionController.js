@@ -76,12 +76,8 @@ exports.index = async (req, res) => {
 
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
-  const { title, description, userIds } = req.body;
+  const { title, description } = req.body;
 
-  const rawUserIds = normIdArray(userIds, { as: "number" }).filter(
-    Number.isFinite
-  );
-  const uniqueUserIds = [...new Set(rawUserIds)];
 
   try {
     const errors = validationResult(req);
@@ -114,38 +110,8 @@ exports.store = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    if (uniqueUserIds.includes(1)) {
-      await trx.rollback();
-      const response = new WithoutDataResource(
-        422,
-        "FORBIDDEN_USER_ID",
-        "User Tidak Diizinkan",
-        "User dengan ID 1 (super admin) tidak boleh ditetapkan sebagai PIC."
-      );
-      return res.status(422).json(response.toResponse());
-    }
-
-    if (uniqueUserIds.length > 0) {
-      const foundIds = await trx("users")
-        .whereIn("id", uniqueUserIds)
-        .pluck("id");
-      const foundSet = new Set(foundIds.map(Number));
-      const missing = uniqueUserIds.filter((id) => !foundSet.has(id));
-      if (missing.length > 0) {
-        await trx.rollback();
-        const response = new WithoutDataResource(
-          422,
-          "INVALID_USER_IDS",
-          "Pengguna Tidak Ditemukan",
-          `Beberapa userIds tidak valid: ${missing.join(", ")}.`
-        );
-        return res.status(422).json(response.toResponse());
-      }
-    }
-
     await trx("monev_pic_divisions")
       .insert({
-        user_pic: asJsonb(uniqueUserIds),
         title,
         description,
       })
@@ -580,11 +546,16 @@ exports.restore = async (req, res) => {
   }
 };
 
-// TODO: Tambahkan validasi yang bisa edit user pic adalah role SSO/Monev
 exports.assignPic = async (req, res) => {
   const trx = await knex.transaction();
   const { userIds } = req.body;
   const id = req.params.id;
+  const userIdAuth =
+    req.auth?.userId ??
+    req.auth?.user_id ??
+    req.auth?.id ??
+    req.userId ??
+    req.user?.id;
 
   const rawUserIds = normIdArray(userIds, { as: "number" }).filter(
     Number.isFinite
@@ -604,13 +575,40 @@ exports.assignPic = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
+    const user = await knex("users")
+      .select("id", "role_id")
+      .where({ id: userIdAuth })
+      .first();
+    if (!user) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        200,
+        "INVALID_USER_ID",
+        "Akun Tidak Ditemukan",
+        `Akun dengan id '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const userRoleId = Number(user.role_id);
+    if (userRoleId !== 3) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        403,
+        "FORBIDDEN_ROLE",
+        "Akses Ditolak",
+        "Anda tidak memiliki hak untuk melakukan assign PIC."
+      );
+      return res.status(403).json(response.toResponse());
+    }
+
     if (uniqueUserIds.includes(1)) {
       await trx.rollback();
       const response = new WithoutDataResource(
         422,
         "FORBIDDEN_USER_ID",
         "User Tidak Diizinkan",
-        "User dengan ID 1 (super admin) tidak boleh ditetapkan sebagai PIC."
+        "User dengan ID 1 tidak boleh ditetapkan sebagai PIC."
       );
       return res.status(422).json(response.toResponse());
     }
@@ -644,7 +642,7 @@ exports.assignPic = async (req, res) => {
       {
         userId: activityLogHelper.fromReq(req),
         module: "master_data",
-        subject: "List Kategori Divisi PIC",
+        subject: "Assign Pengguna Divisi PIC",
       },
       trx
     );
@@ -653,9 +651,9 @@ exports.assignPic = async (req, res) => {
 
     const response = new WithoutDataResource(
       200,
-      "SUCCESS_UPDATE_DATA",
+      "SUCCESS_ASSIGN_PIC",
       "Berhasil Memperbarui",
-      `Data divisi '${title}' berhasil diperbarui.`
+      "Data PIC berhasil diperbarui."
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {

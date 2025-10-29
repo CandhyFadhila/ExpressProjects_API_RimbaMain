@@ -8,15 +8,6 @@ const ALLOWED_CONTRACT_TYPES = Object.freeze([
   "Kontraktual",
 ]);
 
-const isProvided = (v) => {
-  if (v === undefined || v === null) return false;
-  const s = String(v).trim();
-  if (!s) return false; // ""
-  if (/^null$/i.test(s)) return false; // "null"
-  if (/^undefined$/i.test(s)) return false; // "undefined"
-  return true;
-};
-
 exports.storeActivityPackageValidator = [
   body("picDivisionId")
     .notEmpty()
