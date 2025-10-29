@@ -13,9 +13,6 @@ const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
-const {
-  _internals: { parseToUTC },
-} = require("../../helpers/dateHelper");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
@@ -23,7 +20,6 @@ require("dayjs/locale/id");
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.locale("id");
-const DEFAULT_TZ = "Asia/Jakarta";
 
 exports.index = async (req, res) => {
   const { search } = req.query;
@@ -125,17 +121,23 @@ exports.store = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
+    let monthsLabels;
+    let startIdx, endIdx;
     try {
-      enumerateMonthsInclusive(startedMonth, finishedMonth);
+      ({
+        labels: monthsLabels,
+        startIdx,
+        endIdx,
+      } = enumerateMonthsInclusive(startedMonth, finishedMonth));
     } catch (e) {
       await trx.rollback();
       const response = new WithoutDataResource(
         422,
-        e.code === "RANGE_INVALID" ? "INVALID_MONTH_RANGE" : "INVALID_DATE",
-        "Validasi Tanggal Gagal",
+        e.code === "RANGE_INVALID" ? "INVALID_MONTH_RANGE" : "INVALID_MONTH",
+        "Validasi Bulan Gagal",
         e.code === "RANGE_INVALID"
           ? "finishedMonth tidak boleh lebih kecil dari startedMonth."
-          : "Pastikan format tanggal benar (ISO Z/offset atau 'YYYY-MM-DD')."
+          : "Nilai bulan harus integer 0..11."
       );
       return res.status(422).json(response.toResponse());
     }
@@ -162,8 +164,8 @@ exports.store = async (req, res) => {
         contract_type: contractType,
         mak,
         name,
-        started_month: startedMonth,
-        finished_month: finishedMonth,
+        started_month: startIdx,
+        finished_month: endIdx,
         unit_output: unitOutput,
         code_output: codeOutput,
         volume,
@@ -173,13 +175,8 @@ exports.store = async (req, res) => {
       })
       .returning("*");
 
-    await autoCreateTargets(trx, pkg.id, startedMonth, finishedMonth);
-    await autoCreateMonthlyRealizations(
-      trx,
-      pkg.id,
-      startedMonth,
-      finishedMonth
-    );
+    await autoCreateTargets(trx, pkg.id, startIdx, endIdx);
+    await autoCreateMonthlyRealizations(trx, pkg.id, startIdx, endIdx);
 
     await activityLogHelper.logCreate(
       {
@@ -367,51 +364,70 @@ exports.update = async (req, res) => {
 // TODO: Nambah delete disini (hard delete)
 // Hapus data secara permanen semua id monev_activity_packages terkait. Termasuk tabel monev_targets, monev_target_pending_updates, monev_monthly_realizations, monev_monthly_realization_pending_updates
 
+const MONTHS_ID = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
+
+// Konversi & validasi indeks 0..11
+function toMonthIndex(v) {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0 || n > 11) {
+    const err = new Error("Invalid month index");
+    err.code = "INVALID_MONTH";
+    throw err;
+  }
+  return n;
+}
+
 /**
- * Enumerasi nama bulan Indonesia ("MMMM") inklusif dari start..end
- * - start/end boleh ISO Z/offset atau naive 'YYYY-MM-DD'
- * - Jika end null => hanya 1 bulan
+ * Enumerasi bulan inklusif dari start..end (index 0..11).
+ * Jika end null/undefined => end = start.
+ * Return: { labels: string[], startIdx: number, endIdx: number }
  */
 function enumerateMonthsInclusive(startInput, endInput) {
-  if (!startInput) {
-    const err = new Error("startedMonth is required");
-    err.code = "INVALID_DATE";
-    throw err;
-  }
-  const sUTC = parseToUTC(startInput);
-  const eUTC = endInput ? parseToUTC(endInput) : sUTC;
+  const startIdx = toMonthIndex(startInput);
+  const endIdx = endInput == null ? startIdx : toMonthIndex(endInput);
 
-  if (!sUTC?.isValid() || !eUTC?.isValid()) {
-    const err = new Error("Invalid date value");
-    err.code = "INVALID_DATE";
-    throw err;
-  }
-
-  let s = sUTC.tz(DEFAULT_TZ).startOf("month");
-  const e = eUTC.tz(DEFAULT_TZ).startOf("month");
-
-  if (e.isBefore(s)) {
+  if (endIdx < startIdx) {
     const err = new Error("finishedMonth < startedMonth");
     err.code = "RANGE_INVALID";
     throw err;
   }
 
-  const out = [];
-  while (!s.isAfter(e)) {
-    out.push(s.format("MMMM")); // "Januari".."Desember"
-    s = s.add(1, "month");
+  const labels = [];
+  for (let i = startIdx; i <= endIdx; i++) {
+    labels.push(MONTHS_ID[i]);
   }
-  return out;
+  return { labels, startIdx, endIdx };
 }
 
 /** Auto-create monev_targets sesuai rentang bulan */
-async function autoCreateTargets(trx, pkgId, startedMonth, finishedMonth) {
-  const months = enumerateMonthsInclusive(startedMonth, finishedMonth);
-  if (!months.length) return;
+async function autoCreateTargets(
+  trx,
+  pkgId,
+  startedMonthIdx,
+  finishedMonthIdx
+) {
+  const { labels } = enumerateMonthsInclusive(
+    startedMonthIdx,
+    finishedMonthIdx
+  );
+  if (!labels.length) return;
 
-  const rows = months.map((m) => ({
+  const rows = labels.map((label) => ({
     monev_activity_packages_id: pkgId,
-    month: m
+    month: label,
   }));
 
   await trx("monev_targets").insert(rows);
@@ -421,15 +437,18 @@ async function autoCreateTargets(trx, pkgId, startedMonth, finishedMonth) {
 async function autoCreateMonthlyRealizations(
   trx,
   pkgId,
-  startedMonth,
-  finishedMonth
+  startedMonthIdx,
+  finishedMonthIdx
 ) {
-  const months = enumerateMonthsInclusive(startedMonth, finishedMonth);
-  if (!months.length) return;
+  const { labels } = enumerateMonthsInclusive(
+    startedMonthIdx,
+    finishedMonthIdx
+  );
+  if (!labels.length) return;
 
-  const rows = months.map((m) => ({
+  const rows = labels.map((label) => ({
     monev_activity_packages_id: pkgId,
-    month: m,
+    month: label,
     progress: 0
   }));
 

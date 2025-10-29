@@ -7,6 +7,7 @@ const ALLOWED_CONTRACT_TYPES = Object.freeze([
   "Swakelola 3",
   "Kontraktual",
 ]);
+const ALLOWED_MONTHS = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 
 exports.storeActivityPackageValidator = [
   body("picDivisionId")
@@ -73,31 +74,29 @@ exports.storeActivityPackageValidator = [
     .notEmpty()
     .withMessage("Bulan mulai tidak boleh kosong.")
     .bail()
-    .custom((v) => {
-      if (!dateHelper.isIso8601Z(v)) {
-        throw new Error(
-          "Bulan mulai harus ISO 8601 dengan Z/offset, contoh: 1990-05-17T00:00:00+07:00 atau 1990-05-16T17:00:00Z."
-        );
-      }
-      const dUTC = dateHelper.toUTC(v);
-      if (!dUTC) throw new Error("Bulan mulai tidak valid.");
-      return true;
-    }),
+    .isInt()
+    .withMessage("Bulan mulai harus berupa angka.")
+    .bail()
+    .isIn(ALLOWED_MONTHS)
+    .withMessage(
+      `Bulan mulai harus salah satu dari: ${ALLOWED_MONTHS.join(
+        ", "
+      )}.`
+    ),
 
   body("finishedMonth")
     .notEmpty()
     .withMessage("Bulan selesai tidak boleh kosong.")
     .bail()
-    .custom((v) => {
-      if (!dateHelper.isIso8601Z(v)) {
-        throw new Error(
-          "Bulan selesai harus ISO 8601 dengan Z/offset, contoh: 1990-05-17T00:00:00+07:00 atau 1990-05-16T17:00:00Z."
-        );
-      }
-      const dUTC = dateHelper.toUTC(v);
-      if (!dUTC) throw new Error("Bulan selesai tidak valid.");
-      return true;
-    }),
+    .isInt()
+    .withMessage("Bulan selesai harus berupa angka.")
+    .bail()
+    .isIn(ALLOWED_MONTHS)
+    .withMessage(
+      `Bulan selesai harus salah satu dari: ${ALLOWED_MONTHS.join(
+        ", "
+      )}.`
+    ),
 
   body("unitOutput")
     .notEmpty()

@@ -1,7 +1,7 @@
 const { validationResult } = require("express-validator");
 const knex = require("../../config/database");
 const logger = require("../../utils/logger");
-const { orderByMonthName } = require("../../helpers/orderByMonthName");
+const { orderByMonthIndex } = require("../../helpers/orderByMonthIndex");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const targetResource = require("../../resources/monev/targetResource");
@@ -26,7 +26,7 @@ exports.getTargetbyActivityPackageId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const { sql, bindings } = orderByMonthName("month", "asc");
+    const { sql, bindings } = orderByMonthIndex("month_index", "asc");
 
     const originals = await knex("monev_targets")
       .where("monev_activity_packages_id", id)

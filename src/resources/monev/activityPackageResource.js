@@ -1,5 +1,5 @@
 const knex = require("../../config/database");
-const { orderByMonthName } = require("../../helpers/orderByMonthName");
+const { orderByMonthIndex } = require("../../helpers/orderByMonthIndex");
 const picDivisionResource = require("../masterData/picDivisionResource");
 const UserResource = require("../auth/UserResource");
 const targetResource = require("./targetResource");
@@ -19,7 +19,7 @@ async function activityPackageResource(activity) {
       : null,
   ]);
 
-  const { sql, bindings } = orderByMonthName("month", "asc");
+  const { sql, bindings } = orderByMonthIndex("month_index", "asc");
 
   const [originals, pendings] = await Promise.all([
     knex("monev_targets")
@@ -59,7 +59,6 @@ async function activityPackageResource(activity) {
       monevTargetOriginal,
       monevTargetPendingUpdate,
     },
-    // TODO: info monthlyRealization disini
     createdAt: activity.created_at,
     updatedAt: activity.updated_at,
     deletedAt: activity.deleted_at,
