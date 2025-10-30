@@ -3,6 +3,7 @@ const { orderByMonthIndex } = require("../../helpers/orderByMonthIndex");
 const picDivisionResource = require("../masterData/picDivisionResource");
 const UserResource = require("../auth/UserResource");
 const targetResource = require("./targetResource");
+const monthlyRealizationResource = require("./monthlyRealizationResource");
 
 async function activityPackageResource(activity) {
   const [createdUser, editedUser, picDivision] = await Promise.all([
@@ -21,7 +22,12 @@ async function activityPackageResource(activity) {
 
   const { sql, bindings } = orderByMonthIndex("month_index", "asc");
 
-  const [originals, pendings] = await Promise.all([
+  const [
+    originalTargets,
+    pendingTargets,
+    originalMonthRealizations,
+    pendingMonthRealizations,
+  ] = await Promise.all([
     knex("monev_targets")
       .where("monev_activity_packages_id", activity.id)
       .whereNull("deleted_at")
@@ -30,13 +36,36 @@ async function activityPackageResource(activity) {
       .where("monev_activity_packages_id", activity.id)
       .whereNull("deleted_at")
       .orderByRaw(sql, bindings),
+    knex("monev_monthly_realizations")
+      .where("monev_activity_packages_id", activity.id)
+      .whereNull("deleted_at")
+      .orderByRaw(sql, bindings),
+    knex("monev_monthly_realization_pending_updates")
+      .where("monev_activity_packages_id", activity.id)
+      .whereNull("deleted_at")
+      .orderByRaw(sql, bindings),
   ]);
 
   const monevTargetOriginal = await Promise.all(
-    originals.map((row) => targetResource(row, { activityPackage: activity }))
+    originalTargets.map((row) =>
+      targetResource(row, { activityPackage: activity })
+    )
   );
   const monevTargetPendingUpdate = await Promise.all(
-    pendings.map((row) => targetResource(row, { activityPackage: activity }))
+    pendingTargets.map((row) =>
+      targetResource(row, { activityPackage: activity })
+    )
+  );
+
+  const monevMonthlyRealizationOriginal = await Promise.all(
+    originalMonthRealizations.map((row) =>
+      monthlyRealizationResource(row, { activityPackage: activity })
+    )
+  );
+  const monevMonthlyRealizationPendingUpdate = await Promise.all(
+    pendingMonthRealizations.map((row) =>
+      monthlyRealizationResource(row, { activityPackage: activity })
+    )
   );
 
   return {
@@ -59,6 +88,10 @@ async function activityPackageResource(activity) {
       monevTargetOriginal,
       monevTargetPendingUpdate,
     },
+    monthlyRealization: {
+      monevMonthlyRealizationOriginal,
+      monevMonthlyRealizationPendingUpdate,
+    },
     createdAt: activity.created_at,
     updatedAt: activity.updated_at,
     deletedAt: activity.deleted_at,
@@ -66,28 +99,3 @@ async function activityPackageResource(activity) {
 }
 
 module.exports = activityPackageResource;
-
-// "target": { // ini resource target
-//   "monevTargetOriginal": [
-//         {
-//           targetResource
-//         }
-//   ],
-//   "monevTargetPendingUpdate": [
-//         {
-//           targetResource
-//         }
-//   ]
-// },
-// "monthlyRealization": { // ini resource monthlyRealization
-//   "monevMonthlyRealizationtOriginal": [
-//         {
-//           Interface_MONEV_Monthly_Realization
-//         }
-//   ],
-//   "monevMonthlyRealizationPendingUpdate": [
-//         {
-//           Interface_MONEV_Monthly_Realization
-//         }
-//   ]
-// }

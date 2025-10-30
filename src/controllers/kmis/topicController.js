@@ -393,7 +393,6 @@ exports.update = async (req, res) => {
     const oldDocId = normIdArray(oldCoverIds, { as: "number" })[0] ?? null;
 
     let finalDocId = oldDocId;
-    console.log("oldDocId: ", oldDocId);
     if (finalDocId != null && deletedIds.includes(String(finalDocId))) {
       await documentHelper.deleteDocuments([finalDocId]);
       finalDocId = null;
