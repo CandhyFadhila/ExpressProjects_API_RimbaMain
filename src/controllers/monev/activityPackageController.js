@@ -368,6 +368,10 @@ exports.update = async (req, res) => {
 
 // TODO: Nambah export pdf dan csv disini
 
+// TODO: Rombak yang disimpan di tabel monev_targets, monev_target_pending_updates, monev_monthly_realizations, monev_monthly_realization_pending_updates di kolom month adalah integer nya (array 0 sampai 11), bukan string (Januari sampai Desember).
+
+// TODO: Ubah payload dan kolom yang awalnya budgedRealization menjadi budgetRealization beserta kolom  budged_realization menjadi budget_realization di tabel monev_monthly_realizations dan monev_monthly_realization_pending_updates
+
 const MONTHS_ID = [
   "Januari",
   "Februari",

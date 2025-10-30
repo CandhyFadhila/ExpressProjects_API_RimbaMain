@@ -91,6 +91,9 @@ async function activityPackageResource(activity) {
     volume: activity.volume,
     pagu: activity.pagu,
     partner: activity.partner,
+    // TODO: Nambahin data sum dan avg 
+    // 1. sumBudgetRealization, value dari monev_monthly_realizations.budged_realization
+    // 2. avgProgress, progress dari monev_monthly_realizations.progress (dalam persen)
     target: {
       monevTargetOriginal,
       monevTargetPendingUpdate,

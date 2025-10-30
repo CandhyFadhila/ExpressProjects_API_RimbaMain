@@ -59,8 +59,8 @@ exports.storeActivityPackageValidator = [
     .isString()
     .withMessage("Nama Paket harus berupa teks.")
     .bail()
-    .isLength({ max: 180 })
-    .withMessage("Nama Paket maksimal 180 karakter."),
+    .isLength({ max: 255 })
+    .withMessage("Nama Paket maksimal 255 karakter."),
 
   body("description")
     .notEmpty()
