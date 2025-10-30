@@ -92,6 +92,8 @@ exports.store = async (req, res) => {
     description,
     startedMonth,
     finishedMonth,
+    startedYear,
+    finishedYear,
     unitOutput,
     codeOutput,
     volume,
@@ -121,23 +123,21 @@ exports.store = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    let monthsLabels;
-    let startIdx, endIdx;
+    let span;
     try {
-      ({
-        labels: monthsLabels,
-        startIdx,
-        endIdx,
-      } = enumerateMonthsInclusive(startedMonth, finishedMonth));
+      span = enumerateMonthsByYear(
+        startedMonth,
+        startedYear,
+        finishedMonth,
+        finishedYear
+      );
     } catch (e) {
       await trx.rollback();
       const response = new WithoutDataResource(
         422,
-        e.code === "RANGE_INVALID" ? "INVALID_MONTH_RANGE" : "INVALID_MONTH",
-        "Validasi Bulan Gagal",
-        e.code === "RANGE_INVALID"
-          ? "finishedMonth tidak boleh lebih kecil dari startedMonth."
-          : "Nilai bulan harus integer 0..11."
+        e.code === "RANGE_INVALID" ? "INVALID_RANGE" : "INVALID_MONTH_YEAR",
+        "Validasi Bulan/Tahun Gagal",
+        e.message || "Rentang bulan/tahun tidak valid."
       );
       return res.status(422).json(response.toResponse());
     }
@@ -164,8 +164,10 @@ exports.store = async (req, res) => {
         contract_type: contractType,
         mak,
         name,
-        started_month: startIdx,
-        finished_month: endIdx,
+        started_month: span.startIdx,
+        finished_month: span.endIdx,
+        started_year: span.startYear,
+        finished_year: span.endYear,
         unit_output: unitOutput,
         code_output: codeOutput,
         volume,
@@ -175,8 +177,8 @@ exports.store = async (req, res) => {
       })
       .returning("*");
 
-    await autoCreateTargets(trx, pkg.id, startIdx, endIdx);
-    await autoCreateMonthlyRealizations(trx, pkg.id, startIdx, endIdx);
+    await autoCreateTargets(trx, pkg.id, span);
+    await autoCreateMonthlyRealizations(trx, pkg.id, span);
 
     await activityLogHelper.logCreate(
       {
@@ -364,6 +366,8 @@ exports.update = async (req, res) => {
 // TODO: Nambah delete disini (hard delete)
 // Hapus data secara permanen semua id monev_activity_packages terkait. Termasuk tabel monev_targets, monev_target_pending_updates, monev_monthly_realizations, monev_monthly_realization_pending_updates
 
+// TODO: Nambah export pdf dan csv disini
+
 const MONTHS_ID = [
   "Januari",
   "Februari",
@@ -379,78 +383,85 @@ const MONTHS_ID = [
   "Desember",
 ];
 
-// Konversi & validasi indeks 0..11
 function toMonthIndex(v) {
   const n = Number(v);
   if (!Number.isInteger(n) || n < 0 || n > 11) {
-    const err = new Error("Invalid month index");
-    err.code = "INVALID_MONTH";
+    const err = new Error("Index bulan harus 0..11.");
+    err.code = "INVALID_MONTH_YEAR";
     throw err;
   }
   return n;
 }
 
 /**
- * Enumerasi bulan inklusif dari start..end (index 0..11).
- * Jika end null/undefined => end = start.
- * Return: { labels: string[], startIdx: number, endIdx: number }
+ * Enumerasi bulan inklusif lintas tahun.
+ * return: {
+ *   items: Array<{year:number, month_index:number, month_label:string}>,
+ *   startIdx, endIdx, startYear, endYear
+ * }
  */
-function enumerateMonthsInclusive(startInput, endInput) {
-  const startIdx = toMonthIndex(startInput);
-  const endIdx = endInput == null ? startIdx : toMonthIndex(endInput);
+function enumerateMonthsByYear(
+  startIdxInput,
+  startYearInput,
+  endIdxInput,
+  endYearInput
+) {
+  const startIdx = toMonthIndex(startIdxInput);
+  const endIdx = toMonthIndex(endIdxInput);
+  const startYear = Number(startYearInput);
+  const endYear = Number(endYearInput);
 
-  if (endIdx < startIdx) {
-    const err = new Error("finishedMonth < startedMonth");
+  if (!Number.isInteger(startYear) || !Number.isInteger(endYear)) {
+    const err = new Error("Tahun harus berupa angka.");
+    err.code = "INVALID_MONTH_YEAR";
+    throw err;
+  }
+  if (endYear < startYear || (endYear === startYear && endIdx < startIdx)) {
+    const err = new Error(
+      "finished (bulan/tahun) tidak boleh < started (bulan/tahun)."
+    );
     err.code = "RANGE_INVALID";
     throw err;
   }
 
-  const labels = [];
-  for (let i = startIdx; i <= endIdx; i++) {
-    labels.push(MONTHS_ID[i]);
+  const items = [];
+  let y = startYear;
+  let m = startIdx;
+  while (y < endYear || (y === endYear && m <= endIdx)) {
+    items.push({ year: y, month_index: m, month_label: MONTHS_ID[m] });
+    m++;
+    if (m === 12) {
+      m = 0;
+      y++;
+    }
   }
-  return { labels, startIdx, endIdx };
+
+  return { items, startIdx, endIdx, startYear, endYear };
 }
 
 /** Auto-create monev_targets sesuai rentang bulan */
-async function autoCreateTargets(
-  trx,
-  pkgId,
-  startedMonthIdx,
-  finishedMonthIdx
-) {
-  const { labels } = enumerateMonthsInclusive(
-    startedMonthIdx,
-    finishedMonthIdx
-  );
-  if (!labels.length) return;
-
-  const rows = labels.map((label) => ({
+async function autoCreateTargets(trx, pkgId, span) {
+  const rows = span.items.map(({ year, month_index, month_label }) => ({
     monev_activity_packages_id: pkgId,
-    month: label,
+    year,
+    month_index,
+    month: month_label,
   }));
-
-  await trx("monev_targets").insert(rows);
+  if (rows.length) {
+    await trx("monev_targets").insert(rows);
+  }
 }
 
 /** Auto-create monev_monthly_realizations sesuai rentang bulan */
-async function autoCreateMonthlyRealizations(
-  trx,
-  pkgId,
-  startedMonthIdx,
-  finishedMonthIdx
-) {
-  const { labels } = enumerateMonthsInclusive(
-    startedMonthIdx,
-    finishedMonthIdx
-  );
-  if (!labels.length) return;
-
-  const rows = labels.map((label) => ({
+async function autoCreateMonthlyRealizations(trx, pkgId, span) {
+  const rows = span.items.map(({ year, month_index, month_label }) => ({
     monev_activity_packages_id: pkgId,
-    month: label,
-    progress: 0
+    year,
+    month_index,
+    month: month_label,
+    progress: 0,
   }));
-
-  await trx("monev_monthly_realizations").insert(rows);
+  if (rows.length) {
+    await trx("monev_monthly_realizations").insert(rows);
+  }
 }

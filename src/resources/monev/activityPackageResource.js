@@ -1,5 +1,5 @@
 const knex = require("../../config/database");
-const { orderByMonthIndex } = require("../../helpers/orderByMonthIndex");
+const { orderByYearMonth } = require("../../helpers/orderByYearMonth");
 const picDivisionResource = require("../masterData/picDivisionResource");
 const UserResource = require("../auth/UserResource");
 const targetResource = require("./targetResource");
@@ -20,7 +20,12 @@ async function activityPackageResource(activity) {
       : null,
   ]);
 
-  const { sql, bindings } = orderByMonthIndex("month_index", "asc");
+  const { sql, bindings } = orderByYearMonth(
+    "year",
+    "month_index",
+    "asc",
+    "asc"
+  );
 
   const [
     originalTargets,
@@ -79,6 +84,8 @@ async function activityPackageResource(activity) {
     description: activity.description,
     startedMonth: activity.started_month,
     finishedMonth: activity.finished_month,
+    started_year: activity.started_year,
+    finished_year: activity.finished_year,
     unitOutput: activity.unit_output,
     codeOutput: activity.code_output,
     volume: activity.volume,

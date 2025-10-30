@@ -1,3 +1,4 @@
+const { y } = require("pdfkit");
 const knex = require("../../config/database");
 const UserResource = require("../auth/UserResource");
 
@@ -16,6 +17,7 @@ async function targetResource(target) {
     validatedUser: validatedUser ? await UserResource(validatedUser) : null,
     editedUser: editedUser ? await UserResource(editedUser) : null,
     month: target.month,
+    year: target.year,
     budgedTarget: target.budged_target,
     physicalTarget: target.physical_target,
     description: target.description,

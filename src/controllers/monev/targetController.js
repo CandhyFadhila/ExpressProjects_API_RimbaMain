@@ -1,7 +1,7 @@
 const { validationResult } = require("express-validator");
 const knex = require("../../config/database");
 const logger = require("../../utils/logger");
-const { orderByMonthIndex } = require("../../helpers/orderByMonthIndex");
+const { orderByYearMonth } = require("../../helpers/orderByYearMonth");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const targetResource = require("../../resources/monev/targetResource");
@@ -26,7 +26,12 @@ exports.getTargetbyActivityPackageId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const { sql, bindings } = orderByMonthIndex("month_index", "asc");
+    const { sql, bindings } = orderByYearMonth(
+      "year",
+      "month_index",
+      "asc",
+      "asc"
+    );
 
     const originals = await knex("monev_targets")
       .where("monev_activity_packages_id", id)
@@ -108,7 +113,7 @@ exports.update = async (req, res) => {
         200,
         "INVALID_USER_ID",
         "Akun Tidak Ditemukan",
-        `Akun dengan id '${id}' tidak ditemukan.`
+        `Akun dengan id '${userId}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
@@ -205,6 +210,7 @@ exports.verification = async (req, res) => {
       .select([
         "id",
         "month",
+        "year",
         "budged_target",
         "physical_target",
         "description",
@@ -231,7 +237,7 @@ exports.verification = async (req, res) => {
         200,
         "ALREADY_VALIDATED",
         "Sudah Divalidasi",
-        `Target bulan '${existing.month}' sudah berstatus ${
+        `Target bulan '${existing.month} ${existing.year}' sudah berstatus ${
           statusMap[existing.validation_status]
         }.`
       );
@@ -248,7 +254,7 @@ exports.verification = async (req, res) => {
         200,
         "SUCCESS_APPROVE",
         "Berhasil Approve",
-        `Target bulan '${result.month}' berhasil disetujui dan diperbarui.`
+        `Target bulan '${result.month} ${result.year}' berhasil disetujui dan diperbarui.`
       );
       return res.status(200).json(response.toResponse());
     }
@@ -258,7 +264,7 @@ exports.verification = async (req, res) => {
       200,
       "SUCCESS_REJECT",
       "Berhasil Reject",
-      `Target bulan '${result.month}' ditolak dengan alasan: ${payload.rejectionReason}.`
+      `Target bulan '${result.month} ${result.year}' ditolak dengan alasan: ${payload.rejectionReason}.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
@@ -310,6 +316,7 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
       "edited_by",
       "monev_activity_packages_id",
       "month",
+      "year",
       "budged_target",
       "physical_target",
       "description",
@@ -346,7 +353,7 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
       {
         userId,
         module: "monev",
-        subject: `Target Kegiatan Bulan '${existing.month}' (update langsung oleh superadmin)`,
+        subject: `Target Kegiatan Bulan '${existing.month} ${existing.year}' (update langsung oleh superadmin)`,
       },
       trx
     );
@@ -381,7 +388,7 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
       {
         userId,
         module: "monev",
-        subject: `Target Kegiatan Bulan '${existing.month}' (update langsung)`,
+        subject: `Target Kegiatan Bulan '${existing.month} ${existing.year}' (update langsung)`,
       },
       trx
     );
@@ -395,6 +402,7 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
     edited_by: userId,
     monev_activity_packages_id: existing.monev_activity_packages_id,
     month: existing.month,
+    year: existing.year,
     budged_target: isProvided(budgedTarget)
       ? budgedTarget
       : existing.budged_target,
@@ -427,7 +435,7 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
         {
           userId,
           module: "monev",
-          subject: `Target Kegiatan Bulan '${existing.month}' (pending update replaced)`,
+          subject: `Target Kegiatan Bulan '${existing.month} ${existing.year}' (pending update replaced)`,
         },
         trx
       );
@@ -461,7 +469,7 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
     {
       userId,
       module: "monev",
-      subject: `Target Kegiatan Bulan '${existing.month}' (pending update)`,
+      subject: `Target Kegiatan Bulan '${existing.month} ${existing.year}'  (pending update)`,
     },
     trx
   );
@@ -480,7 +488,7 @@ async function verifyTarget(trx, { id, payload, userId }) {
 
   // Ambil target + pending terbaru (jika ada)
   const target = await trx("monev_targets")
-    .select(["id", "month"])
+    .select(["id", "month", "year"])
     .where("id", id)
     .first();
   if (!target) {
@@ -528,12 +536,12 @@ async function verifyTarget(trx, { id, payload, userId }) {
       {
         userId,
         module: "monev",
-        subject: `Verifikasi Target Bulan '${target.month}' (APPROVED)`,
+        subject: `Verifikasi Target Bulan '${target.month} ${target.year}' (APPROVED)`,
       },
       trx
     );
 
-    return { mode: "approved", month: target.month, patch };
+    return { mode: "approved", month: target.month, year: target.year, patch };
   }
 
   // === Rejected (3) ===
@@ -557,10 +565,15 @@ async function verifyTarget(trx, { id, payload, userId }) {
     {
       userId,
       module: "monev",
-      subject: `Verifikasi Target Bulan '${target.month}' (REJECTED)`,
+      subject: `Verifikasi Target Bulan '${target.month} ${target.year}' (REJECTED)`,
     },
     trx
   );
 
-  return { mode: "rejected", month: target.month, patch: patchReject };
+  return {
+    mode: "rejected",
+    month: target.month,
+    year: target.year,
+    patch: patchReject,
+  };
 }

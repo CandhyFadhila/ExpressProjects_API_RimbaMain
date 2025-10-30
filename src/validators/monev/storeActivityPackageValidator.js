@@ -1,6 +1,5 @@
 const { body } = require("express-validator");
 const knex = require("../../config/database");
-const dateHelper = require("../../helpers/dateHelper");
 const ALLOWED_CONTRACT_TYPES = Object.freeze([
   "Swakelola 1",
   "Swakelola 2",
@@ -70,34 +69,6 @@ exports.storeActivityPackageValidator = [
     .isString()
     .withMessage("Deskripsi kategori harus berupa teks."),
 
-  body("startedMonth")
-    .notEmpty()
-    .withMessage("Bulan mulai tidak boleh kosong.")
-    .bail()
-    .isInt()
-    .withMessage("Bulan mulai harus berupa angka.")
-    .bail()
-    .isIn(ALLOWED_MONTHS)
-    .withMessage(
-      `Bulan mulai harus salah satu dari: ${ALLOWED_MONTHS.join(
-        ", "
-      )}.`
-    ),
-
-  body("finishedMonth")
-    .notEmpty()
-    .withMessage("Bulan selesai tidak boleh kosong.")
-    .bail()
-    .isInt()
-    .withMessage("Bulan selesai harus berupa angka.")
-    .bail()
-    .isIn(ALLOWED_MONTHS)
-    .withMessage(
-      `Bulan selesai harus salah satu dari: ${ALLOWED_MONTHS.join(
-        ", "
-      )}.`
-    ),
-
   body("unitOutput")
     .notEmpty()
     .withMessage("Judul kategori tidak boleh kosong.")
@@ -138,4 +109,70 @@ exports.storeActivityPackageValidator = [
     .bail()
     .isLength({ max: 150 })
     .withMessage("Judul kategori maksimal 150 karakter."),
+
+  body("startedMonth")
+    .toInt()
+    .notEmpty()
+    .withMessage("Bulan mulai tidak boleh kosong.")
+    .bail()
+    .isInt()
+    .withMessage("Bulan mulai harus berupa angka.")
+    .bail()
+    .isIn(ALLOWED_MONTHS)
+    .withMessage(
+      `Bulan mulai harus salah satu dari: ${ALLOWED_MONTHS.join(", ")}.`
+    ),
+
+  body("finishedMonth")
+    .toInt()
+    .notEmpty()
+    .withMessage("Bulan selesai tidak boleh kosong.")
+    .bail()
+    .isInt()
+    .withMessage("Bulan selesai harus berupa angka.")
+    .bail()
+    .isIn(ALLOWED_MONTHS)
+    .withMessage(
+      `Bulan selesai harus salah satu dari: ${ALLOWED_MONTHS.join(", ")}.`
+    ),
+
+  body("startedYear")
+    .toInt()
+    .notEmpty()
+    .withMessage("Tahun mulai tidak boleh kosong.")
+    .bail()
+    .isInt({ min: 1900, max: 2100 })
+    .withMessage("Tahun mulai tidak valid (1900 s.d 2100)."),
+
+  body("finishedYear")
+    .toInt()
+    .notEmpty()
+    .withMessage("Tahun selesai tidak boleh kosong.")
+    .bail()
+    .isInt({ min: 1900, max: 2100 })
+    .withMessage("Tahun selesai tidak valid (1900 s.d 2100)."),
+
+  // Validasi pasangan (start <= end)
+  body(["startedMonth", "startedYear", "finishedMonth", "finishedYear"]).custom(
+    (_, { req }) => {
+      const sM = Number(req.body.startedMonth);
+      const sY = Number(req.body.startedYear);
+      const fM = Number(req.body.finishedMonth);
+      const fY = Number(req.body.finishedYear);
+      if (
+        Number.isNaN(sM) ||
+        Number.isNaN(sY) ||
+        Number.isNaN(fM) ||
+        Number.isNaN(fY)
+      ) {
+        throw new Error("Nilai bulan/tahun tidak valid.");
+      }
+      if (fY < sY || (fY === sY && fM < sM)) {
+        throw new Error(
+          "finished (bulan/tahun) tidak boleh lebih kecil dari started (bulan/tahun)."
+        );
+      }
+      return true;
+    }
+  ),
 ];

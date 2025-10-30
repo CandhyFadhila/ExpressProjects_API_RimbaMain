@@ -1,7 +1,7 @@
 const { validationResult } = require("express-validator");
 const knex = require("../../config/database");
 const logger = require("../../utils/logger");
-const { orderByMonthIndex } = require("../../helpers/orderByMonthIndex");
+const { orderByYearMonth } = require("../../helpers/orderByYearMonth");
 const { asJsonb } = require("../../helpers/dbJson");
 const {
   toArray,
@@ -35,7 +35,12 @@ exports.getMonthlyRealizationbyActivityPackageId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const { sql, bindings } = orderByMonthIndex("month_index", "asc");
+    const { sql, bindings } = orderByYearMonth(
+      "year",
+      "month_index",
+      "asc",
+      "asc"
+    );
 
     const originals = await knex("monev_monthly_realizations")
       .where("monev_activity_packages_id", id)
@@ -300,6 +305,7 @@ exports.verification = async (req, res) => {
       .select([
         "id",
         "month",
+        "year",
         "evidence_file_ids",
         "budged_realization",
         "progress",
@@ -328,9 +334,9 @@ exports.verification = async (req, res) => {
         200,
         "ALREADY_VALIDATED",
         "Sudah Divalidasi",
-        `Realisasi bulanan untuk bulan '${existing.month}' sudah berstatus ${
-          statusMap[existing.validation_status]
-        }.`
+        `Realisasi bulanan untuk bulan '${existing.month} ${
+          existing.year
+        }' sudah berstatus ${statusMap[existing.validation_status]}.`
       );
       return res.status(200).json(response.toResponse());
     }
@@ -345,7 +351,7 @@ exports.verification = async (req, res) => {
         200,
         "SUCCESS_APPROVE",
         "Berhasil Approve",
-        `Realisasi bulanan untuk bulan '${result.month}' berhasil disetujui dan diperbarui.`
+        `Realisasi bulanan untuk bulan '${result.month} ${result.year}' berhasil disetujui dan diperbarui.`
       );
       return res.status(200).json(response.toResponse());
     }
@@ -355,7 +361,7 @@ exports.verification = async (req, res) => {
       200,
       "SUCCESS_REJECT",
       "Berhasil Reject",
-      `Realisasi bulanan untuk bulan '${result.month}' ditolak dengan alasan: ${payload.rejectionReason}.`
+      `Realisasi bulanan untuk bulan '${result.month} ${result.year}' ditolak dengan alasan: ${payload.rejectionReason}.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
@@ -407,6 +413,7 @@ async function updateMonthlyRealization(
       "edited_by",
       "monev_activity_packages_id",
       "month",
+      "year",
       "evidence_file_ids",
       "budged_realization",
       "progress",
@@ -448,7 +455,7 @@ async function updateMonthlyRealization(
       {
         userId,
         module: "monev",
-        subject: `Realisasi Bulanan Kegiatan di Bulan '${existing.month}' (update langsung oleh superadmin)`,
+        subject: `Realisasi Bulanan Kegiatan di Bulan '${existing.month} ${existing.year}' (update langsung oleh superadmin)`,
       },
       trx
     );
@@ -486,7 +493,7 @@ async function updateMonthlyRealization(
       {
         userId,
         module: "monev",
-        subject: `Realisasi Bulanan Kegiatan di Bulan '${existing.month}' (update langsung)`,
+        subject: `Realisasi Bulanan Kegiatan di Bulan '${existing.month} ${existing.year}' (update langsung)`,
       },
       trx
     );
@@ -504,6 +511,7 @@ async function updateMonthlyRealization(
     edited_by: userId,
     monev_activity_packages_id: existing.monev_activity_packages_id,
     month: existing.month,
+    year: existing.year,
     evidence_file_ids: evidence_files,
     budged_realization: J(nextBR),
     progress: isProvided(progress) ? progress : existing.progress,
@@ -534,7 +542,7 @@ async function updateMonthlyRealization(
         {
           userId,
           module: "monev",
-          subject: `Realisasi Bulanan Kegiatan di Bulan '${existing.month}' (pending update replaced)`,
+          subject: `Realisasi Bulanan Kegiatan di Bulan '${existing.month} ${existing.year}' (pending update replaced)`,
         },
         trx
       );
@@ -568,7 +576,7 @@ async function updateMonthlyRealization(
     {
       userId,
       module: "monev",
-      subject: `Realisasi Bulanan Kegiatan di Bulan '${existing.month}' (pending update)`,
+      subject: `Realisasi Bulanan Kegiatan di Bulan '${existing.month} ${existing.year}' (pending update)`,
     },
     trx
   );
@@ -596,7 +604,7 @@ async function verifyMonthlyRealization(trx, { id, payload, userId }) {
 
   // Ambil monthlyRealization + pending terbaru (jika ada)
   const monthlyRealization = await trx("monev_monthly_realizations")
-    .select(["id", "month"])
+    .select(["id", "month", "year"])
     .where("id", id)
     .first();
   if (!monthlyRealization) {
@@ -646,12 +654,17 @@ async function verifyMonthlyRealization(trx, { id, payload, userId }) {
       {
         userId,
         module: "monev",
-        subject: `Verifikasi Realisasi Bulanan Kegiatan di Bulan '${monthlyRealization.month}' (APPROVED)`,
+        subject: `Verifikasi Realisasi Bulanan Kegiatan di Bulan '${monthlyRealization.month} ${monthlyRealization.year}' (APPROVED)`,
       },
       trx
     );
 
-    return { mode: "approved", month: monthlyRealization.month, patch };
+    return {
+      mode: "approved",
+      month: monthlyRealization.month,
+      year: monthlyRealization.year,
+      patch,
+    };
   }
 
   // === Rejected (3) ===
@@ -675,7 +688,7 @@ async function verifyMonthlyRealization(trx, { id, payload, userId }) {
     {
       userId,
       module: "monev",
-      subject: `Verifikasi Realisasi Bulanan Kegiatan di Bulan '${monthlyRealization.month}' (REJECTED)`,
+      subject: `Verifikasi Realisasi Bulanan Kegiatan di Bulan '${monthlyRealization.month} ${monthlyRealization.year}' (REJECTED)`,
     },
     trx
   );
@@ -683,6 +696,7 @@ async function verifyMonthlyRealization(trx, { id, payload, userId }) {
   return {
     mode: "rejected",
     month: monthlyRealization.month,
+    year: monthlyRealization.year,
     patch: patchReject,
   };
 }

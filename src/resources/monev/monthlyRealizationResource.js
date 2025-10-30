@@ -27,6 +27,7 @@ async function monthlyRealizationResource(monthlyRealization) {
     editedUser: editedUser ? await UserResource(editedUser) : null,
     evidence: evidence_files,
     month: monthlyRealization.month,
+    year: monthlyRealization.year,
     budgedRealization: monthlyRealization.budged_realization,
     progress: monthlyRealization.progress,
     description: monthlyRealization.description,
