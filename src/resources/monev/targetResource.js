@@ -1,4 +1,3 @@
-const { y } = require("pdfkit");
 const knex = require("../../config/database");
 const UserResource = require("../auth/UserResource");
 

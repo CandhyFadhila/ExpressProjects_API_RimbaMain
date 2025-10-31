@@ -35,6 +35,7 @@ const activityPackageRoutes = require("./routes/monev/activityPackageRoutes");
 const targetRoutes = require("./routes/monev/targetRoutes");
 const monthlyRealizationRoutes = require("./routes/monev/monthlyRealizationRoutes");
 const activityCalendarRoutes = require("./routes/monev/activityCalendarRoutes");
+const shareReportRoutes = require("./routes/monev/shareReportRoutes");
 
 const app = express();
 
@@ -173,6 +174,9 @@ app.use("/api/monev/monthly-realization", monthlyRealizationRoutes);
 
 // Monev Activity Calendar
 app.use("/api/monev/activity-calendar", activityCalendarRoutes);
+
+// Monev Share Report
+app.use("/api/monev/share-report", shareReportRoutes);
 //! ======== MONEV MODULE ========
 
 //! ======== MASTER DATA MODULE ========

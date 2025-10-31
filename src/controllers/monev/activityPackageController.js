@@ -10,7 +10,7 @@ const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const activityPackageResource = require("../../resources/monev/activityPackageResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
-const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
+// const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
 const dayjs = require("dayjs");
@@ -29,7 +29,7 @@ exports.index = async (req, res) => {
       "activity.*"
     );
 
-    applyTrashedScope(query, req, "activity.deleted_at");
+    // applyTrashedScope(query, req, "activity.deleted_at");
 
     applySearch(query, search, ["activity.mak", "activity.name"]);
 
@@ -100,12 +100,7 @@ exports.store = async (req, res) => {
     pagu,
     partner,
   } = req.body;
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = activityLogHelper.fromReq(req);
 
   try {
     const errors = validationResult(req);
@@ -394,13 +389,6 @@ function toMonthIndex(v) {
   return n;
 }
 
-/**
- * Enumerasi bulan inklusif lintas tahun.
- * return: {
- *   items: Array<{year:number, month_index:number, month_label:string}>,
- *   startIdx, endIdx, startYear, endYear
- * }
- */
 function enumerateMonthsByYear(
   startIdxInput,
   startYearInput,
