@@ -3,20 +3,13 @@ const knex = require("../../config/database");
 const logger = require("../../utils/logger");
 const { asJsonb } = require("../../helpers/dbJson");
 const { normIdArray, normJsonbArray } = require("../../helpers/inputNorm");
-const {
-  applySearch,
-  applyPagination,
-  formatPaginationResult,
-} = require("../../helpers/queryHelper");
 const documentHelper = require("../../helpers/documentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const monevDashboardResource = require("../../resources/masterData/monevDashboardResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
-const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
-const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
-exports.getDahsboard = async (req, res) => {
+exports.getDashboard = async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -57,54 +50,55 @@ exports.getDahsboard = async (req, res) => {
   }
 };
 
-exports.index = async (req, res) => {
-  const { search } = req.query;
-
+exports.dashboardInfo = async (req, res) => {
   try {
-    let query = knex("monev_dashboards as dashboard").select("dashboard.*");
+    const rawYear =
+      (req.query && req.query.year) ?? (req.body && req.body.year);
+    const parsed = Number(rawYear);
+    const targetYear =
+      Number.isInteger(parsed) && parsed > 0
+        ? parsed
+        : new Date().getFullYear();
 
-    applyTrashedScope(query, req, "dashboard.deleted_at");
-
-    applySearch(query, search, ["dashboard.networth_hibah"]);
-
-    applyLatestThenTrashed(
-      query,
-      "dashboard.deleted_at",
-      "dashboard.created_at",
-      "dashboard.id"
+    const avgPhysicalTarget = await getAvgPhysicalTargetByYear(targetYear);
+    const avgProgressRealization = await getAvgProgressRealizationByYear(
+      targetYear
     );
-
-    const paginationInfo = applyPagination(req.query);
-
-    const result = await formatPaginationResult(query, paginationInfo, knex);
-    if (result.data.length === 0) {
-      const response = new WithoutDataResource(
-        200,
-        "DATA_NOT_FOUND",
-        "Data Tidak Ditemukan",
-        "Tidak ada data yang sesuai dengan filter atau pencarian."
-      );
-      return res.status(200).json(response.toResponse());
-    }
-
-    const serializedData = await Promise.all(
-      result.data.map((dashboard) => monevDashboardResource(dashboard))
+    const totalActivityPackages = await getTotalActivityPackagesCreatedByYear(
+      targetYear
+    );
+    const statsBudgetTarget = await getStatsBudgetTargetByYear(targetYear);
+    const statsBudgetRealization = await getStatsBudgetRealizationByYear(
+      targetYear
+    );
+    const sumBudgetTarget = await getSumBudgetTargetByYear(targetYear);
+    const sumBudgetRealization = await getSumBudgetRealizationByYear(
+      targetYear
+    );
+    const totalActivityCalendar = await getTotalActivityCalendarCreatedByYear(
+      targetYear
     );
 
     const response = new WithDataResource(
       200,
-      "SUCCESS_GET_DATA",
-      "Berhasil Mengambil Data",
-      "Data dashboard berhasil diambil.",
+      "DATA_FOUND",
+      "Data Ditemukan",
+      "Data dashboard MONEV berhasil didapatkan.",
       {
-        data: serializedData,
-        pagination: result.pagination,
+        avgPhysicalTarget,
+        avgProgressRealization,
+        totalActivityPackages,
+        statsBudgetTarget,
+        statsBudgetRealization,
+        sumBudgetTarget,
+        sumBudgetRealization,
+        totalActivityCalendar,
       }
     );
-    return res.status(200).json(response.toResponse());
+    res.status(200).json(response.toResponse());
   } catch (error) {
     logger.error(
-      `| Dashboard MONEV | - Error function index : ${error.message}`
+      `| Dashboard MONEV | - Error function dashboardInfo : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -287,7 +281,8 @@ exports.store = async (req, res) => {
 
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
-  const { description, hibah, deleteFrameworkFileIds, deletePlanFileIds } = req.body;
+  const { description, hibah, deleteFrameworkFileIds, deletePlanFileIds } =
+    req.body;
   const id = req.params.id;
 
   try {
@@ -491,3 +486,135 @@ exports.update = async (req, res) => {
     return res.status(500).json(response.toResponse());
   }
 };
+
+function buildZeroMonthStats() {
+  return Array.from({ length: 12 }, (_, i) => ({ month: i, value: 0 }));
+}
+
+async function getAvgPhysicalTargetByYear(year) {
+  const row = await knex("monev_targets as mt")
+    .where("mt.year", year)
+    .whereNull("mt.deleted_at")
+    .select(
+      knex.raw("COALESCE(AVG(mt.physical_target), 0) AS avg_physical_target")
+    )
+    .first();
+
+  const avg = Number(row?.avg_physical_target ?? 0);
+  return Math.round(avg * 100) / 100;
+}
+
+async function getAvgProgressRealizationByYear(year) {
+  const row = await knex("monev_monthly_realizations as mmr")
+    .where("mmr.year", year)
+    .whereNull("mmr.deleted_at")
+    .select(
+      knex.raw(
+        "COALESCE(AVG(LEAST(GREATEST(mmr.progress, 0), 100)), 0) AS avg_progress"
+      )
+    )
+    .first();
+
+  const avg = Number(row?.avg_progress ?? 0);
+  return Math.round(avg * 100) / 100;
+}
+
+async function getTotalActivityPackagesCreatedByYear(year) {
+  const startStr = `${year}-01-01 00:00:00`;
+  const endStr = `${year + 1}-01-01 00:00:00`;
+
+  const row = await knex("monev_activity_packages as map")
+    .whereNull("map.deleted_at")
+    .andWhere("map.created_at", ">=", startStr)
+    .andWhere("map.created_at", "<", endStr)
+    .count({ total: "*" })
+    .first();
+
+  return Number(row?.total ?? 0);
+}
+
+async function getStatsBudgetTargetByYear(year) {
+  const rows = await knex("monev_targets as mt")
+    .where("mt.year", year)
+    .whereNull("mt.deleted_at")
+    .select("mt.month")
+    .select(knex.raw("COALESCE(SUM((mt.budget_target)::bigint), 0) AS total"))
+    .groupBy("mt.month")
+    .orderBy("mt.month", "asc");
+
+  const byMonth = new Map(rows.map((r) => [Number(r.month), Number(r.total)]));
+
+  const stats = buildZeroMonthStats();
+  for (let i = 0; i < 12; i++) {
+    stats[i].value = byMonth.get(i + 1) ?? 0;
+  }
+  return stats;
+}
+
+async function getStatsBudgetRealizationByYear(year) {
+  const rows = await knex("monev_monthly_realizations as mmr")
+    .where("mmr.year", year)
+    .whereNull("mmr.deleted_at")
+    .joinRaw(
+      "LEFT JOIN LATERAL jsonb_array_elements(COALESCE(mmr.budget_realization, '[]'::jsonb)) AS elem ON TRUE"
+    )
+    .select("mmr.month")
+    .select(
+      knex.raw(
+        "COALESCE(SUM(GREATEST((elem->>'value')::bigint, 0)), 0) AS total"
+      )
+    )
+    .groupBy("mmr.month")
+    .orderBy("mmr.month", "asc");
+
+  const byMonth = new Map(rows.map((r) => [Number(r.month), Number(r.total)]));
+
+  const stats = buildZeroMonthStats();
+  for (let i = 0; i < 12; i++) {
+    stats[i].value = byMonth.get(i + 1) ?? 0;
+  }
+  return stats;
+}
+
+async function getSumBudgetTargetByYear(year) {
+  const row = await knex("monev_targets as mt")
+    .where("mt.year", year)
+    .whereNull("mt.deleted_at")
+    .select(
+      knex.raw("COALESCE(SUM(mt.budget_target), 0) AS total_budget_target")
+    )
+    .first();
+
+  return Number(row?.total_budget_target ?? 0);
+}
+
+async function getSumBudgetRealizationByYear(year) {
+  const row = await knex("monev_monthly_realizations as mmr")
+    .where("mmr.year", year)
+    .whereNull("mmr.deleted_at")
+    .joinRaw(
+      "LEFT JOIN LATERAL jsonb_array_elements(COALESCE(mmr.budget_realization,'[]'::jsonb)) AS elem ON TRUE"
+    )
+    .select(
+      knex.raw(
+        "COALESCE(SUM(GREATEST((elem->>'value')::bigint, 0)), 0) AS total_realization"
+      )
+    )
+    .first();
+
+  return Number(row?.total_realization ?? 0);
+}
+
+async function getTotalActivityCalendarCreatedByYear(year) {
+  const startStr = `${year}-01-01 00:00:00`;
+  const endStr = `${year + 1}-01-01 00:00:00`;
+
+  const row = await knex("monev_activity_calendar as mac")
+    .whereNull("mac.deleted_at")
+    .andWhere("mac.created_at", ">=", startStr)
+    .andWhere("mac.created_at", "<", endStr)
+    .count({ total: "*" })
+    .first();
+
+  return Number(row?.total ?? 0);
+}

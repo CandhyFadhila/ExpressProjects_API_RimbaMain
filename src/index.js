@@ -106,102 +106,100 @@ app.use("/api/kmis/public-request", kmispublicRequestRoute);
 app.use("/api/cms/public-request", cmspublicRequestRoute);
 
 //! ======== CMS MODULE ========
-// Content
+// CMS Content
 app.use("/api/cms/content", contentRoutes);
 
-// News
+// CMS News
 app.use("/api/cms/news", newsRoutes);
 
-// Event
+// CMS Event
 app.use("/api/cms/event", eventRoutes);
 
-// Animal Composition
+// CMS Animal Composition
 app.use("/api/cms/animal-composition", animalCompositionRoutes);
 
-// Legal Document
+// CMS Legal Document
 app.use("/api/cms/legal-document", legalDocumentRoutes);
 
-// FAQ
+// CMS FAQ
 app.use("/api/cms/faq", faqRoutes);
 //! ======== CMS MODULE ========
 
 //! ======== KMIS MODULE ========
-// Dashboard
+// KMIS Dashboard
 app.use("/api/kmis/dashboard", dashboardRoutes);
 
-// Category
+// KMIS Category
 app.use("/api/kmis/category", categoryRoutes);
 
-// Topic
+// KMIS Topic
 app.use("/api/kmis/topic", topicRoutes);
 
-// Educator
+// KMIS Educator
 app.use("/api/kmis/educator", educatorRoutes);
 
-// Student
+// KMIS Student
 app.use("/api/kmis/student", studentRoutes);
 
-// Material
+// KMIS Material
 app.use("/api/kmis/material", materialRoutes);
 
-// Quiz
+// KMIS Quiz
 app.use("/api/kmis/quiz", quizRoutes);
 
-// Learning Participant
+// KMIS Learning Participant
 app.use("/api/kmis/learning-participant", learningParticipantRoutes);
 
 //? Student Area
-// Learning Course
+// KMIS Learning Course
 app.use("/api/kmis/learning-course", learningAttemptRoutes);
 
-// Exam
+// KMIS Exam
 app.use("/api/kmis/exam", quizAttemptRoutes);
 //? Student Area
 //! ======== KMIS MODULE ========
 
 //! ======== MONEV MODULE ========
-// Monev User
+// MONEV User
 app.use("/api/monev/user", monevUserRoutes);
 
-// Monev Activity Package
+// MONEV Activity Package
 app.use("/api/monev/activity-package", activityPackageRoutes);
 
-// Monev Target
+// MONEV Target
 app.use("/api/monev/target", targetRoutes);
 
-// Monev Monthly Realization
+// MONEV Monthly Realization
 app.use("/api/monev/monthly-realization", monthlyRealizationRoutes);
 
-// Monev Activity Calendar
+// MONEV Activity Calendar
 app.use("/api/monev/activity-calendar", activityCalendarRoutes);
 
-// Monev Share Report
+// MONEV Share Report
 app.use("/api/monev/share-report", shareReportRoutes);
 //! ======== MONEV MODULE ========
 
 //! ======== MASTER DATA MODULE ========
-// News Category
+// MASTER DATA News Category
 app.use("/api/master-data/news-category", newsCategoryRoutes);
 
-// Event Category
+// MASTER DATA Event Category
 app.use("/api/master-data/event-category", eventCategoryRoutes);
 
-// Animal Category
+// MASTER DATA Animal Category
 app.use("/api/master-data/animal-category", animalCategoryRoutes);
 
-// Activity Category
+// MASTER DATA Activity Category
 app.use("/api/master-data/activity-category", activityCategoryRoutes);
 
-// PIC Division
+// MASTER DATA PIC Division
 app.use("/api/master-data/pic-division", picDivisionRoutes);
 
-// Monev Dashboard Management
+// MASTER DATA Monev Dashboard Management
 app.use("/api/master-data/monev-dashboard", monevDashboardRoutes);
 //! ======== MASTER DATA MODULE ========
 
 // Jalankan server
 app.listen(PORT, () => {
-  // Di windows akan log: http://localhost:4000
-  // Di linux akan log:   https://rimbaexium.org
   console.log(`Server berjalan di ${app.locals.baseUrl} (listen port ${PORT})`);
 });

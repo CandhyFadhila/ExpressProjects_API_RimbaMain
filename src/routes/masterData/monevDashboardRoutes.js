@@ -21,20 +21,20 @@ const uploadMaterialFields = upload.fields([
 router.use(rateLimiter, authMiddleware);
 
 router.get(
-  "/index",
-  requirePermission(["view.master_data"]),
-  monevDashboardController.index
+  "/info",
+  requirePermission(["view.monev_dashboard"]),
+  monevDashboardController.dashboardInfo
 );
 
 router.get(
   "/:id",
-  requirePermission(["view.master_data"]),
-  monevDashboardController.getDahsboard
+  requirePermission(["view.monev_dashboard"]),
+  monevDashboardController.getDashboard
 );
 
 router.post(
   "/create",
-  requirePermission(["create.master_data"]),
+  requirePermission(["create.monev_dashboard"]),
   uploadMaterialFields,
   storeMonevDashboardValidator,
   validate,
@@ -43,7 +43,7 @@ router.post(
 
 router.patch(
   "/update/:id",
-  requirePermission(["edit.master_data"]),
+  requirePermission(["edit.monev_dashboard"]),
   uploadMaterialFields,
   updateMonevDashboardValidator,
   validate,
