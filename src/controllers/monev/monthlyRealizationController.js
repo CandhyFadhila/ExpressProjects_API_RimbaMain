@@ -35,12 +35,7 @@ exports.getMonthlyRealizationbyActivityPackageId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const { sql, bindings } = orderByYearMonth(
-      "year",
-      "month_index",
-      "asc",
-      "asc"
-    );
+    const { sql, bindings } = orderByYearMonth("year", "month", "asc", "asc");
 
     const originals = await knex("monev_monthly_realizations")
       .where("monev_activity_packages_id", id)
@@ -307,7 +302,7 @@ exports.verification = async (req, res) => {
         "month",
         "year",
         "evidence_file_ids",
-        "budged_realization",
+        "budget_realization",
         "progress",
         "description",
         "problem",
@@ -382,7 +377,7 @@ exports.verification = async (req, res) => {
 /**
  * updateMonthlyRealization
  * Alur:
- * - Jika kedua kolom existing (budged_realization & progress) masih 0/null => UPDATE langsung ke monev_monthly_realizations
+ * - Jika kedua kolom existing (budget_realization & progress) masih 0/null => UPDATE langsung ke monev_monthly_realizations
  * - Jika salah satu sudah terisi (≠ 0 / tidak null) => INSERT ke monev_monthly_realization_pending_updates + set monev_monthly_realizations.validation_status = 1
  */
 async function updateMonthlyRealization(
@@ -415,7 +410,7 @@ async function updateMonthlyRealization(
       "month",
       "year",
       "evidence_file_ids",
-      "budged_realization",
+      "budget_realization",
       "progress",
       "description",
       "problem",
@@ -444,7 +439,7 @@ async function updateMonthlyRealization(
       updated_at: now,
     };
     if (isProvided(budgetRealization))
-      patch.budged_realization = J(budgetRealization);
+      patch.budget_realization = J(budgetRealization);
     if (isProvided(progress)) patch.progress = progress;
     if (isProvided(problem)) patch.problem = problem;
     if (isProvided(description)) patch.description = description;
@@ -471,7 +466,7 @@ async function updateMonthlyRealization(
 
   // === JALUR NORMAL ===
   const bothEmpty =
-    isEmptyJsonb(existing.budged_realization) &&
+    isEmptyJsonb(existing.budget_realization) &&
     isNullOrZero(existing.progress);
 
   if (bothEmpty) {
@@ -482,7 +477,7 @@ async function updateMonthlyRealization(
       edited_by: userId,
     };
     if (isProvided(budgetRealization))
-      patch.budged_realization = J(budgetRealization);
+      patch.budget_realization = J(budgetRealization);
     if (isProvided(progress)) patch.progress = progress;
     if (isProvided(problem)) patch.problem = problem;
     if (isProvided(description)) patch.description = description;
@@ -504,7 +499,7 @@ async function updateMonthlyRealization(
   // === PENDING UPDATE ===
   const nextBR = isProvided(budgetRealization)
     ? budgetRealization
-    : existing.budged_realization;
+    : existing.budget_realization;
 
   const candidate = {
     monev_monthly_realization_id: id,
@@ -513,7 +508,7 @@ async function updateMonthlyRealization(
     month: existing.month,
     year: existing.year,
     evidence_file_ids: evidence_files,
-    budged_realization: J(nextBR),
+    budget_realization: J(nextBR),
     progress: isProvided(progress) ? progress : existing.progress,
     problem: isProvided(problem) ? problem : existing.problem,
     description: isProvided(description) ? description : existing.description,
@@ -630,7 +625,7 @@ async function verifyMonthlyRealization(trx, { id, payload, userId }) {
 
     // Salin nilai dari pending → monthlyRealization
     const patch = {
-      budged_realization: J(latestPending.budged_realization),
+      budget_realization: J(latestPending.budget_realization),
       progress: latestPending.progress,
       problem: latestPending.problem,
       description: latestPending.description,

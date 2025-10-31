@@ -9,7 +9,7 @@ async function targetResource(target) {
       : null,
     target.edited_by
       ? knex("users").where("id", target.edited_by).first()
-      : null
+      : null,
   ]);
 
   return {
@@ -18,7 +18,7 @@ async function targetResource(target) {
     editedUser: editedUser ? await UserResource(editedUser) : null,
     month: target.month,
     year: target.year,
-    budgedTarget: target.budged_target,
+    budgetTarget: target.budget_target,
     physicalTarget: target.physical_target,
     description: target.description,
     validationStatus: target.validation_status,

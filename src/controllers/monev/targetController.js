@@ -26,12 +26,7 @@ exports.getTargetbyActivityPackageId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const { sql, bindings } = orderByYearMonth(
-      "year",
-      "month_index",
-      "asc",
-      "asc"
-    );
+    const { sql, bindings } = orderByYearMonth("year", "month", "asc", "asc");
 
     const originals = await knex("monev_targets")
       .where("monev_activity_packages_id", id)
@@ -80,7 +75,7 @@ exports.getTargetbyActivityPackageId = async (req, res) => {
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
   const payload = {
-    budgedTarget: req.body.budgedTarget,
+    budgetTarget: req.body.budgetTarget,
     physicalTarget: req.body.physicalTarget,
     description: req.body.description,
   };
@@ -211,7 +206,7 @@ exports.verification = async (req, res) => {
         "id",
         "month",
         "year",
-        "budged_target",
+        "budget_target",
         "physical_target",
         "description",
         "validation_status",
@@ -285,7 +280,7 @@ exports.verification = async (req, res) => {
 /**
  * updateTarget
  * Alur:
- * - Jika kedua kolom existing (budged_target & physical_target) masih 0/null => UPDATE langsung ke monev_targets
+ * - Jika kedua kolom existing (budget_target & physical_target) masih 0/null => UPDATE langsung ke monev_targets
  * - Jika salah satu sudah terisi (≠ 0 / tidak null) => INSERT ke monev_target_pending_updates + set monev_targets.validation_status = 1
  */
 async function updateTarget(trx, { id, payload, userId, userRoleId }) {
@@ -304,7 +299,7 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
   const isNullOrZero = (v) => v === null || Number(v) === 0;
   const now = trx.fn.now();
 
-  const budgedTarget = toNonNegInt(payload.budgedTarget);
+  const budgetTarget = toNonNegInt(payload.budgetTarget);
   const physicalTarget = toNonNegFloat(payload.physicalTarget);
   const { description } = payload;
 
@@ -317,7 +312,7 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
       "monev_activity_packages_id",
       "month",
       "year",
-      "budged_target",
+      "budget_target",
       "physical_target",
       "description",
       "validation_status",
@@ -343,7 +338,7 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
       validate_at: now,
       updated_at: now,
     };
-    if (isProvided(budgedTarget)) patch.budged_target = budgedTarget;
+    if (isProvided(budgetTarget)) patch.budget_target = budgetTarget;
     if (isProvided(physicalTarget)) patch.physical_target = physicalTarget;
     if (isProvided(description)) patch.description = description;
 
@@ -369,7 +364,7 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
 
   // === JALUR NORMAL ===
   const bothEmpty =
-    isNullOrZero(existing.budged_target) &&
+    isNullOrZero(existing.budget_target) &&
     isNullOrZero(existing.physical_target);
 
   if (bothEmpty) {
@@ -378,7 +373,7 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
       updated_at: now,
       edited_by: userId,
     };
-    if (isProvided(budgedTarget)) patch.budged_target = budgedTarget;
+    if (isProvided(budgetTarget)) patch.budget_target = budgetTarget;
     if (isProvided(physicalTarget)) patch.physical_target = physicalTarget;
     if (isProvided(description)) patch.description = description;
 
@@ -403,9 +398,9 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
     monev_activity_packages_id: existing.monev_activity_packages_id,
     month: existing.month,
     year: existing.year,
-    budged_target: isProvided(budgedTarget)
-      ? budgedTarget
-      : existing.budged_target,
+    budget_target: isProvided(budgetTarget)
+      ? budgetTarget
+      : existing.budget_target,
     physical_target: isProvided(physicalTarget)
       ? physicalTarget
       : existing.physical_target,
@@ -514,7 +509,7 @@ async function verifyTarget(trx, { id, payload, userId }) {
 
     // Salin nilai dari pending → target
     const patch = {
-      budged_target: latestPending.budged_target,
+      budget_target: latestPending.budget_target,
       physical_target: latestPending.physical_target,
       description: latestPending.description,
       validate_by: userId,

@@ -28,7 +28,7 @@ async function monthlyRealizationResource(monthlyRealization) {
     evidence: evidence_files,
     month: monthlyRealization.month,
     year: monthlyRealization.year,
-    budgedRealization: monthlyRealization.budged_realization,
+    budgetRealization: monthlyRealization.budget_realization,
     progress: monthlyRealization.progress,
     description: monthlyRealization.description,
     problem: monthlyRealization.problem,
