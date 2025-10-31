@@ -14,6 +14,12 @@ const upload = multer();
 router.use(rateLimiter, authMiddleware);
 
 router.get(
+  "/sso",
+  requirePermission(["view.monev_user"]),
+  monevUserController.getAllUserSso
+);
+
+router.get(
   "/index",
   requirePermission(["view.monev_user"]),
   monevUserController.index
