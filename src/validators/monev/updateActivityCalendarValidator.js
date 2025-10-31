@@ -8,16 +8,18 @@ const timezone = require("dayjs/plugin/timezone");
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-const TIME_DOT_RE = /^([01]\d|2[0-3])\.(\d{2})(?:\.(\d{2}))?$/; // HH.mm[.ss]
+const TIME_COLON_STRICT = /^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$/; // HH:mm:ss
+const TIME_DOT_STRICT = /^([01]\d|2[0-3])\.([0-5]\d)\.([0-5]\d)$/; // HH.mm.ss
 
-function normalizeTimeDotToColon(v) {
+function normalizeToHHMMSS(v) {
   const s = String(v || "").trim();
-  const m = s.match(TIME_DOT_RE);
-  if (!m) return s;
-  const hh = m[1];
-  const mm = m[2];
-  const ss = m[3] || "00";
-  return `${hh}:${mm}:${ss}`; // HH:mm:ss (8 chars)
+  if (TIME_COLON_STRICT.test(s)) return s; // sudah HH:mm:ss
+  const m = s.match(TIME_DOT_STRICT);
+  if (m) {
+    const [, hh, mm, ss] = m;
+    return `${hh}:${mm}:${ss}`; // konversi ke HH:mm:ss
+  }
+  return s;
 }
 
 exports.updateActivityCalendarValidator = [
@@ -99,23 +101,27 @@ exports.updateActivityCalendarValidator = [
 
   body("startedTime")
     .notEmpty()
-    .withMessage("Jam mulai wajib diisi (format HH.mm atau HH.mm.ss).")
+    .withMessage("Jam mulai wajib diisi (format HH:mm:ss).")
     .bail()
-    .custom((v) => TIME_DOT_RE.test(String(v).trim()))
-    .withMessage(
-      "Format jam mulai tidak valid. Gunakan HH.mm atau HH.mm.ss (24 jam)."
-    )
+    .custom((v) => {
+      const s = String(v || "").trim();
+      return TIME_COLON_STRICT.test(s) || TIME_DOT_STRICT.test(s);
+    })
+    .withMessage("Format jam mulai tidak valid. Gunakan HH:mm:ss (24 jam).")
     .bail()
-    .customSanitizer((v) => normalizeTimeDotToColon(v)),
+    .customSanitizer((v) => normalizeToHHMMSS(v)),
 
   body("finishedTime")
     .notEmpty()
-    .withMessage("Jam selesai wajib diisi (format HH.mm atau HH.mm.ss).")
+    .withMessage("Jam selesai wajib diisi (format HH:mm:ss atau HH.mm.ss).")
     .bail()
-    .custom((v) => TIME_DOT_RE.test(String(v).trim()))
+    .custom((v) => {
+      const s = String(v || "").trim();
+      return TIME_COLON_STRICT.test(s) || TIME_DOT_STRICT.test(s);
+    })
     .withMessage(
-      "Format jam selesai tidak valid. Gunakan HH.mm atau HH.mm.ss (24 jam)."
+      "Format jam selesai tidak valid. Gunakan HH:mm:ss atau HH.mm.ss (24 jam)."
     )
     .bail()
-    .customSanitizer((v) => normalizeTimeDotToColon(v)),
+    .customSanitizer((v) => normalizeToHHMMSS(v)),
 ];
