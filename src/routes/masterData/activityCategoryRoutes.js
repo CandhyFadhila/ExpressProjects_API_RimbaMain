@@ -52,4 +52,10 @@ router.delete(
   activityCategoryController.destroy
 );
 
+router.patch(
+  "/restore",
+  requirePermission(["restore.master_data"]),
+  activityCategoryController.restore
+);
+
 module.exports = router;

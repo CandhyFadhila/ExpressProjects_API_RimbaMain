@@ -52,10 +52,4 @@ router.delete(
   activityCalendarController.destroy
 );
 
-router.patch(
-  "/restore",
-  requirePermission(["restore.monev_activity_calendar"]),
-  activityCalendarController.restore
-);
-
 module.exports = router;
