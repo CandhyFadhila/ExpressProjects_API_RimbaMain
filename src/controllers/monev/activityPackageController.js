@@ -6,6 +6,7 @@ const {
   applyPagination,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
+const dateHelper = require("../../helpers/dateHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const activityPackageResource = require("../../resources/monev/activityPackageResource");
@@ -20,6 +21,29 @@ require("dayjs/locale/id");
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.locale("id");
+
+const path = require("path");
+const fs = require("fs");
+const fsp = fs.promises;
+const PDFDocument = require("pdfkit");
+const archiver = require("archiver");
+const BASE_TEMP_DIR = path.resolve(
+  process.cwd(),
+  "src",
+  "public",
+  "storage",
+  "documents",
+  "temp"
+);
+
+const slugify = (s) =>
+  String(s || "export")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+
+const ymToAbs = ({ y, m }) => y * 12 + m;
 
 exports.index = async (req, res) => {
   const { search } = req.query;
@@ -361,8 +385,134 @@ exports.update = async (req, res) => {
 // TODO: Nambah delete disini (hard delete)
 // Hapus data secara permanen semua id monev_activity_packages terkait. Termasuk tabel monev_targets, monev_target_pending_updates, monev_monthly_realizations, monev_monthly_realization_pending_updates
 
-// TODO: Nambah export pdf dan csv disini
+exports.export = async (req, res) => {
+  const { startDate, endDate } = req.query;
 
+  try {
+    // 1) Filter rentang (opsional)
+    let filterStartAbs = null;
+    let filterEndAbs = null;
+    if (startDate || endDate) {
+      const sYM = toYM(startDate || endDate);
+      const eYM = toYM(endDate || startDate);
+      if (!sYM || !eYM) {
+        const response = new WithoutDataResource(
+          422,
+          "INVALID_DATE",
+          "Validasi Tanggal Gagal",
+          "Format tanggal tidak valid. Gunakan ISO Z/offset atau YYYY-MM-DD."
+        );
+        return res.status(422).json(response.toResponse());
+      }
+      filterStartAbs = Math.min(ymToAbs(sYM), ymToAbs(eYM));
+      filterEndAbs = Math.max(ymToAbs(sYM), ymToAbs(eYM));
+    }
+
+    // 2) Ambil semua paket (overlap dengan rentang jika ada)
+    const q = knex("monev_activity_packages")
+      .select("*")
+      .whereNull("deleted_at");
+    if (filterStartAbs != null && filterEndAbs != null) {
+      q.whereRaw(
+        '(COALESCE("finished_year","started_year")*12 + COALESCE("finished_month","started_month")) >= ?',
+        [filterStartAbs]
+      ).whereRaw('("started_year"*12 + "started_month") <= ?', [filterEndAbs]);
+    }
+    const rows = await q.orderBy([
+      { column: "started_year", order: "asc" },
+      { column: "started_month", order: "asc" },
+      { column: "id", order: "asc" },
+    ]);
+
+    // 3) Build resource dan flatten 3 field + N/A
+    const resources = await Promise.all(
+      rows.map((r) => activityPackageResource(r))
+    );
+    const exportList = resources.map(
+      ({
+        // Pengecualian
+        target,
+        monthlyRealization,
+        createdAt,
+        updatedAt,
+        deletedAt,
+        sumBudgetRealization,
+        avgProgress,
+        ...flat
+      }) => {
+        const createdUserName = flat.createdUser?.name ?? "N/A";
+        const editedUserName = flat.editedUser?.name ?? "N/A";
+        const picDivisionTitle = flat.picDivision?.title ?? "N/A";
+        const base = {
+          ...flat,
+          createdUser: createdUserName,
+          editedUser: editedUserName,
+          picDivision: picDivisionTitle,
+          startedMonth: monthIdxToLabel(flat.startedMonth),
+          finishedMonth: monthIdxToLabel(flat.finishedMonth),
+        };
+        // Pastikan semua nilai non-null; string kosong -> "N/A"
+        for (const k of Object.keys(base)) {
+          base[k] = normalizeCell(base[k]);
+        }
+        return base;
+      }
+    );
+
+    // 4) Siapkan temp dir + file path
+    const baseName = `activity-packages${
+      startDate || endDate
+        ? "-" + slugify(`${startDate || ""}-${endDate || ""}`)
+        : ""
+    }`;
+    const folderName = `${Date.now()}-${slugify(baseName)}`;
+    const tempDir = path.join(BASE_TEMP_DIR, folderName);
+    await ensureTempDir(tempDir);
+
+    const csvPath = path.join(tempDir, `${baseName}.csv`);
+    const pdfPath = path.join(tempDir, `${baseName}.pdf`);
+
+    // 5) Buat CSV & PDF
+    await createCSV(exportList, csvPath);
+    await createPDF(exportList, pdfPath);
+
+    // 6) Siapkan header download ZIP
+    const zipFilename = `${baseName}.zip`;
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${zipFilename}"`
+    );
+
+    // Cleanup harus didaftarkan SEBELUM streaming dimulai
+    let cleaned = false;
+    const cleanupOnce = async () => {
+      if (cleaned) return;
+      cleaned = true;
+      try {
+        await cleanupTempDir(tempDir);
+      } catch (e) {
+        logger.warn(`| Export Cleanup | gagal hapus temp dir: ${e.message}`);
+      }
+    };
+    res.once("finish", cleanupOnce);
+    res.once("close", cleanupOnce);
+
+    // 7) Zip & stream ke response
+    await zipFilesToResponse([csvPath, pdfPath], res);
+  } catch (error) {
+    logger.error(
+      `| Activity Package MONEV | - Error function export: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
 
 const MONTHS_ID = [
   "Januari",
@@ -428,7 +578,6 @@ function enumerateMonthsByYear(
   return { items, startIdx, endIdx, startYear, endYear };
 }
 
-/** Auto-create monev_targets sesuai rentang bulan */
 async function autoCreateTargets(trx, pkgId, span) {
   const rows = span.items.map(({ year, month_index }) => ({
     monev_activity_packages_id: pkgId,
@@ -440,7 +589,6 @@ async function autoCreateTargets(trx, pkgId, span) {
   }
 }
 
-/** Auto-create monev_monthly_realizations sesuai rentang bulan */
 async function autoCreateMonthlyRealizations(trx, pkgId, span) {
   const rows = span.items.map(({ year, month_index }) => ({
     monev_activity_packages_id: pkgId,
@@ -451,4 +599,321 @@ async function autoCreateMonthlyRealizations(trx, pkgId, span) {
   if (rows.length) {
     await trx("monev_monthly_realizations").insert(rows);
   }
+}
+
+/** Helper untuk export */
+function toYM(dateString) {
+  if (!dateString) return null;
+  const dUTC = dateHelper._internals?.parseToUTC
+    ? dateHelper._internals.parseToUTC(dateString) // dayjs.utc instance
+    : null;
+  if (!dUTC || !dUTC.isValid()) return null;
+  const dWIB = dUTC.tz("Asia/Jakarta");
+  return { y: dWIB.year(), m: dWIB.month() }; // month: 0..11
+}
+
+function monthIdxToLabel(v) {
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 0 && n <= 11 ? MONTHS_ID[n] : "N/A";
+}
+
+/**
+ * Membuat CSV dari object "flat" exportData.
+ * - Object nested akan di-JSON.stringify agar tetap "sesuai resource".
+ * - Hanya 1 record per file (sesuai kebutuhan export detail).
+ */
+async function createCSV(list, outPath) {
+  let headers = [];
+  if (Array.isArray(list) && list.length > 0) {
+    const set = new Set();
+    list.forEach((obj) => Object.keys(obj || {}).forEach((k) => set.add(k)));
+    set.delete("id"); // buang id
+    const rest = Array.from(set);
+    headers = ["No", ...rest];
+  } else {
+    headers = ["No", "info"];
+    list = [{ info: "N/A" }];
+  }
+
+  const headerLine = headers.map(csvQuote).join(",");
+  const lines = [headerLine];
+
+  for (let i = 0; i < list.length; i++) {
+    const row = list[i] || {};
+    const values = headers.map((k) => {
+      if (k === "No") return csvQuote(String(i + 1)); // penomoran
+      return csvQuote(normalizeCell(row?.[k]));
+    });
+    lines.push(values.join(","));
+  }
+
+  await fsp.writeFile(outPath, lines.join("\n") + "\n", "utf8");
+}
+
+function csvQuote(s) {
+  const escaped = String(s).replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
+/**
+ * PDF A3 Landscape berisi key-value dari exportData (tanpa target & monthlyRealization).
+ * Layout sederhana dua kolom agar muat.
+ */
+async function createPDF(list, outPath) {
+  await new Promise((resolve, reject) => {
+    const doc = new PDFDocument({
+      size: "A3",
+      layout: "landscape",
+      margins: { top: 36, bottom: 36, left: 16, right: 16 },
+    });
+    const stream = fs.createWriteStream(outPath);
+    doc.pipe(stream);
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(16)
+      .text("Paket Kegiatan", { align: "left" });
+    doc.moveDown(0.5);
+
+    if (!Array.isArray(list) || list.length === 0) {
+      doc.font("Helvetica").fontSize(10).text("N/A");
+      doc.end();
+      stream.on("finish", resolve);
+      stream.on("error", reject);
+      doc.on("error", reject);
+      return;
+    }
+
+    // Header = union keys - id, lalu prepend "No"
+    const headerSet = new Set();
+    for (const obj of list)
+      Object.keys(obj || {}).forEach((k) => headerSet.add(k));
+    headerSet.delete("id");
+    const headers = ["No", ...Array.from(headerSet)];
+
+    // Geometry
+    const marginL = doc.page.margins.left;
+    const marginR = doc.page.margins.right;
+    const marginT = doc.page.margins.top;
+    const marginB = doc.page.margins.bottom;
+    const contentW = doc.page.width - marginL - marginR;
+    const padding = 6;
+    const minRowH = 18;
+
+    // === FIX: Kolom "No" dibuat kecil, sisanya dibagi merata ===
+    const noIdx = headers.indexOf("No"); // harus 0
+    const NO_WIDTH = 42; // kecil (±0.58 inch), muat 3 digit
+    const MIN_OTHER = 70;
+
+    // bagi rata ke selain "No"
+    const othersCount = headers.length - 1;
+    let baseW = Math.floor((contentW - NO_WIDTH) / Math.max(1, othersCount));
+    baseW = Math.max(MIN_OTHER, baseW);
+
+    let colWidths = headers.map((_, i) => (i === noIdx ? NO_WIDTH : baseW));
+
+    // stretch kolom terakhir agar total = contentW
+    const sumW = colWidths.reduce((a, b) => a + b, 0);
+    const diff = contentW - sumW;
+    if (Math.abs(diff) > 0) {
+      // cari kolom terlebar selain "No"
+      let idxMax =
+        noIdx === headers.length - 1 ? headers.length - 2 : headers.length - 1;
+      for (let i = 0; i < colWidths.length; i++) {
+        if (i !== noIdx && colWidths[i] > colWidths[idxMax]) idxMax = i;
+      }
+      colWidths[idxMax] += diff;
+    }
+
+    // Mulai tabel
+    doc.fontSize(9).font("Helvetica");
+    let cursorY = doc.y + 8;
+    const startX = marginL;
+
+    cursorY = drawTableHeader(
+      doc,
+      startX,
+      cursorY,
+      headers,
+      colWidths,
+      padding,
+      noIdx
+    );
+
+    // rows
+    for (let i = 0; i < list.length; i++) {
+      const row = list[i] || {};
+      const values = headers.map((h) =>
+        h === "No" ? String(i + 1) : normalizeCell(row[h])
+      );
+
+      const cellHeights = values.map((val, idx) =>
+        Math.max(
+          minRowH,
+          doc.heightOfString(val, { width: colWidths[idx] - padding * 2 }) +
+            padding * 2
+        )
+      );
+      const rowH = Math.max(...cellHeights);
+
+      if (cursorY + rowH > doc.page.height - marginB) {
+        doc.addPage({
+          size: "A3",
+          layout: "landscape",
+          margins: { top: 36, bottom: 36, left: 16, right: 16 },
+        });
+        cursorY = marginT;
+        cursorY = drawTableHeader(
+          doc,
+          startX,
+          cursorY,
+          headers,
+          colWidths,
+          padding,
+          noIdx
+        );
+      }
+
+      cursorY = drawTableRow(
+        doc,
+        startX,
+        cursorY,
+        values,
+        colWidths,
+        rowH,
+        padding,
+        i,
+        noIdx
+      );
+    }
+
+    doc.end();
+    stream.on("finish", resolve);
+    stream.on("error", reject);
+    doc.on("error", reject);
+  });
+}
+
+function drawTableHeader(doc, x, y, headers, colWidths, padding, noIdx = -1) {
+  const headerH = 22;
+  let cursorX = x;
+
+  doc.save();
+  doc
+    .rect(
+      x,
+      y,
+      colWidths.reduce((a, b) => a + b, 0),
+      headerH
+    )
+    .fill("#f2f2f2");
+  doc.restore();
+
+  doc.font("Helvetica-Bold").fillColor("black").fontSize(9);
+  for (let i = 0; i < headers.length; i++) {
+    doc.rect(cursorX, y, colWidths[i], headerH).stroke();
+    doc.text(headers[i], cursorX + padding, y + (padding - 1), {
+      width: colWidths[i] - padding * 2,
+      ellipsis: true,
+      align: i === noIdx ? "center" : "left",
+    });
+    cursorX += colWidths[i];
+  }
+  return y + headerH;
+}
+
+function drawTableRow(
+  doc,
+  x,
+  y,
+  values,
+  colWidths,
+  rowH,
+  padding,
+  idx,
+  noIdx = -1
+) {
+  let cursorX = x;
+
+  if (idx % 2 === 1) {
+    doc.save();
+    doc
+      .rect(
+        x,
+        y,
+        colWidths.reduce((a, b) => a + b, 0),
+        rowH
+      )
+      .fill("#fbfbfb");
+    doc.restore();
+  }
+
+  doc.font("Helvetica").fillColor("black").fontSize(9);
+  for (let i = 0; i < values.length; i++) {
+    doc.rect(cursorX, y, colWidths[i], rowH).stroke();
+    doc.text(values[i], cursorX + padding, y + padding, {
+      width: colWidths[i] - padding * 2,
+      height: rowH - padding * 2,
+      align: i === noIdx ? "center" : "left",
+    });
+    cursorX += colWidths[i];
+  }
+  return y + rowH;
+}
+
+function injectSoftWrap(str, chunk = 28) {
+  if (!str) return str;
+  const s = String(str);
+
+  if (s === "N/A" || s.length < chunk) return s;
+
+  let out = s;
+
+  const re = new RegExp(`([^\\s]{${chunk}})(?=[^\\s])`, "g");
+  out = out.replace(re, "$1\u200B");
+
+  if (s.length >= chunk * 2) {
+    out = out.replace(/([\/_.-])(?!\u200B)/g, "$1\u200B");
+  }
+  return out;
+}
+
+function normalizeCell(v) {
+  if (v == null) return "N/A";
+  if (typeof v === "string" && v.trim() === "") return "N/A";
+
+  if (typeof v === "object") {
+    try {
+      return injectSoftWrap(JSON.stringify(v));
+    } catch {
+      return "N/A";
+    }
+  }
+  return injectSoftWrap(String(v));
+}
+
+/**
+ * Me-zip file-file dan langsung stream ke response.
+ * Tidak menyimpan ZIP di disk (lebih efisien); cleanup dilakukan di 'finish' di controller.
+ */
+async function zipFilesToResponse(filePaths, res) {
+  await new Promise((resolve, reject) => {
+    const archive = archiver("zip", { zlib: { level: 9 } });
+    archive.on("error", reject);
+    res.on("close", resolve);
+
+    archive.pipe(res);
+    for (const p of filePaths) {
+      archive.file(p, { name: path.basename(p) });
+    }
+    archive.finalize();
+  });
+}
+
+async function ensureTempDir(dirPath) {
+  await fsp.mkdir(dirPath, { recursive: true });
+  return dirPath;
+}
+async function cleanupTempDir(dirPath) {
+  await fsp.rm(dirPath, { recursive: true, force: true });
 }

@@ -290,6 +290,8 @@ export const staticContents = {
       "en": "RIMBA Program Completion Percentage",
     },
   },
+  48,
+  49
 
   // INI ANOMALI //
 

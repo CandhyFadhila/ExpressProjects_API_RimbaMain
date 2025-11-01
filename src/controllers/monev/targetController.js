@@ -226,6 +226,36 @@ exports.verification = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
+    const monthIdx = parseMonthIndex(existing.month);
+    const yearNum = Number(existing.year);
+    if (!Number.isFinite(yearNum) || monthIdx == null) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "INVALID_PERIOD",
+        "Periode Tidak Valid",
+        "Nilai bulan/tahun tidak valid untuk diverifikasi."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
+    const now = new Date();
+    const nowYear = now.getFullYear();
+    const nowMonthIdx = now.getMonth();
+    const isFuture =
+      yearNum > nowYear || (yearNum === nowYear && monthIdx > nowMonthIdx);
+
+    if (isFuture) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "FUTURE_PERIOD_NOT_ALLOWED",
+        "Tidak Boleh Verifikasi Periode Mendatang",
+        `Periode ${existing.month} ${existing.year} masih di masa depan dan belum bisa diverifikasi.`
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
     if (existing.validation_status === 2 || existing.validation_status === 3) {
       const statusMap = { 1: "Pending", 2: "Approve", 3: "Rejected" };
       const response = new WithoutDataResource(
@@ -571,4 +601,55 @@ async function verifyTarget(trx, { id, payload, userId }) {
     year: target.year,
     patch: patchReject,
   };
+}
+
+function parseMonthIndex(m) {
+  if (m == null) return null;
+  const s = String(m).trim();
+
+  // jika angka: dukung "0..11" atau "1..12"
+  if (/^-?\d+$/.test(s)) {
+    const n = Number(s);
+    if (n >= 0 && n <= 11) return n; // penyimpanan 0..11
+    if (n >= 1 && n <= 12) return n - 1; // penyimpanan 1..12
+    return null;
+  }
+
+  // mapping nama bulan (EN + ID)
+  const map = {
+    jan: 0,
+    january: 0,
+    januari: 0,
+    feb: 1,
+    february: 1,
+    februari: 1,
+    mar: 2,
+    march: 2,
+    maret: 2,
+    apr: 3,
+    april: 3,
+    may: 4,
+    mei: 4,
+    jun: 5,
+    june: 5,
+    juni: 5,
+    jul: 6,
+    july: 6,
+    juli: 6,
+    aug: 7,
+    august: 7,
+    agustus: 7,
+    sep: 8,
+    sept: 8,
+    september: 8,
+    oct: 9,
+    october: 9,
+    oktober: 9,
+    nov: 10,
+    november: 10,
+    dec: 11,
+    december: 11,
+    desember: 11,
+  };
+  return map[s.toLowerCase()] ?? null;
 }

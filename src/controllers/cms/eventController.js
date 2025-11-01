@@ -46,7 +46,12 @@ exports.index = async (req, res) => {
       }
     );
 
-    applyLatestThenTrashed(query, "event.deleted_at", "event.created_at", "event.id");
+    applyLatestThenTrashed(
+      query,
+      "event.deleted_at",
+      "event.created_at",
+      "event.id"
+    );
 
     const paginationInfo = applyPagination(req.query);
 
@@ -877,63 +882,51 @@ async function validateFilesQuotaAndTypesOnUpdate({
   allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
   sizeLimitBytes = 10 * 1024 * 1024,
 }) {
-  // Normalisasi array dokumen yang saat ini tersimpan
   const currentIds = normIdArray(normJsonbArray(existingRow?.[dbColumn]), {
     as: "string",
   });
 
-  // Normalisasi daftar yang minta dihapus (kalau ada), lalu "simulasikan" state setelah dihapus
   const toDelete = toArray(deleteDocumentIds).map(String);
   const currentAfterDelete = currentIds.filter(
     (id) => !toDelete.includes(String(id))
   );
 
-  // Hitung sisa slot setelah penghapusan
-  const currentCount = currentAfterDelete.length;
-  const remaining = Math.max(maxFilesAllowed - currentCount, 0);
-
   const incomingCount = Array.isArray(files) ? files.length : 0;
 
-  if (currentCount === 0 && incomingCount === 0) {
+  if (currentIds.length === 0 && incomingCount === 0) {
     return {
       ok: false,
       http: 422,
-      code: "MINIMUM_FILE_REQUIRED",
-      title: "Minimal 1 File Harus Ada",
-      desc: "Minimal harus ada 1 file di dalam database.",
+      code: "FILES_NOT_FOUND",
+      title: "File Tidak Ditemukan",
+      desc: "File wajib diunggah untuk pertama kali.",
     };
   }
 
-  // Tidak upload file → boleh lanjut (validator hanya mengembalikan info remaining)
-  if (incomingCount === 0) {
-    return { ok: true, remaining };
+  const currentCount = currentAfterDelete.length;
+  const remaining = Math.max(maxFilesAllowed - currentCount, 0);
+
+  if (remaining === 0 && incomingCount > 0) {
+    return {
+      ok: false,
+      http: 422,
+      code: "MAX_CAPACITY",
+      title: "Kapasitas Sudah Penuh",
+      desc: "Kapasitas file untuk data ini sudah terpenuhi. Tidak ada slot tersisa.",
+    };
   }
 
-  // Sudah penuh tapi masih ada file yang dikirim
-  // if (remaining === 0) {
-  //   return {
-  //     ok: false,
-  //     http: 422,
-  //     code: "MAX_CAPACITY",
-  //     title: "Kapasitas Sudah Penuh",
-  //     desc: "Kapasitas file untuk data ini sudah terpenuhi. Tidak ada slot tersisa.",
-  //   };
-  // }
-
-  // Jika payload melebihi sisa slot → kembalikan info berapa yang boleh
   if (incomingCount > remaining) {
-    const s = remaining;
     return {
       ok: false,
       http: 422,
       code: "UPLOAD_LIMIT_EXCEEDED",
       title: "Terlalu Banyak File",
-      desc: `File yang diperbolehkan di upload adalah ${s} file.`,
+      desc: `File yang diperbolehkan diupload adalah ${remaining} file.`,
     };
   }
 
-  // Validasi tipe & ukuran per file
-  for (const f of files) {
+  for (const f of files || []) {
     if (!allowedTypes.includes(f.mimetype)) {
       return {
         ok: false,
@@ -951,7 +944,7 @@ async function validateFilesQuotaAndTypesOnUpdate({
         title: "Ukuran File Terlalu Besar",
         desc: `Ukuran maksimal tiap file adalah ${Math.floor(
           sizeLimitBytes / (1024 * 1024)
-        )}MB.`,
+        )}mB.`,
       };
     }
   }

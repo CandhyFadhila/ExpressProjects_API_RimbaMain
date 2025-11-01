@@ -46,4 +46,10 @@ router.patch(
   activityPackageController.update
 );
 
+router.get(
+  "/export",
+  requirePermission(["view.monev_activity"]),
+  activityPackageController.export
+);
+
 module.exports = router;
