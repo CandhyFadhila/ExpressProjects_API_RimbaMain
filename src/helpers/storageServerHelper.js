@@ -21,13 +21,13 @@ class StorageServerHelper {
   }
 
   static resolveBaseURL() {
-    const env = String(process.env.PG_ENV || "windows")
+    const env = String(process.env.PG_ENV || "development")
       .trim()
       .toLowerCase();
     switch (env) {
-      case "linux":
-        return "https://doc.rimbaexium.org";
-      case "windows":
+      case "production":
+        return "https://apidocwg.rimbaexium.org";
+      case "development":
         return "http://localhost:4001";
     }
   }

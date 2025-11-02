@@ -1,16 +1,16 @@
 const knex = require("knex");
 
-const env = (process.env.PG_ENV || "windows").toLowerCase();
+const env = (process.env.PG_ENV || "development").toLowerCase();
 
 const connections = {
-  windows: {
+  development: {
     host: "localhost",
     port: 5433,
     user: "postgres",
     password: "super.admin",
     database: "rimba_main",
   },
-  linux: {
+  production: {
     host: "localhost",
     port: 5432,
     user: "user_rimba",
@@ -19,7 +19,7 @@ const connections = {
   },
 };
 
-const connection = connections[env] || connections.windows;
+const connection = connections[env] || connections.development;
 
 const db = knex({
   client: "pg",

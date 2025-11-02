@@ -39,18 +39,20 @@ const shareReportRoutes = require("./routes/monev/shareReportRoutes");
 
 const app = express();
 
-app.set('trust proxy', 1);
+app.set("trust proxy", 1);
 
-function isLinux() {
+function isProduction() {
   return (
-    String(process.env.PG_ENV || "windows")
+    String(process.env.PG_ENV || "development")
       .trim()
-      .toLowerCase() === "linux"
+      .toLowerCase() === "production"
   );
 }
 
 function resolvePublicBaseUrl(port) {
-  return isLinux() ? "https://rimbaexium.org" : `http://localhost:${port}`;
+  return isProduction()
+    ? "https://apimainwg.rimbaexium.org"
+    : `http://localhost:${port}`;
 }
 
 // Middleware
@@ -58,7 +60,7 @@ app.use(corsMiddleware);
 app.use(express.json());
 app.use(morgan("dev"));
 
-if (isLinux()) {
+if (isProduction()) {
   app.set("trust proxy", 1);
 }
 
@@ -73,8 +75,8 @@ app.get("/", (req, res) => {
 // Cek db
 app.get("/check-db", async (req, res) => {
   try {
-    // Cek koneksi berdasarkan environment (Linux/Windows)
-    const env = process.env.PG_ENV || "windows";
+    // Cek koneksi berdasarkan environment (Development/Production)
+    const env = process.env.PG_ENV || "development";
     const database = require("./config/database"); // ini file database.js
 
     // Panggil query untuk cek waktu server database
