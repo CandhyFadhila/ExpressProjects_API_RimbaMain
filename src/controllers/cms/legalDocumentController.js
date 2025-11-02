@@ -177,21 +177,13 @@ exports.store = async (req, res) => {
     }
 
     for (const file of req.files) {
-      const allowedTypes = [
-        "application/pdf",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/vnd.ms-excel",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "application/vnd.ms-powerpoint",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      ];
+      const allowedTypes = ["application/pdf"];
       if (!allowedTypes.includes(file.mimetype)) {
         const response = new WithoutDataResource(
           422,
           "INVALID_FILE_TYPE",
           "Tipe File Salah",
-          "File File hanya boleh PDF, DOC, DOCX, XLS, XLSX, PPT, dan PPTX."
+          "File File hanya boleh PDF."
         );
         return res.status(422).json(response.toResponse());
       }
@@ -466,15 +458,7 @@ exports.update = async (req, res) => {
     }
 
     const deletedIds = toArray(deleteDocumentIds).map(String);
-    const allowedTypes = [
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-powerpoint",
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    ];
+    const allowedTypes = ["application/pdf"];
     const validation = await validateFilesQuotaAndTypesOnUpdate({
       existingRow: existing,
       deleteDocumentIds: deletedIds,
@@ -852,15 +836,7 @@ async function validateFilesQuotaAndTypesOnUpdate({
   files,
   dbColumn = "document_ids",
   maxFilesAllowed = 5,
-  allowedTypes = [
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/vnd.ms-powerpoint",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  ],
+  allowedTypes = ["application/pdf"],
   sizeLimitBytes = 20 * 1024 * 1024,
 }) {
   const currentIds = normIdArray(normJsonbArray(existingRow?.[dbColumn]), {
@@ -914,7 +890,7 @@ async function validateFilesQuotaAndTypesOnUpdate({
         http: 422,
         code: "INVALID_FILE_TYPE",
         title: "Tipe File Salah",
-        desc: `File hanya boleh bertipe: PDF, DOC, DOCX, XLS, XLSX, PPT, dan PPTX.`,
+        desc: `File hanya boleh bertipe PDF.`,
       };
     }
     if (f.size > sizeLimitBytes) {

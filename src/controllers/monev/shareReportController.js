@@ -452,6 +452,7 @@ exports.update = async (req, res) => {
   }
 };
 
+// TODO: Ubah menjadi delete permanen
 exports.destroy = async (req, res) => {
   const trx = await knex.transaction();
 

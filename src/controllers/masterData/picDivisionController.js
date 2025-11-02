@@ -549,6 +549,8 @@ exports.restore = async (req, res) => {
   }
 };
 
+// TODO: Buat jadi fitur create akun, dengan role monev
+// Jika email tersebut dihilangkan dari pic user, maka update account_status === 3
 exports.assignPic = async (req, res) => {
   const trx = await knex.transaction();
   const { userPic } = req.body;
