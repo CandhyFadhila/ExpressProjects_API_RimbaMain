@@ -24,6 +24,21 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.locale("id");
 
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+const MONTHS_ID = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
 const path = require("path");
 const fs = require("fs");
 const fsp = fs.promises;
@@ -384,7 +399,7 @@ exports.update = async (req, res) => {
   }
 };
 
-// Khusus permanen delete 
+// Khusus permanen delete
 exports.destroy = async (req, res) => {
   const trx = await knex.transaction();
 
@@ -513,38 +528,20 @@ exports.export = async (req, res) => {
   const { startDate, endDate } = req.query;
 
   try {
-    // 1) Filter rentang (opsional)
-    let filterStartAbs = null;
-    let filterEndAbs = null;
-    if (startDate || endDate) {
-      const sYM = toYM(startDate || endDate);
-      const eYM = toYM(endDate || startDate);
-      if (!sYM || !eYM) {
-        const response = new WithoutDataResource(
-          422,
-          "INVALID_DATE",
-          "Validasi Tanggal Gagal",
-          "Format tanggal tidak valid. Gunakan ISO Z/offset atau YYYY-MM-DD."
-        );
-        return res.status(422).json(response.toResponse());
-      }
-      filterStartAbs = Math.min(ymToAbs(sYM), ymToAbs(eYM));
-      filterEndAbs = Math.max(ymToAbs(sYM), ymToAbs(eYM));
-    }
-
-    // 2) Ambil semua paket (overlap dengan rentang jika ada)
     const q = knex("monev_activity_packages")
       .select("*")
       .whereNull("deleted_at");
-    if (filterStartAbs != null && filterEndAbs != null) {
-      q.whereRaw(
-        '(COALESCE("finished_year","started_year")*12 + COALESCE("finished_month","started_month")) >= ?',
-        [filterStartAbs]
-      ).whereRaw('("started_year"*12 + "started_month") <= ?', [filterEndAbs]);
+
+    if (startDate || endDate) {
+      const { startStr, endStr } = parseCreatedAtRange(startDate, endDate);
+      q.modify((qb) => {
+        if (startStr) qb.where("created_at", ">=", startStr);
+        if (endStr) qb.where("created_at", "<", endStr); // end exclusive
+      });
     }
+
     const rows = await q.orderBy([
-      { column: "started_year", order: "asc" },
-      { column: "started_month", order: "asc" },
+      { column: "created_at", order: "asc" },
       { column: "id", order: "asc" },
     ]);
 
@@ -638,20 +635,25 @@ exports.export = async (req, res) => {
   }
 };
 
-const MONTHS_ID = [
-  "Januari",
-  "Februari",
-  "Maret",
-  "April",
-  "Mei",
-  "Juni",
-  "Juli",
-  "Agustus",
-  "September",
-  "Oktober",
-  "November",
-  "Desember",
-];
+function parseCreatedAtRange(startDate, endDate) {
+  const sDate = startDate ? dateHelper.toUTC(startDate) : null;
+  const eDateRaw = endDate ? dateHelper.toUTC(endDate) : null;
+
+  let eDate = eDateRaw;
+  if (
+    endDate &&
+    typeof endDate === "string" &&
+    DATE_ONLY.test(endDate.trim())
+  ) {
+    // end exclusive = < (endDate + 1 day) 00:00
+    eDate = new Date(eDateRaw.getTime() + 24 * 60 * 60 * 1000);
+  }
+
+  return {
+    startStr: sDate ? dateHelper.toDatabaseUTC(sDate) : null,
+    endStr: eDate ? dateHelper.toDatabaseUTC(eDate) : null,
+  };
+}
 
 function toMonthIndex(v) {
   const n = Number(v);

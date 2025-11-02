@@ -1,6 +1,8 @@
 const { validationResult } = require("express-validator");
 const knex = require("../../config/database");
 const logger = require("../../utils/logger");
+const bcrypt = require("bcryptjs");
+const nodemailer = require("nodemailer");
 const { asJsonb } = require("../../helpers/dbJson");
 const {
   applySearch,
@@ -12,6 +14,12 @@ const {
   parseJsonSafe,
   isPlainObject,
 } = require("../../helpers/inputNorm");
+const {
+  stripTitlesOnly,
+  generateRandomPassword,
+} = require("../../helpers/credentialHelper");
+const renderEmailTemplate = require("../../utils/emailOTP/renderEmailTemplate");
+const { checkEmailDeliverability } = require("../../helpers/emailValidChecker");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const picDivisionResource = require("../../resources/masterData/picDivisionResource");
@@ -549,12 +557,12 @@ exports.restore = async (req, res) => {
   }
 };
 
-// TODO: Buat jadi fitur create akun, dengan role monev
-// Jika email tersebut dihilangkan dari pic user, maka update account_status === 3
 exports.assignPic = async (req, res) => {
   const trx = await knex.transaction();
   const { userPic } = req.body;
   const id = req.params.id;
+
+  let credentialsToSend = [];
 
   try {
     const existing = await trx("monev_pic_divisions").where("id", id).first();
@@ -579,13 +587,20 @@ exports.assignPic = async (req, res) => {
       await trx.rollback();
       return res.status(422).json(parsed.error.toResponse());
     }
-    const list = parsed.value; // [{name, email}, ...]
+    const list = parsed.value;
 
-    const checked = await validatePicUsers(trx, id, list);
-    if (checked.error) {
+    const precheck = await validatePicUsersForCreate(trx, id, list);
+    if (precheck.error) {
       await trx.rollback();
-      return res.status(422).json(checked.error.toResponse());
+      return res.status(422).json(precheck.error.toResponse());
     }
+
+    const created = await createPicUsers(trx, list);
+    if (created.error) {
+      await trx.rollback();
+      return res.status(422).json(created.error.toResponse());
+    }
+    credentialsToSend = created.credentials;
 
     await trx("monev_pic_divisions")
       .where("id", id)
@@ -604,6 +619,12 @@ exports.assignPic = async (req, res) => {
     );
 
     await trx.commit();
+
+    try {
+      await sendPicCredentials(credentialsToSend);
+    } catch (e) {
+      logger.warn(`[PIC Credential] Bulk send error: ${e.message}`);
+    }
 
     const response = new WithoutDataResource(
       200,
@@ -699,63 +720,49 @@ function handleUserPicArray(rawContent, opts = {}) {
   return { value: unique };
 }
 
-async function validatePicUsers(trx, divisionId, list) {
+async function validatePicUsersForCreate(trx, divisionId, list) {
+  // a) Unik di payload
+  const seen = new Set();
+  const dup = new Set();
+  for (const it of list) {
+    const key = it.email.toLowerCase();
+    if (seen.has(key)) dup.add(key);
+    else seen.add(key);
+  }
+  if (dup.size > 0) {
+    return {
+      error: new WithoutDataResource(
+        422,
+        "DUPLICATE_EMAIL",
+        "Email Duplikat di Payload",
+        `Terdapat email duplikat pada payload: ${[...dup].join(", ")}.`
+      ),
+    };
+  }
+
   const emailsLower = list.map((x) => x.email.toLowerCase());
 
-  // ---- 1) Ambil users by email (lowercase)
-  let usersByEmail = [];
+  // b) Email belum dipakai di tabel users
+  let used = [];
   if (emailsLower.length > 0) {
-    usersByEmail = await trx("users")
-      .select("id", "email", "role_id")
-      .whereIn(trx.raw("lower(email)"), emailsLower);
+    used = await trx("users")
+      .select(trx.raw("lower(email) as lemail"))
+      .whereIn(trx.raw("lower(email)"), emailsLower)
+      .whereNull("deleted_at");
   }
-
-  // a) Email harus terdaftar
-  const emailSet = new Set(
-    usersByEmail.map((u) => String(u.email).toLowerCase())
-  );
-  const missing = emailsLower.filter((e) => !emailSet.has(e));
-  if (missing.length > 0) {
+  if (used.length > 0) {
+    const already = used.map((r) => r.lemail);
     return {
       error: new WithoutDataResource(
         422,
-        "INVALID_USER_EMAILS",
-        "Pengguna Tidak Ditemukan",
-        `Beberapa email tidak terdaftar: ${missing.join(", ")}.`
+        "DUPLICATE_EMAIL",
+        "Duplikat Email",
+        `Email berikut sudah digunakan oleh akun lain: ${already.join(", ")}.`
       ),
     };
   }
 
-  // b) Semua user yang diassign harus role_id === 1
-  const invalidRoles = usersByEmail
-    .filter((u) => Number(u.role_id) !== 1)
-    .map((u) => u.email);
-  if (invalidRoles.length > 0) {
-    return {
-      error: new WithoutDataResource(
-        422,
-        "INVALID_USER_ROLES",
-        "Role Tidak Diizinkan",
-        `Hanya pengguna dengan role_id = 1 yang boleh ditetapkan sebagai PIC. Tidak valid: ${invalidRoles.join(
-          ", "
-        )}.`
-      ),
-    };
-  }
-
-  // c) Larang super admin utama (id === 1)
-  if (usersByEmail.some((u) => Number(u.id) === 1)) {
-    return {
-      error: new WithoutDataResource(
-        422,
-        "FORBIDDEN_USER_ID",
-        "User Tidak Diizinkan",
-        "User dengan ID 1 (super admin) tidak boleh ditetapkan sebagai PIC."
-      ),
-    };
-  }
-
-  // d) Cek rangkap divisi (email sudah ada di divisi lain)
+  // c) Anti rangkap divisi: email tidak boleh ada di user_pic divisi lain
   if (emailsLower.length > 0) {
     const placeholders = emailsLower.map(() => "?").join(",");
     const conflictSQL = `
@@ -770,9 +777,7 @@ async function validatePicUsers(trx, divisionId, list) {
       divisionId,
       ...emailsLower,
     ]);
-
     if (conflicts.length > 0) {
-      // group by email → daftar divisi yang konflik
       const byEmail = conflicts.reduce((acc, r) => {
         (acc[r.email] ||= []).push(r.title ?? `Divisi #${r.id}`);
         return acc;
@@ -780,7 +785,7 @@ async function validatePicUsers(trx, divisionId, list) {
       const detail = Object.entries(byEmail)
         .map(
           ([email, titles]) =>
-            `${email} (sudah ada di divisi: ${[...new Set(titles)].join(", ")})`
+            `${email} (sudah di: ${[...new Set(titles)].join(", ")})`
         )
         .join("; ");
 
@@ -795,5 +800,109 @@ async function validatePicUsers(trx, divisionId, list) {
     }
   }
 
-  return { usersByEmail };
+  return { emailsLower };
+}
+
+async function createPicUsers(trx, list) {
+  const createdUsers = [];
+  const credentials = [];
+
+  for (const item of list) {
+    const name = item.name;
+    const email = item.email;
+
+    // 1) Deliverability check (mirip contohmu)
+    const probe = await checkEmailDeliverability(email, {
+      useSmtp: true,
+      strict: false,
+      timeoutMs: 7000,
+      maxMx: 3,
+    });
+    logger.info(
+      `[email-check] ${email} -> ${probe.ok} (${probe.reason}) ${JSON.stringify(
+        probe.detail || []
+      )}`
+    );
+    if (!probe.ok) {
+      return {
+        error: new WithoutDataResource(
+          422,
+          "EMAIL_NOT_DELIVERABLE",
+          "Email Tidak Dapat Dikirim",
+          `Alamat email '${email}' tampaknya tidak dapat menerima email. Gunakan email lain.`
+        ),
+      };
+    }
+
+    // 2) Safety: cek lagi unik email (race condition)
+    const exists = await trx("users")
+      .whereRaw("lower(email) = lower(?)", [email])
+      .whereNull("deleted_at")
+      .first();
+    if (exists) {
+      return {
+        error: new WithoutDataResource(
+          422,
+          "DUPLICATE_EMAIL",
+          "Duplikat Data",
+          `Email '${email}' sudah digunakan oleh akun lain.`
+        ),
+      };
+    }
+
+    // 3) Buat akun
+    const displayName = stripTitlesOnly(name);
+    const rawPassword = generateRandomPassword(8);
+    const passwordHash = await bcrypt.hash(rawPassword, 12);
+
+    const [created] = await trx("users")
+      .insert({
+        name: displayName,
+        email,
+        role_id: 3,
+        account_status: 2,
+        password: passwordHash,
+      })
+      .returning(["id", "name", "email", "created_at"]);
+
+    createdUsers.push(created);
+    credentials.push({ name: displayName, email, password: rawPassword });
+  }
+
+  return { createdUsers, credentials };
+}
+
+async function sendPicCredentials(credentials) {
+  if (!credentials || credentials.length === 0) return;
+
+  const transporter = nodemailer.createTransport({
+    service: "Gmail",
+    auth: {
+      user: process.env.MAIL_USERNAME,
+      pass: process.env.MAIL_PASSWORD,
+    },
+  });
+
+  for (const cred of credentials) {
+    const htmlBody = renderEmailTemplate("credential_monev.html", {
+      name: cred.name,
+      email: cred.email,
+      password: cred.password,
+      login_url: process.env.APP_LOGIN_URL || "#",
+      from_email: process.env.MAIL_USERNAME,
+      year: new Date().getFullYear(),
+    });
+
+    try {
+      await transporter.sendMail({
+        from: `"Rimba" <${process.env.MAIL_USERNAME}>`,
+        to: cred.email,
+        subject: "Credential Akun PIC MONEV RIMBA",
+        html: htmlBody,
+      });
+      logger.info(`[PIC Credential] sent to ${cred.email}`);
+    } catch (e) {
+      logger.warn(`[PIC Credential] FAILED to ${cred.email}: ${e.message}`);
+    }
+  }
 }

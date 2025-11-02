@@ -52,10 +52,4 @@ router.delete(
   shareReportController.destroy
 );
 
-router.patch(
-  "/restore",
-  requirePermission(["restore.monev_share_report"]),
-  shareReportController.restore
-);
-
 module.exports = router;

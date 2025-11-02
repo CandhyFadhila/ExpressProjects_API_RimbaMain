@@ -452,7 +452,7 @@ exports.update = async (req, res) => {
   }
 };
 
-// TODO: Ubah menjadi delete permanen
+// TODO: Bugs, file gamau ke delete
 exports.destroy = async (req, res) => {
   const trx = await knex.transaction();
 
@@ -484,25 +484,46 @@ exports.destroy = async (req, res) => {
     }
 
     const existing = await trx("monev_share_reports")
-      .select("id", "name")
-      .whereIn("id", ids)
-      .whereNull("deleted_at");
+      .select("id", "name", "report_file_ids")
+      .whereIn("id", ids);
+
     if (existing.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Tidak ada data laporan yang cocok atau sudah terhapus.`
+        "Tidak ada data laporan yang cocok."
       );
       return res.status(200).json(response.toResponse());
     }
 
     const existingIds = existing.map((r) => r.id);
 
-    await trx("monev_share_reports").whereIn("id", existingIds).update({
-      deleted_at: trx.fn.now(),
-    });
+    const allFileIds = [];
+    for (const r of existing) {
+      const arr = normJsonbArray(r?.report_file_ids);
+      const fileIds = normIdArray(arr, { as: "number" })
+        .filter(Number.isFinite);
+      allFileIds.push(...fileIds);
+    }
+    const uniqueFileIds = [...new Set(allFileIds)];
+
+    if (uniqueFileIds.length > 0) {
+      try {
+        await documentHelper.deleteDocuments(uniqueFileIds);
+      } catch (e) {
+        logger.warn(
+          `| Share Report MONEV | - Gagal hapus files (${uniqueFileIds.join(
+            ", "
+          )}): ${e.message}`
+        );
+      }
+    }
+
+    const deletedCount = await trx("monev_share_reports")
+      .whereIn("id", existingIds)
+      .del();
 
     await activityLogHelper.logDelete(
       {
@@ -519,7 +540,7 @@ exports.destroy = async (req, res) => {
       200,
       "SUCCESS_DELETE_DATA",
       "Berhasil Menghapus Data",
-      `Berhasil menghapus (soft delete) ${existingIds.length} data laporan.`
+      `Berhasil menghapus secara permanen ${deletedCount} data laporan.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
@@ -534,152 +555,6 @@ exports.destroy = async (req, res) => {
       "Terjadi kesalahan pada sistem. Silakan coba lagi nanti."
     );
     return res.status(500).json(response.toResponse());
-  }
-};
-
-exports.restore = async (req, res) => {
-  const trx = await knex.transaction();
-
-  try {
-    const ids = normIdArray(req.body?.restoreIds, { as: "number" }).filter(
-      Number.isFinite
-    );
-    if (ids.length === 0) {
-      await trx.rollback();
-      const response = new WithoutDataResource(
-        422,
-        "INVALID_INPUT",
-        "Gagal Menghapus Data",
-        "Mohon kirimkan restoreIds berupa array ID numerik, misal: [1,2,3]."
-      );
-      return res.status(422).json(response.toResponse());
-    }
-
-    const MAX_BULK = 50;
-    if (ids.length > MAX_BULK) {
-      await trx.rollback();
-      const response = new WithoutDataResource(
-        422,
-        "TOO_MANY_IDS",
-        "Terlalu Banyak Data",
-        `Maksimal id yang bisa dikembalikan adalah ${MAX_BULK} ID.`
-      );
-      return res.status(422).json(response.toResponse());
-    }
-
-    const softDeleted = await trx("monev_share_reports")
-      .select("id", "name")
-      .whereIn("id", ids)
-      .whereNotNull("deleted_at");
-    if (softDeleted.length === 0) {
-      await trx.rollback();
-      const response = new WithoutDataResource(
-        200,
-        "DATA_NOT_FOUND",
-        "Data Tidak Ditemukan",
-        `Tidak ada data laporan terhapus yang cocok untuk direstore.`
-      );
-      return res.status(200).json(response.toResponse());
-    }
-
-    // 1) Cek bentrok judul dengan entri aktif
-    const namesLower = softDeleted.map((r) => r.name?.toLowerCase?.() ?? "");
-    const activeWithSameTitle = await trx("monev_share_reports")
-      .select(knex.raw("lower(name) AS lname"))
-      .whereNull("deleted_at")
-      .whereIn(knex.raw("lower(name)"), namesLower);
-
-    const conflictActive = new Set(activeWithSameTitle.map((r) => r.lname));
-
-    // 2) Cek duplikat judul di dalam batch restore sendiri
-    const seenBatch = new Set();
-    const duplicateInBatch = new Set();
-    for (const r of softDeleted) {
-      const lt = (r.name || "").toLowerCase();
-      if (seenBatch.has(lt)) duplicateInBatch.add(lt);
-      else seenBatch.add(lt);
-    }
-
-    // 3) Tentukan mana yang boleh direstore (tidak bentrok & bukan duplikat batch)
-    const restorable = [];
-    const skippedConflicts = [];
-    const takenInBatch = new Set(); // untuk hanya ambil satu per name di batch
-
-    for (const r of softDeleted) {
-      const lt = (r.name || "").toLowerCase();
-      const hasActiveConflict = conflictActive.has(lt);
-      const hasBatchDup = duplicateInBatch.has(lt);
-
-      if (hasActiveConflict || hasBatchDup) {
-        skippedConflicts.push({ id: r.id, name: r.name });
-        continue;
-      }
-      if (takenInBatch.has(lt)) {
-        skippedConflicts.push({ id: r.id, name: r.name });
-        continue;
-      }
-      takenInBatch.add(lt);
-      restorable.push(r);
-    }
-
-    // 4) Eksekusi restore
-    let restoredCount = 0;
-    if (restorable.length > 0) {
-      const idsToRestore = restorable.map((r) => r.id);
-      await trx("monev_share_reports")
-        .whereIn("id", idsToRestore)
-        .update({ deleted_at: null, updated_at: trx.fn.now() });
-      restoredCount = idsToRestore.length;
-    }
-
-    await activityLogHelper.logRestore(
-      {
-        userId: activityLogHelper.fromReq(req),
-        module: "monev",
-        subject: "List Laporan",
-      },
-      trx
-    );
-
-    await trx.commit();
-
-    if (restoredCount === 0) {
-      const response = new WithoutDataResource(
-        422,
-        "DUPLICATE_NAME",
-        "Restore Gagal",
-        "Semua ID gagal direstore karena duplikat data dengan entri aktif atau duplikat data di dalam batch."
-      );
-      return res.status(422).json(response.toResponse());
-    }
-
-    const descParts = [
-      `Berhasil mengembalikan ${restoredCount} data yang terhapus.`,
-    ];
-    if (skippedConflicts.length) {
-      descParts.push(
-        `Terlewat ${skippedConflicts.length} karena bentrok/duplikat data.`
-      );
-    }
-
-    const response = new WithoutDataResource(
-      200,
-      "SUCCESS_RESTORE_DATA",
-      "Berhasil Mengembalikan Data",
-      descParts.join(" ")
-    );
-    return res.status(200).json(response.toResponse());
-  } catch (error) {
-    logger.error(
-      `| Share Report MONEV | - Error function restore: ${error.message}`
-    );
-    const response = new WithoutDataResource(
-      500,
-      "SERVER_ERROR",
-      "Server Sedang Error",
-      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
-    );
-    res.status(500).json(response.toResponse());
   }
 };
 
