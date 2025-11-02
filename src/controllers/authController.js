@@ -725,6 +725,26 @@ async function signInWithContext(
       return res.status(422).json(response.toResponse());
     }
 
+    if (context === "super_admin") {
+      const isPic = await isEmailRegisteredAsMonevPIC({
+        userId: user.id,
+        email: user.email,
+      });
+
+      if (isPic) {
+        logger.info(
+          `| Login | - Denied super_admin login for PIC MONEV email: ${email}`
+        );
+        const response = new WithoutDataResource(
+          403,
+          "FORBIDDEN_CONTEXT_PIC_MONEV",
+          "Konteks Tidak Sesuai",
+          "Akun Anda terdaftar sebagai PIC pada modul MONEV. Silakan login melalui konteks yang sesuai."
+        );
+        return res.status(403).json(response.toResponse());
+      }
+    }
+
     // Validasi status akun: 1 (nonaktif) dan 3 (suspended) -> TOLAK
     const status = Number(user.account_status);
     if (status === 1) {
@@ -837,4 +857,44 @@ async function signInWithContext(
     );
     return res.status(500).json(response.toResponse());
   }
+}
+
+async function isEmailRegisteredAsMonevPIC({ userId, email }) {
+  const emailStr = String(email || "").trim();
+  const emailLower = emailStr.toLowerCase();
+
+  // 1) Array of strings: cari email langsung
+  const byEmailString = await knex("monev_pic_divisions")
+    .whereRaw("user_pic @> ?::jsonb", [JSON.stringify([emailStr])])
+    .first();
+  if (byEmailString) return true;
+
+  // 2) Array of objects: elem.email match (case-insensitive)
+  const byObjectEmail = await knex("monev_pic_divisions")
+    .whereRaw(
+      "EXISTS (SELECT 1 FROM jsonb_array_elements(user_pic) elem WHERE lower(elem->>'email') = ?)",
+      [emailLower]
+    )
+    .first();
+  if (byObjectEmail) return true;
+
+  // 3) Array of numbers: mengandung userId
+  const uid = Number(userId);
+  if (Number.isFinite(uid)) {
+    const byIdArray = await knex("monev_pic_divisions")
+      .whereRaw("user_pic @> ?::jsonb", [JSON.stringify([uid])])
+      .first();
+    if (byIdArray) return true;
+
+    // 4) Array of objects: elem.id / elem.user_id cocok (disimpan sebagai string/number)
+    const byObjectId = await knex("monev_pic_divisions")
+      .whereRaw(
+        "EXISTS (SELECT 1 FROM jsonb_array_elements(user_pic) elem WHERE (elem->>'id') = ? OR (elem->>'user_id') = ?)",
+        [String(uid), String(uid)]
+      )
+      .first();
+    if (byObjectId) return true;
+  }
+
+  return false;
 }

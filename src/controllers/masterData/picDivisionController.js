@@ -1,13 +1,17 @@
 const { validationResult } = require("express-validator");
 const knex = require("../../config/database");
 const logger = require("../../utils/logger");
-const { normIdArray } = require("../../helpers/inputNorm");
 const { asJsonb } = require("../../helpers/dbJson");
 const {
   applySearch,
   applyPagination,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
+const {
+  normIdArray,
+  parseJsonSafe,
+  isPlainObject,
+} = require("../../helpers/inputNorm");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const picDivisionResource = require("../../resources/masterData/picDivisionResource");
@@ -77,7 +81,6 @@ exports.index = async (req, res) => {
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
   const { title, description } = req.body;
-
 
   try {
     const errors = validationResult(req);
@@ -548,7 +551,7 @@ exports.restore = async (req, res) => {
 
 exports.assignPic = async (req, res) => {
   const trx = await knex.transaction();
-  const { userIds } = req.body;
+  const { userPic } = req.body;
   const id = req.params.id;
   const userIdAuth =
     req.auth?.userId ??
@@ -556,11 +559,6 @@ exports.assignPic = async (req, res) => {
     req.auth?.id ??
     req.userId ??
     req.user?.id;
-
-  const rawUserIds = normIdArray(userIds, { as: "number" }).filter(
-    Number.isFinite
-  );
-  const uniqueUserIds = [...new Set(rawUserIds)];
 
   try {
     const existing = await trx("monev_pic_divisions").where("id", id).first();
@@ -602,39 +600,28 @@ exports.assignPic = async (req, res) => {
       return res.status(403).json(response.toResponse());
     }
 
-    if (uniqueUserIds.includes(1)) {
+    const parsed = handleUserPicArray(userPic, {
+      allowEmpty: false,
+      fieldLabel: "userPic",
+      maxNameLen: 255,
+      maxEmailLen: 255,
+    });
+    if (parsed.error) {
       await trx.rollback();
-      const response = new WithoutDataResource(
-        422,
-        "FORBIDDEN_USER_ID",
-        "User Tidak Diizinkan",
-        "User dengan ID 1 tidak boleh ditetapkan sebagai PIC."
-      );
-      return res.status(422).json(response.toResponse());
+      return res.status(422).json(parsed.error.toResponse());
     }
+    const list = parsed.value; // [{name, email}, ...]
 
-    if (uniqueUserIds.length > 0) {
-      const foundIds = await trx("users")
-        .whereIn("id", uniqueUserIds)
-        .pluck("id");
-      const foundSet = new Set(foundIds.map(Number));
-      const missing = uniqueUserIds.filter((id) => !foundSet.has(id));
-      if (missing.length > 0) {
-        await trx.rollback();
-        const response = new WithoutDataResource(
-          422,
-          "INVALID_USER_IDS",
-          "Pengguna Tidak Ditemukan",
-          `Beberapa userIds tidak valid: ${missing.join(", ")}.`
-        );
-        return res.status(422).json(response.toResponse());
-      }
+    const checked = await validatePicUsers(trx, id, list);
+    if (checked.error) {
+      await trx.rollback();
+      return res.status(422).json(checked.error.toResponse());
     }
 
     await trx("monev_pic_divisions")
       .where("id", id)
       .update({
-        user_pic: asJsonb(uniqueUserIds),
+        user_pic: asJsonb(list),
         updated_at: trx.fn.now(),
       });
 
@@ -670,3 +657,174 @@ exports.assignPic = async (req, res) => {
     return res.status(500).json(response.toResponse());
   }
 };
+
+function handleUserPicArray(rawContent, opts = {}) {
+  const {
+    allowEmpty = false,
+    maxNameLen = 255,
+    maxEmailLen = 255,
+    fieldLabel = "userPic",
+  } = opts;
+
+  let arr = rawContent;
+  if (typeof arr === "string") arr = parseJsonSafe(arr) ?? arr;
+
+  if (!Array.isArray(arr)) {
+    const err = new WithoutDataResource(
+      422,
+      "INVALID_CONTENT_FORMAT",
+      "Format Konten Salah",
+      `${fieldLabel} format harus array of object dengan properti { name: string, email: string }.`
+    );
+    return { error: err };
+  }
+
+  // regex email sederhana & robust
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+  const cleaned = arr
+    .map((it) => {
+      if (!isPlainObject(it)) return null;
+      let { name, email } = it;
+
+      // validasi name
+      if (typeof name !== "string") return null;
+      name = name.trim();
+      if (name.length === 0) return null;
+      if (typeof maxNameLen === "number" && name.length > maxNameLen)
+        return null;
+
+      // validasi email
+      if (typeof email !== "string") return null;
+      email = email.trim();
+      if (email.length === 0) return null;
+      if (typeof maxEmailLen === "number" && email.length > maxEmailLen)
+        return null;
+      if (!emailRe.test(email)) return null; // format email invalid
+
+      return { name, email };
+    })
+    .filter(Boolean);
+
+  if (!allowEmpty && cleaned.length === 0) {
+    const err = new WithoutDataResource(
+      422,
+      "INVALID_CONTENT_ITEMS",
+      "Elemen Konten Tidak Valid",
+      `Setiap elemen ${fieldLabel} harus objek { name, email } dan minimal satu elemen valid.`
+    );
+    return { error: err };
+  }
+
+  // dedupe by lower(email)
+  const seen = new Set();
+  const unique = [];
+  for (const it of cleaned) {
+    const key = it.email.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(it);
+    }
+  }
+
+  return { value: unique };
+}
+
+async function validatePicUsers(trx, divisionId, list) {
+  const emailsLower = list.map((x) => x.email.toLowerCase());
+
+  // ---- 1) Ambil users by email (lowercase)
+  let usersByEmail = [];
+  if (emailsLower.length > 0) {
+    usersByEmail = await trx("users")
+      .select("id", "email", "role_id")
+      .whereIn(trx.raw("lower(email)"), emailsLower);
+  }
+
+  // a) Email harus terdaftar
+  const emailSet = new Set(
+    usersByEmail.map((u) => String(u.email).toLowerCase())
+  );
+  const missing = emailsLower.filter((e) => !emailSet.has(e));
+  if (missing.length > 0) {
+    return {
+      error: new WithoutDataResource(
+        422,
+        "INVALID_USER_EMAILS",
+        "Pengguna Tidak Ditemukan",
+        `Beberapa email tidak terdaftar: ${missing.join(", ")}.`
+      ),
+    };
+  }
+
+  // b) Semua user yang diassign harus role_id === 1
+  const invalidRoles = usersByEmail
+    .filter((u) => Number(u.role_id) !== 1)
+    .map((u) => u.email);
+  if (invalidRoles.length > 0) {
+    return {
+      error: new WithoutDataResource(
+        422,
+        "INVALID_USER_ROLES",
+        "Role Tidak Diizinkan",
+        `Hanya pengguna dengan role_id = 1 yang boleh ditetapkan sebagai PIC. Tidak valid: ${invalidRoles.join(
+          ", "
+        )}.`
+      ),
+    };
+  }
+
+  // c) Larang super admin utama (id === 1)
+  if (usersByEmail.some((u) => Number(u.id) === 1)) {
+    return {
+      error: new WithoutDataResource(
+        422,
+        "FORBIDDEN_USER_ID",
+        "User Tidak Diizinkan",
+        "User dengan ID 1 (super admin) tidak boleh ditetapkan sebagai PIC."
+      ),
+    };
+  }
+
+  // d) Cek rangkap divisi (email sudah ada di divisi lain)
+  if (emailsLower.length > 0) {
+    const placeholders = emailsLower.map(() => "?").join(",");
+    const conflictSQL = `
+      SELECT d.id, d.title, lower(e->>'email') AS email
+      FROM monev_pic_divisions d
+      CROSS JOIN LATERAL jsonb_array_elements(COALESCE(d.user_pic, '[]'::jsonb)) AS e
+      WHERE d.deleted_at IS NULL
+        AND d.id <> ?
+        AND lower(e->>'email') IN (${placeholders})
+    `;
+    const { rows: conflicts } = await trx.raw(conflictSQL, [
+      divisionId,
+      ...emailsLower,
+    ]);
+
+    if (conflicts.length > 0) {
+      // group by email → daftar divisi yang konflik
+      const byEmail = conflicts.reduce((acc, r) => {
+        (acc[r.email] ||= []).push(r.title ?? `Divisi #${r.id}`);
+        return acc;
+      }, {});
+      const detail = Object.entries(byEmail)
+        .map(
+          ([email, titles]) =>
+            `${email} (sudah ada di divisi: ${[...new Set(titles)].join(", ")})`
+        )
+        .join("; ");
+
+      return {
+        error: new WithoutDataResource(
+          422,
+          "DUPLICATE_PIC_ASSIGNMENT",
+          "Rangkap Divisi Tidak Diizinkan",
+          `Beberapa email sudah terdaftar pada divisi lain: ${detail}.`
+        ),
+      };
+    }
+  }
+
+  return { usersByEmail };
+}

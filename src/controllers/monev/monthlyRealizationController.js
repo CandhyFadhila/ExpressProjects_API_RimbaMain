@@ -145,7 +145,7 @@ exports.update = async (req, res) => {
     if (payload.budgetRealization !== undefined) {
       const norm = handleBudgetRealizationArray(payload.budgetRealization, {
         allowEmpty: false,
-        maxNameLen: 100,
+        maxNameLen: 255,
         fieldLabel: "budgetRealization",
       });
       if (norm.error) {
@@ -814,7 +814,7 @@ async function validateFilesQuotaAndTypesOnUpdate({
 function handleBudgetRealizationArray(rawContent, opts = {}) {
   const {
     allowEmpty = false,
-    maxNameLen = 100,
+    maxNameLen = 255,
     fieldLabel = "budgetRealization",
   } = opts;
 
