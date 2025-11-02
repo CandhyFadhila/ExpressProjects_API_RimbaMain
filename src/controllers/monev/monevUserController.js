@@ -28,6 +28,7 @@ exports.getAllUserSso = async (req, res) => {
   try {
     let query = knex("users as user")
       .select([
+        "user.id",
         "user.name",
         "user.email",
         "user.role_id",
