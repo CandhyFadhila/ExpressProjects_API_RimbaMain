@@ -6,7 +6,9 @@ const {
   applyPagination,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
+const { normJsonbArray, normIdArray } = require("../../helpers/inputNorm");
 const dateHelper = require("../../helpers/dateHelper");
+const documentHelper = require("../../helpers/documentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const activityPackageResource = require("../../resources/monev/activityPackageResource");
@@ -382,8 +384,130 @@ exports.update = async (req, res) => {
   }
 };
 
-// TODO: Nambah delete disini (hard delete)
-// Hapus data secara permanen semua id monev_activity_packages terkait. Termasuk tabel monev_targets, monev_target_pending_updates, monev_monthly_realizations, monev_monthly_realization_pending_updates
+// Khusus permanen delete 
+exports.destroy = async (req, res) => {
+  const trx = await knex.transaction();
+
+  try {
+    const ids = normIdArray(req.body?.deleteIds, { as: "number" }).filter(
+      Number.isFinite
+    );
+    if (ids.length === 0) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "INVALID_INPUT",
+        "Gagal Menghapus Data",
+        "Mohon kirimkan deleteIds berupa array ID numerik, misal: [1,2,3]."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
+    const MAX_BULK = 50;
+    if (ids.length > MAX_BULK) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "TOO_MANY_IDS",
+        "Terlalu Banyak Data",
+        `Maksimal id yang bisa dihapus adalah ${MAX_BULK} ID.`
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
+    const existing = await trx("monev_activity_packages")
+      .select("id", "name")
+      .whereIn("id", ids);
+    if (existing.length === 0) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Tidak ada data paket kegiatan yang cocok atau sudah terhapus.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const existingIds = existing.map((r) => r.id);
+
+    const [rowsOrig, rowsPending] = await Promise.all([
+      trx("monev_monthly_realizations")
+        .select("evidence_file_ids")
+        .whereIn("monev_activity_packages_id", existingIds),
+      trx("monev_monthly_realization_pending_updates")
+        .select("evidence_file_ids")
+        .whereIn("monev_activity_packages_id", existingIds),
+    ]);
+
+    const allEvidenceIds = [];
+    const collect = (arrLike) => {
+      const arr = normJsonbArray(arrLike);
+      const ids = normIdArray(arr, { as: "number" }).filter(Number.isFinite);
+      allEvidenceIds.push(...ids);
+    };
+
+    for (const r of rowsOrig) collect(r?.evidence_file_ids);
+    for (const r of rowsPending) collect(r?.evidence_file_ids);
+
+    const uniqueEvidenceIds = [...new Set(allEvidenceIds)];
+
+    if (uniqueEvidenceIds.length > 0) {
+      try {
+        await documentHelper.deleteDocuments(uniqueEvidenceIds);
+      } catch (e) {
+        logger.warn(
+          `| Activity Package MONEV | - Gagal hapus evidence files (${uniqueEvidenceIds.join(
+            ", "
+          )}): ${e.message}`
+        );
+      }
+    }
+
+    await trx("monev_targets")
+      .whereIn("monev_activity_packages_id", existingIds)
+      .del();
+
+    await trx("monev_monthly_realizations")
+      .whereIn("monev_activity_packages_id", existingIds)
+      .del();
+
+    const deletedParent = await trx("monev_activity_packages")
+      .whereIn("id", existingIds)
+      .del();
+
+    await activityLogHelper.logDelete(
+      {
+        userId: activityLogHelper.fromReq(req),
+        module: "monev",
+        subject: "List Aktivitas Paket Kegiatan",
+      },
+      trx
+    );
+
+    await trx.commit();
+
+    const response = new WithoutDataResource(
+      200,
+      "SUCCESS_DELETE_DATA",
+      "Berhasil Menghapus Data",
+      `Berhasil menghapus secara permanen ${deletedParent} data paket kegiatan.`
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    await trx.rollback();
+    logger.error(
+      `| Activity Package MONEV | - Error function destroy : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem. Silakan coba lagi nanti."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
 
 exports.export = async (req, res) => {
   const { startDate, endDate } = req.query;

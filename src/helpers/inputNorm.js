@@ -141,7 +141,7 @@ function normUUIDv4Array(value, key = "id") {
 function handleLocalizedText(raw, opts = {}) {
   const {
     allowPartial = false, // true untuk update (boleh hanya id atau en saja)
-    maxLen = 255, // default batas name; set undefined/null untuk no-limit (mis. description)
+    maxLen = undefined, // default batas name; set undefined/null untuk no-limit (mis. description)
     fieldLabel = "teks", // label untuk pesan error
   } = opts;
 

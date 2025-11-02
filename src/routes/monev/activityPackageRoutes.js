@@ -46,6 +46,12 @@ router.patch(
   activityPackageController.update
 );
 
+router.delete(
+  "/delete",
+  requirePermission(["delete.monev_activity"]),
+  activityPackageController.destroy
+);
+
 router.get(
   "/export",
   requirePermission(["view.monev_activity"]),
