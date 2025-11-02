@@ -59,7 +59,7 @@ exports.index = async (req, res) => {
 
     applyLatestThenTrashed(
       query,
-      "activity.deleted_at",
+      // "activity.deleted_at",
       "activity.created_at",
       "activity.id"
     );
