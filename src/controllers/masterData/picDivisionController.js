@@ -553,12 +553,6 @@ exports.assignPic = async (req, res) => {
   const trx = await knex.transaction();
   const { userPic } = req.body;
   const id = req.params.id;
-  const userIdAuth =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
 
   try {
     const existing = await trx("monev_pic_divisions").where("id", id).first();
@@ -571,33 +565,6 @@ exports.assignPic = async (req, res) => {
         `Data divisi dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
-    }
-
-    const user = await knex("users")
-      .select("id", "role_id")
-      .where({ id: userIdAuth })
-      .first();
-    if (!user) {
-      await trx.rollback();
-      const response = new WithoutDataResource(
-        200,
-        "INVALID_USER_ID",
-        "Akun Tidak Ditemukan",
-        `Akun dengan id '${id}' tidak ditemukan.`
-      );
-      return res.status(200).json(response.toResponse());
-    }
-
-    const userRoleId = Number(user.role_id);
-    if (userRoleId !== 3) {
-      await trx.rollback();
-      const response = new WithoutDataResource(
-        403,
-        "FORBIDDEN_ROLE",
-        "Akses Ditolak",
-        "Anda tidak memiliki hak untuk melakukan assign PIC."
-      );
-      return res.status(403).json(response.toResponse());
     }
 
     const parsed = handleUserPicArray(userPic, {
@@ -767,14 +734,26 @@ async function validatePicUsers(trx, divisionId, list) {
         422,
         "INVALID_USER_ROLES",
         "Role Tidak Diizinkan",
-        `Hanya pengguna dengan role Super Admin yang boleh ditetapkan sebagai PIC. Tidak valid: ${invalidRoles.join(
+        `Hanya pengguna dengan role_id = 1 yang boleh ditetapkan sebagai PIC. Tidak valid: ${invalidRoles.join(
           ", "
         )}.`
       ),
     };
   }
 
-  // c) Cek rangkap divisi (email sudah ada di divisi lain)
+  // c) Larang super admin utama (id === 1)
+  if (usersByEmail.some((u) => Number(u.id) === 1)) {
+    return {
+      error: new WithoutDataResource(
+        422,
+        "FORBIDDEN_USER_ID",
+        "User Tidak Diizinkan",
+        "User dengan ID 1 (super admin) tidak boleh ditetapkan sebagai PIC."
+      ),
+    };
+  }
+
+  // d) Cek rangkap divisi (email sudah ada di divisi lain)
   if (emailsLower.length > 0) {
     const placeholders = emailsLower.map(() => "?").join(",");
     const conflictSQL = `
