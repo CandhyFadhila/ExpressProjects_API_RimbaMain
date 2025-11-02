@@ -1,8 +1,15 @@
-require("dotenv").config();
+// src/index.js
+const path = require("path");
+
+// Muat .env dari root proyek (bukan dari __dirname bundle)
+require("dotenv").config({ path: path.resolve(process.cwd(), ".env") });
+
 const express = require("express");
 const morgan = require("morgan");
+
 const corsMiddleware = require("./middlewares/cors");
 const logger = require("./utils/logger");
+
 const publicRequestRoute = require("./routes/publicRequest/publicRequestRoute");
 const cmspublicRequestRoute = require("./routes/publicRequest/cmspublicRequestRoute");
 const kmispublicRequestRoute = require("./routes/publicRequest/kmispublicRequestRoute");
@@ -39,14 +46,14 @@ const shareReportRoutes = require("./routes/monev/shareReportRoutes");
 
 const app = express();
 
-app.set("trust proxy", 1);
-
 function isProduction() {
-  return (
-    String(process.env.PG_ENV || "development")
-      .trim()
-      .toLowerCase() === "production"
-  );
+  const nodeEnv = String(process.env.NODE_ENV || "")
+    .trim()
+    .toLowerCase();
+  const pgEnv = String(process.env.PG_ENV || "development")
+    .trim()
+    .toLowerCase();
+  return nodeEnv === "production" || pgEnv === "production";
 }
 
 function resolvePublicBaseUrl(port) {
@@ -55,17 +62,17 @@ function resolvePublicBaseUrl(port) {
     : `http://localhost:${port}`;
 }
 
-// Middleware
-app.use(corsMiddleware);
-app.use(express.json());
-app.use(morgan("dev"));
-
 if (isProduction()) {
   app.set("trust proxy", 1);
 }
 
-const PORT = 4000;
+const PORT = Number(process.env.PORT || 4000);
 app.locals.baseUrl = resolvePublicBaseUrl(PORT);
+
+// ---------- Middleware global ----------
+app.use(corsMiddleware);
+app.use(express.json());
+app.use(morgan(isProduction() ? "combined" : "dev"));
 
 // Cek API root
 app.get("/", (req, res) => {
@@ -97,6 +104,8 @@ app.get("/check-db", async (req, res) => {
     });
   }
 });
+
+app.use("/public", express.static(path.join(__dirname, "public")));
 
 // Auth
 app.use("/api", authRoutes);
