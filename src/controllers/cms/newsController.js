@@ -115,7 +115,7 @@ exports.store = async (req, res) => {
 
     const titleNorm = handleLocalizedText(title, {
       allowPartial: false,
-      maxLen: 255,
+      maxLen: undefined,
       fieldLabel: "title",
     });
     if (titleNorm.error) {
@@ -130,7 +130,7 @@ exports.store = async (req, res) => {
 
     const slugNorm = handleLocalizedText(slug, {
       allowPartial: false,
-      maxLen: 255,
+      maxLen: undefined,
       fieldLabel: "slug",
     });
     if (slugNorm.error) {
@@ -383,7 +383,7 @@ exports.update = async (req, res) => {
     if (typeof title !== "undefined") {
       const t = handleLocalizedText(title, {
         allowPartial: true,
-        maxLen: 255,
+        maxLen: undefined,
         fieldLabel: "title",
       });
       if (t.error) {
@@ -425,7 +425,7 @@ exports.update = async (req, res) => {
     if (typeof slug !== "undefined") {
       const t = handleLocalizedText(slug, {
         allowPartial: true,
-        maxLen: 255,
+        maxLen: undefined,
         fieldLabel: "slug",
       });
       if (t.error) {

@@ -123,7 +123,7 @@ exports.store = async (req, res) => {
 
     const nameNorm = handleLocalizedText(name, {
       allowPartial: false,
-      maxLen: 255,
+      maxLen: undefined,
       fieldLabel: "name",
     });
     if (nameNorm.error) {
@@ -356,7 +356,7 @@ exports.update = async (req, res) => {
     if (typeof name !== "undefined") {
       const t = handleLocalizedText(name, {
         allowPartial: true,
-        maxLen: 255,
+        maxLen: undefined,
         fieldLabel: "name",
       });
       if (t.error) {
