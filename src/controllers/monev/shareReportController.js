@@ -486,7 +486,6 @@ exports.destroy = async (req, res) => {
     const existing = await trx("monev_share_reports")
       .select("id", "name", "report_file_ids")
       .whereIn("id", ids);
-
     if (existing.length === 0) {
       await trx.rollback();
       const response = new WithoutDataResource(

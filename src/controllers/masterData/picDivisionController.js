@@ -557,8 +557,6 @@ exports.restore = async (req, res) => {
   }
 };
 
-// TODO: Jika akun (email) sudah ada, maka tinggal assign aja (kalau awalnya role_id = 1, maka update role_id = 3)
-// Jika emailnya hilang dari user_pic, update role_id = 1
 exports.assignPic = async (req, res) => {
   const trx = await knex.transaction();
   const { userPic } = req.body;
@@ -597,7 +595,37 @@ exports.assignPic = async (req, res) => {
       return res.status(422).json(precheck.error.toResponse());
     }
 
-    const created = await createPicUsers(trx, list);
+    // === (A) Hitung siapa yang HILANG dari user_pic lama ===
+    const oldEmailsLower = new Set(
+      extractEmailsLowerFromUserPic(existing.user_pic)
+    );
+    const newEmailsLower = new Set(
+      list.map((x) => x.email.trim().toLowerCase())
+    );
+    const removedEmails = [...oldEmailsLower].filter(
+      (e) => !newEmailsLower.has(e)
+    );
+
+    // === (B) Downgrade role ke 1 untuk yang hilang (kecuali id=1) ===
+    if (removedEmails.length > 0) {
+      const toCheck = await trx("users")
+        .select("id", "email", "role_id")
+        .whereIn(trx.raw("lower(email)"), removedEmails)
+        .whereNull("deleted_at");
+
+      const idsToDowngrade = toCheck
+        .filter((u) => Number(u.id) !== 1 && Number(u.role_id) !== 1)
+        .map((u) => u.id);
+
+      if (idsToDowngrade.length > 0) {
+        await trx("users")
+          .whereIn("id", idsToDowngrade)
+          .update({ role_id: 1, updated_at: trx.fn.now() });
+      }
+    }
+
+    // === (C) Buat/upgrade user untuk payload baru ===
+    const created = await createPicUsers(trx, list, precheck);
     if (created.error) {
       await trx.rollback();
       return res.status(422).json(created.error.toResponse());
@@ -723,43 +751,50 @@ function handleUserPicArray(rawContent, opts = {}) {
 }
 
 async function validatePicUsersForCreate(trx, divisionId, list) {
-  // a) Unik di payload
-  const seen = new Set();
-  const dup = new Set();
+  // a) email unik di payload
+  const seen = new Set(),
+    dup = new Set();
   for (const it of list) {
-    const key = it.email.toLowerCase();
+    const key = it.email.trim().toLowerCase();
     if (seen.has(key)) dup.add(key);
     else seen.add(key);
   }
-  if (dup.size > 0) {
+
+  const emailsLower = list.map((x) => x.email.trim().toLowerCase());
+
+  // b) Cek existing users untuk email tsb
+  let usersFound = [];
+  if (emailsLower.length > 0) {
+    usersFound = await trx("users")
+      .select("id", "email", "role_id")
+      .whereIn(trx.raw("lower(email)"), emailsLower)
+      .whereNull("deleted_at");
+  }
+
+  // larang user id=1 tetap (kebijakan sebelumnya tetap berlaku)
+  if (usersFound.some((u) => Number(u.id) === 1)) {
     return {
       error: new WithoutDataResource(
         422,
-        "DUPLICATE_EMAIL",
-        "Email Duplikat di Payload",
-        `Terdapat email duplikat pada payload: ${[...dup].join(", ")}.`
+        "FORBIDDEN_USER_ID",
+        "User Tidak Diizinkan",
+        "User dengan ID 1 (super admin) tidak boleh ditetapkan sebagai PIC."
       ),
     };
   }
 
-  const emailsLower = list.map((x) => x.email.toLowerCase());
-
-  // b) Email belum dipakai di tabel users
-  let used = [];
-  if (emailsLower.length > 0) {
-    used = await trx("users")
-      .select(trx.raw("lower(email) as lemail"))
-      .whereIn(trx.raw("lower(email)"), emailsLower)
-      .whereNull("deleted_at");
-  }
-  if (used.length > 0) {
-    const already = used.map((r) => r.lemail);
+  // Hanya izinkan existing dengan role_id = 1; selain itu dianggap konflik
+  const invalidExisting = usersFound.filter((u) => Number(u.role_id) !== 1 && u.id !== 3);
+  if (invalidExisting.length > 0) {
+    const emails = invalidExisting.map((u) => String(u.email).toLowerCase());
     return {
       error: new WithoutDataResource(
         422,
         "DUPLICATE_EMAIL",
         "Duplikat Email",
-        `Email berikut sudah digunakan oleh akun lain: ${already.join(", ")}.`
+        `Email berikut sudah digunakan oleh akun non-Super Admin dan non-Monev: ${emails.join(
+          ", "
+        )}.`
       ),
     };
   }
@@ -790,7 +825,6 @@ async function validatePicUsersForCreate(trx, divisionId, list) {
             `${email} (sudah di: ${[...new Set(titles)].join(", ")})`
         )
         .join("; ");
-
       return {
         error: new WithoutDataResource(
           422,
@@ -802,18 +836,50 @@ async function validatePicUsersForCreate(trx, divisionId, list) {
     }
   }
 
-  return { emailsLower };
+  // kumpulkan email existing role=1 untuk di-upgrade nanti
+  const existingRole1Emails = new Set(
+    usersFound
+      .filter((u) => Number(u.role_id) === 1)
+      .map((u) => String(u.email).toLowerCase())
+  );
+
+  return { emailsLower, existingRole1Emails };
 }
 
-async function createPicUsers(trx, list) {
+async function createPicUsers(trx, list, plan) {
   const createdUsers = [];
   const credentials = [];
 
-  for (const item of list) {
-    const name = item.name;
-    const email = item.email;
+  // preload existing (supaya bisa update name & role)
+  const emailsLower = list.map((x) => x.email.trim().toLowerCase());
+  const existingUsers =
+    emailsLower.length > 0
+      ? await trx("users")
+          .select("id", "name", "email", "role_id")
+          .whereIn(trx.raw("lower(email)"), emailsLower)
+          .whereNull("deleted_at")
+      : [];
 
-    // 1) Deliverability check (mirip contohmu)
+  const emailToUser = new Map(
+    existingUsers.map((u) => [String(u.email).toLowerCase(), u])
+  );
+
+  for (const item of list) {
+    const name = item.name.trim();
+    const email = item.email.trim();
+    const emailLower = email.toLowerCase();
+
+    const exist = emailToUser.get(emailLower);
+
+    if (exist) {
+      await trx("users").where({ id: exist.id }).update({
+        role_id: 3,
+        updated_at: trx.fn.now(),
+      });
+      continue;
+    }
+
+    // Tidak ada → buat akun baru (kirim credential)
     const probe = await checkEmailDeliverability(email, {
       useSmtp: true,
       strict: false,
@@ -836,23 +902,6 @@ async function createPicUsers(trx, list) {
       };
     }
 
-    // 2) Safety: cek lagi unik email (race condition)
-    const exists = await trx("users")
-      .whereRaw("lower(email) = lower(?)", [email])
-      .whereNull("deleted_at")
-      .first();
-    if (exists) {
-      return {
-        error: new WithoutDataResource(
-          422,
-          "DUPLICATE_EMAIL",
-          "Duplikat Data",
-          `Email '${email}' sudah digunakan oleh akun lain.`
-        ),
-      };
-    }
-
-    // 3) Buat akun
     const displayName = stripTitlesOnly(name);
     const rawPassword = generateRandomPassword(8);
     const passwordHash = await bcrypt.hash(rawPassword, 12);
@@ -907,4 +956,21 @@ async function sendPicCredentials(credentials) {
       logger.warn(`[PIC Credential] FAILED to ${cred.email}: ${e.message}`);
     }
   }
+}
+
+function extractEmailsLowerFromUserPic(jsonbVal) {
+  let arr = [];
+  if (Array.isArray(jsonbVal)) arr = jsonbVal;
+  else if (typeof jsonbVal === "string") arr = parseJsonSafe(jsonbVal) || [];
+  else if (isPlainObject(jsonbVal)) arr = jsonbVal;
+  else arr = [];
+
+  const out = [];
+  for (const it of arr) {
+    if (isPlainObject(it) && typeof it.email === "string") {
+      const e = it.email.trim().toLowerCase();
+      if (e) out.push(e);
+    }
+  }
+  return out;
 }
