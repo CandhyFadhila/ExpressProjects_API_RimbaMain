@@ -130,6 +130,7 @@ exports.update = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
+    const periodText = formatPeriodeID(existing.month, existing.year);
     const monthIdx = parseMonthIndex(existing.month);
     const yearNum = Number(existing.year);
     if (!Number.isFinite(yearNum) || monthIdx == null) {
@@ -166,7 +167,7 @@ exports.update = async (req, res) => {
         422,
         "TARGET_REQUIRED",
         "Target Bulanan Belum Diisi",
-        `Mohon lengkapi minimal salah satu target pada target (budget target atau physical target) untuk periode '${existing.month} ${existing.year}' sebelum mengisi realisasi.`
+        `Mohon lengkapi minimal salah satu target pada target (budget target atau physical target) untuk periode '${periodText}' sebelum mengisi realisasi.`
       );
       return res.status(422).json(response.toResponse());
     }
@@ -304,6 +305,7 @@ exports.update = async (req, res) => {
   }
 };
 
+// TODO: Tambah validasi pastikan paket pada month dan year sesuai input untuk targetnya sudah tervalidasi (validation_status == 2)
 exports.verification = async (req, res) => {
   const trx = await knex.transaction();
   const payload = {
@@ -344,8 +346,7 @@ exports.verification = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const userRoleId = Number(user.role_id);
-    if (userRoleId !== 1) {
+    if (Number(user.role_id) !== 1) {
       await trx.rollback();
       const response = new WithoutDataResource(
         403,
@@ -359,6 +360,7 @@ exports.verification = async (req, res) => {
     const existing = await trx("monev_monthly_realizations")
       .select([
         "id",
+        "monev_activity_packages_id",
         "month",
         "year",
         "evidence_file_ids",
@@ -383,8 +385,12 @@ exports.verification = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const monthIdx = parseMonthIndex(existing.month);
+    const monthIdx = (() => {
+      const m = Number(existing.month);
+      return Number.isFinite(m) ? m : parseMonthIndex(existing.month);
+    })();
     const yearNum = Number(existing.year);
+
     if (!Number.isFinite(yearNum) || monthIdx == null) {
       await trx.rollback();
       const response = new WithoutDataResource(
@@ -395,6 +401,8 @@ exports.verification = async (req, res) => {
       );
       return res.status(422).json(response.toResponse());
     }
+
+    const periodText = formatPeriodeID(monthIdx, yearNum);
 
     const now = new Date();
     const nowYear = now.getFullYear();
@@ -408,7 +416,7 @@ exports.verification = async (req, res) => {
         422,
         "FUTURE_PERIOD_NOT_ALLOWED",
         "Tidak Boleh Verifikasi Periode Mendatang",
-        `Periode ${existing.month} ${existing.year} masih di masa depan dan belum bisa diverifikasi.`
+        `Periode '${periodText}' masih di masa depan dan belum bisa diverifikasi.`
       );
       return res.status(422).json(response.toResponse());
     }
@@ -419,34 +427,74 @@ exports.verification = async (req, res) => {
         200,
         "ALREADY_VALIDATED",
         "Sudah Divalidasi",
-        `Realisasi bulanan untuk bulan '${existing.month} ${
-          existing.year
-        }' sudah berstatus ${statusMap[existing.validation_status]}.`
+        `Realisasi bulanan untuk bulan '${periodText}' sudah berstatus ${
+          statusMap[existing.validation_status]
+        }.`
       );
       return res.status(200).json(response.toResponse());
+    }
+
+    const target = await trx("monev_targets")
+      .select(["id", "budget_target", "physical_target", "validation_status"])
+      .where("monev_activity_packages_id", existing.monev_activity_packages_id)
+      .andWhere("month", monthIdx)
+      .andWhere("year", yearNum)
+      .whereNull("deleted_at")
+      .first();
+
+    const isEmptyVal = (v) => {
+      if (v == null) return true;
+      if (typeof v === "string") return v.trim() === "" || Number(v) === 0;
+      if (typeof v === "number") return Number(v) === 0;
+      const n = Number(v);
+      return Number.isFinite(n) ? n === 0 : false;
+    };
+
+    if (
+      !target ||
+      (isEmptyVal(target.budget_target) && isEmptyVal(target.physical_target))
+    ) {
+      await trx.rollback();
+      const resp = new WithoutDataResource(
+        422,
+        "TARGET_REQUIRED",
+        "Target Bulanan Belum Diisi",
+        `Target periode '${periodText}' belum memiliki data (budget/physical). Tidak dapat melakukan verifikasi realisasi.`
+      );
+      return res.status(422).json(resp.toResponse());
+    }
+
+    if (Number(target.validation_status ?? 0) !== 2) {
+      await trx.rollback();
+      const resp = new WithoutDataResource(
+        422,
+        "TARGET_NOT_VALIDATED",
+        "Target Bulanan Belum Tervalidasi",
+        `Target periode '${periodText}' belum disetujui/tervalidasi. Tidak dapat melakukan verifikasi realisasi sebelum target disetujui.`
+      );
+      return res.status(422).json(resp.toResponse());
     }
 
     const result = await verifyMonthlyRealization(trx, { id, payload, userId });
 
     await trx.commit();
 
-    // approved
+    const periodTextResult = formatPeriodeID(result.month, result.year);
     if (result.mode === "approved") {
       const response = new WithoutDataResource(
         200,
         "SUCCESS_APPROVE",
         "Berhasil Approve",
-        `Realisasi bulanan untuk bulan '${result.month} ${result.year}' berhasil disetujui dan diperbarui.`
+        `Realisasi bulanan untuk bulan '${periodTextResult}' berhasil disetujui dan diperbarui.`
       );
       return res.status(200).json(response.toResponse());
     }
 
-    // rejected
     const response = new WithoutDataResource(
       200,
       "SUCCESS_REJECT",
       "Berhasil Reject",
-      `Realisasi bulanan untuk bulan '${result.month} ${result.year}' ditolak dengan alasan: ${payload.rejectionReason}.`
+      `Realisasi bulanan untuk bulan '${periodTextResult}' ditolak dengan alasan: ${payload.rejectionReason}.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
@@ -679,6 +727,10 @@ async function verifyMonthlyRealization(trx, { id, payload, userId }) {
     err.code = "MONTHLY_REALIZATION_NOT_FOUND";
     throw err;
   }
+  const periodText = formatPeriodeID(
+    monthlyRealization.month,
+    monthlyRealization.year
+  );
 
   // Pending terbaru (kalau ada)
   const latestPending = await trx("monev_monthly_realization_pending_updates")
@@ -721,7 +773,7 @@ async function verifyMonthlyRealization(trx, { id, payload, userId }) {
       {
         userId,
         module: "monev",
-        subject: `Verifikasi Realisasi Bulanan Kegiatan di Bulan '${monthlyRealization.month} ${monthlyRealization.year}' (APPROVED)`,
+        subject: `Verifikasi Realisasi Bulanan Kegiatan di Bulan '${periodText}' (APPROVED)`,
       },
       trx
     );
@@ -755,7 +807,7 @@ async function verifyMonthlyRealization(trx, { id, payload, userId }) {
     {
       userId,
       module: "monev",
-      subject: `Verifikasi Realisasi Bulanan Kegiatan di Bulan '${monthlyRealization.month} ${monthlyRealization.year}' (REJECTED)`,
+      subject: `Verifikasi Realisasi Bulanan Kegiatan di Bulan '${periodText}' (REJECTED)`,
     },
     trx
   );
@@ -957,4 +1009,33 @@ function parseMonthIndex(m) {
     desember: 11,
   };
   return map[s.toLowerCase()] ?? null;
+}
+
+function monthNameID(m) {
+  const NAMES = [
+    "Januari",
+    "Februari",
+    "Maret",
+    "April",
+    "Mei",
+    "Juni",
+    "Juli",
+    "Agustus",
+    "September",
+    "Oktober",
+    "November",
+    "Desember",
+  ];
+
+  const n = Number(m);
+  if (!Number.isFinite(n)) return String(m ?? "");
+
+  const idx = n >= 1 && n <= 12 ? n - 1 : n;
+
+  return idx >= 0 && idx < 12 ? NAMES[idx] : String(m);
+}
+
+function formatPeriodeID(monthIndex, year) {
+  const name = monthNameID(monthIndex);
+  return year != null ? `${name} ${year}` : `${name}`;
 }

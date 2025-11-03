@@ -572,6 +572,7 @@ exports.destroy = async (req, res) => {
   }
 };
 
+// TODO: Export jumlah datanya sesuai dengan jumlah data user login (mekanisme data tergantung user login kolom user_pic)
 exports.export = async (req, res) => {
   const { startDate, endDate } = req.query;
 

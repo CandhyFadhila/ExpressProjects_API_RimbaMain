@@ -226,6 +226,8 @@ exports.verification = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
+    const periodText = formatPeriodeID(existing.month, existing.year);
+
     const monthIdx = parseMonthIndex(existing.month);
     const yearNum = Number(existing.year);
     if (!Number.isFinite(yearNum) || monthIdx == null) {
@@ -251,7 +253,7 @@ exports.verification = async (req, res) => {
         422,
         "FUTURE_PERIOD_NOT_ALLOWED",
         "Tidak Boleh Verifikasi Periode Mendatang",
-        `Periode ${existing.month} ${existing.year} masih di masa depan dan belum bisa diverifikasi.`
+        `Periode '${periodText}' masih di masa depan dan belum bisa diverifikasi.`
       );
       return res.status(422).json(response.toResponse());
     }
@@ -262,7 +264,7 @@ exports.verification = async (req, res) => {
         200,
         "ALREADY_VALIDATED",
         "Sudah Divalidasi",
-        `Target bulan '${existing.month} ${existing.year}' sudah berstatus ${
+        `Target bulan '${periodText}' sudah berstatus ${
           statusMap[existing.validation_status]
         }.`
       );
@@ -270,6 +272,7 @@ exports.verification = async (req, res) => {
     }
 
     const result = await verifyTarget(trx, { id, payload, userId });
+    const periodTextResult = formatPeriodeID(result.month, result.year);
 
     await trx.commit();
 
@@ -279,7 +282,7 @@ exports.verification = async (req, res) => {
         200,
         "SUCCESS_APPROVE",
         "Berhasil Approve",
-        `Target bulan '${result.month} ${result.year}' berhasil disetujui dan diperbarui.`
+        `Target bulan '${periodTextResult}' berhasil disetujui dan diperbarui.`
       );
       return res.status(200).json(response.toResponse());
     }
@@ -289,7 +292,7 @@ exports.verification = async (req, res) => {
       200,
       "SUCCESS_REJECT",
       "Berhasil Reject",
-      `Target bulan '${result.month} ${result.year}' ditolak dengan alasan: ${payload.rejectionReason}.`
+      `Target bulan '${periodTextResult}' ditolak dengan alasan: ${payload.rejectionReason}.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
@@ -357,6 +360,7 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
     err.code = "TARGET_NOT_FOUND";
     throw err;
   }
+  const periodText = formatPeriodeID(existing.month, existing.year);
 
   // === JALUR SUPER ADMIN -> selalu update langsung + edited_by + validation_status
   const isSuperAdmin = Number(userRoleId) === 1;
@@ -402,6 +406,9 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
     const patch = {
       updated_at: now,
       edited_by: userId,
+      validation_status: 2,
+      validate_by: userId,
+      updated_at: now,
     };
     if (isProvided(budgetTarget)) patch.budget_target = budgetTarget;
     if (isProvided(physicalTarget)) patch.physical_target = physicalTarget;
@@ -413,7 +420,7 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
       {
         userId,
         module: "monev",
-        subject: `Target Kegiatan Bulan '${existing.month} ${existing.year}' (update langsung)`,
+        subject: `Target Kegiatan Bulan '${periodText}' (update langsung)`,
       },
       trx
     );
@@ -460,7 +467,7 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
         {
           userId,
           module: "monev",
-          subject: `Target Kegiatan Bulan '${existing.month} ${existing.year}' (pending update replaced)`,
+          subject: `Target Kegiatan Bulan '${periodText}' (pending update replaced)`,
         },
         trx
       );
@@ -494,7 +501,7 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
     {
       userId,
       module: "monev",
-      subject: `Target Kegiatan Bulan '${existing.month} ${existing.year}'  (pending update)`,
+      subject: `Target Kegiatan Bulan '${periodText}'  (pending update)`,
     },
     trx
   );
@@ -521,6 +528,7 @@ async function verifyTarget(trx, { id, payload, userId }) {
     err.code = "TARGET_NOT_FOUND";
     throw err;
   }
+  const periodText = formatPeriodeID(target.month, target.year);
 
   // Pending terbaru (kalau ada)
   const latestPending = await trx("monev_target_pending_updates")
@@ -561,7 +569,7 @@ async function verifyTarget(trx, { id, payload, userId }) {
       {
         userId,
         module: "monev",
-        subject: `Verifikasi Target Bulan '${target.month} ${target.year}' (APPROVED)`,
+        subject: `Verifikasi Target Bulan '${periodText}' (APPROVED)`,
       },
       trx
     );
@@ -590,7 +598,7 @@ async function verifyTarget(trx, { id, payload, userId }) {
     {
       userId,
       module: "monev",
-      subject: `Verifikasi Target Bulan '${target.month} ${target.year}' (REJECTED)`,
+      subject: `Verifikasi Target Bulan '${periodText}' (REJECTED)`,
     },
     trx
   );
@@ -652,4 +660,33 @@ function parseMonthIndex(m) {
     desember: 11,
   };
   return map[s.toLowerCase()] ?? null;
+}
+
+function monthNameID(m) {
+  const NAMES = [
+    "Januari",
+    "Februari",
+    "Maret",
+    "April",
+    "Mei",
+    "Juni",
+    "Juli",
+    "Agustus",
+    "September",
+    "Oktober",
+    "November",
+    "Desember",
+  ];
+
+  const n = Number(m);
+  if (!Number.isFinite(n)) return String(m ?? "");
+
+  const idx = n >= 1 && n <= 12 ? n - 1 : n;
+
+  return idx >= 0 && idx < 12 ? NAMES[idx] : String(m);
+}
+
+function formatPeriodeID(monthIndex, year) {
+  const name = monthNameID(monthIndex);
+  return year != null ? `${name} ${year}` : `${name}`;
 }
