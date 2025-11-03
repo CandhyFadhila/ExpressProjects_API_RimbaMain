@@ -60,20 +60,52 @@ const slugify = (s) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
 
-const ymToAbs = ({ y, m }) => y * 12 + m;
-
 exports.index = async (req, res) => {
   const { search } = req.query;
+  const userIdAuth =
+    req.auth?.userId ??
+    req.auth?.user_id ??
+    req.auth?.id ??
+    req.userId ??
+    req.user?.id;
 
   try {
+    // Ambil role & email user (untuk filter role 3)
+    let currentUser = null;
+    if (userIdAuth) {
+      currentUser = await knex("users")
+        .select("id", "role_id", "email")
+        .where({ id: userIdAuth })
+        .first();
+    }
+
     let query = knex("monev_activity_packages as activity").select(
       "activity.*"
     );
 
+    if (currentUser?.role_id === 3) {
+      if (!currentUser.email) {
+        query.whereRaw("1=0");
+      } else {
+        query.whereExists(function () {
+          this.select(1)
+            .from("monev_pic_divisions as mpd")
+            .whereRaw("mpd.id = activity.monev_pic_division_id")
+            .whereRaw(
+              `EXISTS (
+                SELECT 1
+                FROM jsonb_array_elements(mpd.user_pic) AS elem
+                WHERE lower(elem->>'email') = lower(?)
+              )`,
+              [currentUser.email]
+            );
+        });
+      }
+    }
+
     // applyTrashedScope(query, req, "activity.deleted_at");
 
     applySearch(query, search, ["activity.mak", "activity.name"]);
-
     applyLatestThenTrashed(
       query,
       // "activity.deleted_at",
