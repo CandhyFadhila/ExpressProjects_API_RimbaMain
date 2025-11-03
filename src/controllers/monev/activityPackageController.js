@@ -62,7 +62,7 @@ const slugify = (s) =>
 
 exports.index = async (req, res) => {
   const { search } = req.query;
-  const userIdAuth =
+  const userId =
     req.auth?.userId ??
     req.auth?.user_id ??
     req.auth?.id ??
@@ -70,42 +70,58 @@ exports.index = async (req, res) => {
     req.user?.id;
 
   try {
-    // Ambil role & email user (untuk filter role 3)
-    let currentUser = null;
-    if (userIdAuth) {
-      currentUser = await knex("users")
-        .select("id", "role_id", "email")
-        .where({ id: userIdAuth })
-        .first();
+    const user = await knex("users")
+      .select("id", "role_id", "email")
+      .where({ id: userId })
+      .first();
+    if (!user) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Akun tidak valid atau tidak ditemukan."
+      );
+      return res.status(200).json(response.toResponse());
     }
 
     let query = knex("monev_activity_packages as activity").select(
       "activity.*"
     );
 
-    if (currentUser?.role_id === 3) {
-      if (!currentUser.email) {
-        query.whereRaw("1=0");
-      } else {
-        query.whereExists(function () {
-          this.select(1)
-            .from("monev_pic_divisions as mpd")
-            .whereRaw("mpd.id = activity.monev_pic_division_id")
-            .whereRaw(
-              `EXISTS (
-                SELECT 1
-                FROM jsonb_array_elements(mpd.user_pic) AS elem
-                WHERE lower(elem->>'email') = lower(?)
-              )`,
-              [currentUser.email]
-            );
-        });
+    // Aturan akses:
+    // 1) role_id === 1 => lihat semua (tanpa filter tambahan)
+    // 2) selain itu => hanya paket yang PIC divisinya memuat email user di user_pic
+    if (Number(user.role_id) !== 1) {
+      if (!user.email) {
+        const response = new WithoutDataResource(
+          200,
+          "DATA_NOT_FOUND",
+          "Data Tidak Ditemukan",
+          "Tidak ada data yang sesuai dengan filter atau pencarian."
+        );
+        return res.status(200).json(response.toResponse());
       }
+
+      query.whereExists(function () {
+        this.select(1)
+          .from("monev_pic_divisions as d")
+          .whereRaw("d.id = activity.monev_pic_division_id")
+          .whereNull("d.deleted_at")
+          .whereRaw(
+            `EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements(d.user_pic) AS up
+              WHERE lower(up->>'email') = lower(?)
+            )`,
+            [user.email]
+          );
+      });
     }
 
     // applyTrashedScope(query, req, "activity.deleted_at");
 
     applySearch(query, search, ["activity.mak", "activity.name"]);
+
     applyLatestThenTrashed(
       query,
       // "activity.deleted_at",
