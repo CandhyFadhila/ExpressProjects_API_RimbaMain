@@ -376,12 +376,12 @@ exports.verification = async (req, res) => {
     if (!existing) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        200,
+        422,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
         `Realisasi bulanan dengan ID '${id}' tidak ditemukan.`
       );
-      return res.status(200).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const monthIdx = (() => {
@@ -950,7 +950,7 @@ function handleBudgetRealizationArray(rawContent, opts = {}) {
       422,
       "INVALID_CONTENT_ITEMS",
       "Elemen Konten Tidak Valid",
-      `Setiap elemen ${fieldLabel} harus objek { name, value:number } dan minimal satu elemen valid.`
+      `Setiap elemen ${fieldLabel} harus objek { name:string, value:number } dan minimal satu elemen valid.`
     );
     return { error: err };
   }

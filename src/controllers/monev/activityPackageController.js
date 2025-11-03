@@ -572,20 +572,51 @@ exports.destroy = async (req, res) => {
   }
 };
 
-// TODO: Export jumlah datanya sesuai dengan jumlah data user login (mekanisme data tergantung user login kolom user_pic)
 exports.export = async (req, res) => {
   const { startDate, endDate } = req.query;
+  const userId =
+    req.auth?.userId ??
+    req.auth?.user_id ??
+    req.auth?.id ??
+    req.userId ??
+    req.user?.id;
 
   try {
-    const q = knex("monev_activity_packages")
-      .select("*")
-      .whereNull("deleted_at");
+    const user = await knex("users")
+      .select("id", "role_id", "email")
+      .where({ id: userId })
+      .first();
+
+    const q = knex("monev_activity_packages as activity")
+      .select("activity.*")
+      .whereNull("activity.deleted_at");
+
+    if (!user || Number(user.role_id) !== 1) {
+      if (!user?.email) {
+        q.whereRaw("false");
+      } else {
+        q.whereExists(function () {
+          this.select(1)
+            .from("monev_pic_divisions as d")
+            .whereRaw("d.id = activity.monev_pic_division_id")
+            .whereNull("d.deleted_at")
+            .whereRaw(
+              `EXISTS (
+                SELECT 1
+                FROM jsonb_array_elements(d.user_pic) AS up
+                WHERE lower(up->>'email') = lower(?)
+              )`,
+              [user.email]
+            );
+        });
+      }
+    }
 
     if (startDate || endDate) {
       const { startStr, endStr } = parseCreatedAtRange(startDate, endDate);
       q.modify((qb) => {
-        if (startStr) qb.where("created_at", ">=", startStr);
-        if (endStr) qb.where("created_at", "<", endStr); // end exclusive
+        if (startStr) qb.where("activity.created_at", ">=", startStr);
+        if (endStr) qb.where("activity.created_at", "<", endStr);
       });
     }
 
@@ -685,22 +716,36 @@ exports.export = async (req, res) => {
 };
 
 function parseCreatedAtRange(startDate, endDate) {
-  const sDate = startDate ? dateHelper.toUTC(startDate) : null;
-  const eDateRaw = endDate ? dateHelper.toUTC(endDate) : null;
+  let sUTC = startDate ? dateHelper.toUTC(startDate) : null;
+  let eUTC = endDate ? dateHelper.toUTC(endDate) : null;
 
-  let eDate = eDateRaw;
+  // end date-only -> jadikan < (end + 1 hari)
   if (
     endDate &&
     typeof endDate === "string" &&
     DATE_ONLY.test(endDate.trim())
   ) {
-    // end exclusive = < (endDate + 1 day) 00:00
-    eDate = new Date(eDateRaw.getTime() + 24 * 60 * 60 * 1000);
+    eUTC = new Date(eUTC.getTime() + DAY_MS);
+  }
+
+  // hanya start -> default 1 hari
+  if (sUTC && !eUTC) {
+    eUTC = new Date(sUTC.getTime() + DAY_MS);
+  }
+
+  // hanya end -> default 1 hari berakhir di end (kalau date-only, end sudah +1d di atas)
+  if (!sUTC && eUTC) {
+    sUTC = new Date(eUTC.getTime() - DAY_MS);
+  }
+
+  // start & end ada: kalau end <= start (kasus sama persis), paksa +1 hari
+  if (sUTC && eUTC && eUTC.getTime() <= sUTC.getTime()) {
+    eUTC = new Date(sUTC.getTime() + DAY_MS);
   }
 
   return {
-    startStr: sDate ? dateHelper.toDatabaseUTC(sDate) : null,
-    endStr: eDate ? dateHelper.toDatabaseUTC(eDate) : null,
+    startStr: sUTC ? dateHelper.toDatabaseUTC(sUTC) : null,
+    endStr: eUTC ? dateHelper.toDatabaseUTC(eUTC) : null,
   };
 }
 
@@ -777,16 +822,6 @@ async function autoCreateMonthlyRealizations(trx, pkgId, span) {
 }
 
 /** Helper untuk export */
-function toYM(dateString) {
-  if (!dateString) return null;
-  const dUTC = dateHelper._internals?.parseToUTC
-    ? dateHelper._internals.parseToUTC(dateString) // dayjs.utc instance
-    : null;
-  if (!dUTC || !dUTC.isValid()) return null;
-  const dWIB = dUTC.tz("Asia/Jakarta");
-  return { y: dWIB.year(), m: dWIB.month() }; // month: 0..11
-}
-
 function monthIdxToLabel(v) {
   const n = Number(v);
   return Number.isInteger(n) && n >= 0 && n <= 11 ? MONTHS_ID[n] : "N/A";
