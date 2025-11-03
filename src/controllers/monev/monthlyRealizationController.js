@@ -81,8 +81,6 @@ exports.getMonthlyRealizationbyActivityPackageId = async (req, res) => {
   }
 };
 
-// TODO 1: Nambah validasi, jika pada month dan year saat input data realisasi terdapat data monev_targets dengan month dan year yang sama masih kosong, maka kembalikan response bahwa target wajib diisi dahulu sebelum input realisasi
-// TODO 2: Ketika update pertama kali jangan langsung masuk ke monev_monthly_realizations, tapi masuk ke monev_monthly_realization_pending_updates
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
   const payload = {
@@ -205,6 +203,19 @@ exports.update = async (req, res) => {
     }
 
     // === Documents ===
+    const latestPending = await trx("monev_monthly_realization_pending_updates")
+      .select(["id", "evidence_file_ids"])
+      .where({ monev_monthly_realization_id: id })
+      .whereNull("deleted_at")
+      .orderBy("created_at", "desc")
+      .first();
+
+    const existingIdsArr = normJsonbArray(existing.evidence_file_ids);
+    const baseEvidenceJsonb =
+      existingIdsArr.length > 0
+        ? existing.evidence_file_ids
+        : latestPending?.evidence_file_ids ?? [];
+
     const { deleteDocumentIds } = payload;
     const deletedIds = toArray(deleteDocumentIds).map(String);
     const allowedTypes = [
@@ -215,7 +226,7 @@ exports.update = async (req, res) => {
       "application/pdf",
     ];
     const validation = await validateFilesQuotaAndTypesOnUpdate({
-      existingRow: existing,
+      existingRow: { evidence_file_ids: baseEvidenceJsonb },
       deleteDocumentIds: deletedIds,
       files: Array.isArray(req.files) ? req.files : [],
       dbColumn: "evidence_file_ids",
@@ -233,7 +244,7 @@ exports.update = async (req, res) => {
       return res.status(validation.http).json(response.toResponse());
     }
 
-    const oldCoverIds = normJsonbArray(existing.evidence_file_ids);
+    const oldCoverIds = normJsonbArray(baseEvidenceJsonb);
     const oldDocId = normIdArray(oldCoverIds, { as: "number" })[0] ?? null;
 
     let finalDocId = oldDocId;
@@ -266,7 +277,7 @@ exports.update = async (req, res) => {
         200,
         "SUCCESS_UPDATE_DATA",
         "Berhasil Memperbarui",
-        `Perubahan realisasi bulanan berhasil diperbarui langsung karena sebelumnya belum memiliki data.`
+        `Perubahan realisasi bulanan berhasil diperbarui langsung.`
       );
       return res.status(200).json(response.toResponse());
     }
@@ -473,10 +484,7 @@ async function updateMonthlyRealization(
       /^undefined$/i.test(String(v))
     );
 
-  const isEmptyJsonb = (v) => normJsonbArray(v).length === 0;
-  const isNullOrZero = (v) => v === null || Number(v) === 0;
   const now = trx.fn.now();
-
   const { budgetRealization, progress, description, problem } = payload;
 
   // lock row monthlyRealization
@@ -506,7 +514,9 @@ async function updateMonthlyRealization(
     throw err;
   }
 
-  // === JALUR SUPER ADMIN -> selalu update langsung + edited_by + validation_status
+  // ===========================
+  // SUPER ADMIN → DIRECT UPDATE
+  // ===========================
   const isSuperAdmin = Number(userRoleId) === 1;
   if (isSuperAdmin) {
     const patch = {
@@ -517,9 +527,15 @@ async function updateMonthlyRealization(
       validate_at: now,
       updated_at: now,
     };
+
     if (isProvided(budgetRealization))
       patch.budget_realization = J(budgetRealization);
-    if (isProvided(progress)) patch.progress = progress;
+
+    if (isProvided(progress)) {
+      const p = Math.max(0, Math.min(100, Number(progress)));
+      patch.progress = Number.isFinite(p) ? p : existing.progress;
+    }
+
     if (isProvided(problem)) patch.problem = problem;
     if (isProvided(description)) patch.description = description;
 
@@ -534,7 +550,7 @@ async function updateMonthlyRealization(
       trx
     );
 
-    // (Opsional) bersihkan pending aktif untuk monthly realization ini jika ada:
+    // bersihkan semua pending aktif (kalau ada)
     await trx("monev_monthly_realization_pending_updates")
       .where({ monev_monthly_realization_id: id })
       .whereNull("deleted_at")
@@ -543,42 +559,19 @@ async function updateMonthlyRealization(
     return { mode: "direct", patch };
   }
 
-  // === JALUR NORMAL ===
-  const bothEmpty =
-    isEmptyJsonb(existing.budget_realization) &&
-    isNullOrZero(existing.progress);
-
-  if (bothEmpty) {
-    // === UPDATE LANGSUNG (pertama kali diisi) ===
-    const patch = {
-      updated_at: now,
-      evidence_file_ids: evidence_files,
-      edited_by: userId,
-    };
-    if (isProvided(budgetRealization))
-      patch.budget_realization = J(budgetRealization);
-    if (isProvided(progress)) patch.progress = progress;
-    if (isProvided(problem)) patch.problem = problem;
-    if (isProvided(description)) patch.description = description;
-
-    await trx("monev_monthly_realizations").where("id", id).update(patch);
-
-    await activityLogHelper.logUpdate(
-      {
-        userId,
-        module: "monev",
-        subject: `Realisasi Bulanan Kegiatan di Bulan '${existing.month} ${existing.year}' (update langsung)`,
-      },
-      trx
-    );
-
-    return { mode: "direct", patch };
-  }
-
-  // === PENDING UPDATE ===
+  // ===========================================
+  // NON-SUPERADMIN → SELALU MASUK PENDING
+  // ===========================================
   const nextBR = isProvided(budgetRealization)
     ? budgetRealization
     : existing.budget_realization;
+
+  const nextProgress = isProvided(progress)
+    ? (() => {
+        const p = Math.max(0, Math.min(100, Number(progress)));
+        return Number.isFinite(p) ? p : existing.progress;
+      })()
+    : existing.progress;
 
   const candidate = {
     monev_monthly_realization_id: id,
@@ -588,47 +581,48 @@ async function updateMonthlyRealization(
     year: existing.year,
     evidence_file_ids: evidence_files,
     budget_realization: J(nextBR),
-    progress: isProvided(progress) ? progress : existing.progress,
+    progress: nextProgress,
     problem: isProvided(problem) ? problem : existing.problem,
     description: isProvided(description) ? description : existing.description,
   };
 
-  // replace jika status monthlyRealization menunggu validasi (validation_status === 1)
-  if (existing.validation_status === 1) {
-    const latestPending = await trx("monev_monthly_realization_pending_updates")
+  // Cek pending aktif → replace yang terbaru, soft-delete sisanya
+  const latestPending = await trx("monev_monthly_realization_pending_updates")
+    .where({ monev_monthly_realization_id: id })
+    .whereNull("deleted_at")
+    .orderBy("created_at", "desc")
+    .first();
+
+  if (latestPending) {
+    await trx("monev_monthly_realization_pending_updates")
+      .where("id", latestPending.id)
+      .update({ ...candidate, updated_at: now });
+
+    await trx("monev_monthly_realization_pending_updates")
       .where({ monev_monthly_realization_id: id })
       .whereNull("deleted_at")
-      .orderBy("created_at", "desc")
-      .first();
+      .whereNot("id", latestPending.id)
+      .update({ deleted_at: now, updated_at: now });
 
-    if (latestPending) {
-      await trx("monev_monthly_realization_pending_updates")
-        .where("id", latestPending.id)
-        .update({ ...candidate, updated_at: now });
-
-      await trx("monev_monthly_realization_pending_updates")
-        .where({ monev_monthly_realization_id: id })
-        .whereNull("deleted_at")
-        .whereNot("id", latestPending.id)
-        .update({ deleted_at: now, updated_at: now });
-
-      await activityLogHelper.logUpdate(
-        {
-          userId,
-          module: "monev",
-          subject: `Realisasi Bulanan Kegiatan di Bulan '${existing.month} ${existing.year}' (pending update replaced)`,
-        },
-        trx
-      );
-
-      return {
-        mode: "pending",
-        pending: { id: latestPending.id, ...candidate },
-      };
+    if (existing.validation_status !== 1) {
+      await trx("monev_monthly_realizations")
+        .where("id", id)
+        .update({ validation_status: 1, updated_at: now });
     }
+
+    await activityLogHelper.logUpdate(
+      {
+        userId,
+        module: "monev",
+        subject: `Realisasi Bulanan Kegiatan di Bulan '${existing.month} ${existing.year}' (pending update replaced)`,
+      },
+      trx
+    );
+
+    return { mode: "pending", pending: { id: latestPending.id, ...candidate } };
   }
 
-  // insert pending baru + set validation_status monthlyRealization = 1 bila belum
+  // Belum ada pending → insert baru
   const pendingRow = { ...candidate, created_at: now, updated_at: now };
   const inserted = await trx("monev_monthly_realization_pending_updates")
     .insert(pendingRow)
@@ -640,10 +634,9 @@ async function updateMonthlyRealization(
     : null;
 
   if (existing.validation_status !== 1) {
-    await trx("monev_monthly_realizations").where("id", id).update({
-      validation_status: 1,
-      updated_at: now,
-    });
+    await trx("monev_monthly_realizations")
+      .where("id", id)
+      .update({ validation_status: 1, updated_at: now });
   }
 
   await activityLogHelper.logCreate(

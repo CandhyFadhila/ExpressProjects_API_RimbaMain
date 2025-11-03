@@ -557,8 +557,8 @@ exports.restore = async (req, res) => {
   }
 };
 
-// TODO: Jika akun (email) sudah ada, maka tinggal assign aja
-// Jika emailnya hilang dari user_pic, update role_id === 1
+// TODO: Jika akun (email) sudah ada, maka tinggal assign aja (kalau awalnya role_id = 1, maka update role_id = 3)
+// Jika emailnya hilang dari user_pic, update role_id = 1
 exports.assignPic = async (req, res) => {
   const trx = await knex.transaction();
   const { userPic } = req.body;

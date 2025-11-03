@@ -218,12 +218,12 @@ exports.verification = async (req, res) => {
     if (!existing) {
       await trx.rollback();
       const response = new WithoutDataResource(
-        200,
+        422,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
         `Target dengan ID '${id}' tidak ditemukan.`
       );
-      return res.status(200).json(response.toResponse());
+      return res.status(422).json(response.toResponse());
     }
 
     const monthIdx = parseMonthIndex(existing.month);
