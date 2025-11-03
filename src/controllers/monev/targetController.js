@@ -681,12 +681,14 @@ function monthNameID(m) {
   const n = Number(m);
   if (!Number.isFinite(n)) return String(m ?? "");
 
-  const idx = n >= 1 && n <= 12 ? n - 1 : n;
+  if (n >= 0 && n <= 11) return NAMES[n];
 
-  return idx >= 0 && idx < 12 ? NAMES[idx] : String(m);
+  if (n >= 1 && n <= 12) return NAMES[n - 1];
+
+  return String(m);
 }
 
 function formatPeriodeID(monthIndex, year) {
   const name = monthNameID(monthIndex);
-  return year != null ? `${name} ${year}` : `${name}`;
+  return year != null ? `${name} ${year}` : name;
 }
