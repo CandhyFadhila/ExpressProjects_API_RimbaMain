@@ -81,6 +81,8 @@ exports.getMonthlyRealizationbyActivityPackageId = async (req, res) => {
   }
 };
 
+// TODO 1: Nambah validasi, jika pada month dan year saat input data realisasi terdapat data monev_targets dengan month dan year yang sama masih kosong, maka kembalikan response bahwa target wajib diisi dahulu sebelum input realisasi
+// TODO 2: Ketika update pertama kali jangan langsung masuk ke monev_monthly_realizations, tapi masuk ke monev_monthly_realization_pending_updates
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
   const payload = {
@@ -110,7 +112,13 @@ exports.update = async (req, res) => {
     }
 
     const existing = await knex("monev_monthly_realizations")
-      .select(["id", "evidence_file_ids"])
+      .select([
+        "id",
+        "monev_activity_packages_id",
+        "evidence_file_ids",
+        "month",
+        "year",
+      ])
       .where("id", id)
       .first();
     if (!existing) {
@@ -122,6 +130,47 @@ exports.update = async (req, res) => {
         `Realisasi bulanan dengan id '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
+    }
+
+    const monthIdx = parseMonthIndex(existing.month);
+    const yearNum = Number(existing.year);
+    if (!Number.isFinite(yearNum) || monthIdx == null) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "INVALID_PERIOD",
+        "Periode Tidak Valid",
+        "Nilai bulan/tahun pada realisasi tidak valid."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
+    const target = await trx("monev_targets")
+      .select(["id", "budget_target", "physical_target"])
+      .where("monev_activity_packages_id", existing.monev_activity_packages_id)
+      .andWhere("month", monthIdx)
+      .andWhere("year", yearNum)
+      .whereNull("deleted_at")
+      .first();
+    const isEmptyVal = (v) => {
+      if (v == null) return true;
+      if (typeof v === "string") return v.trim() === "" || Number(v) === 0;
+      if (typeof v === "number") return Number(v) === 0;
+      const n = Number(v);
+      return Number.isFinite(n) ? n === 0 : false;
+    };
+    if (
+      !target ||
+      (isEmptyVal(target.budget_target) && isEmptyVal(target.physical_target))
+    ) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "TARGET_REQUIRED",
+        "Target Bulanan Belum Diisi",
+        `Mohon lengkapi minimal salah satu target pada target (budget target atau physical target) untuk periode '${existing.month} ${existing.year}' sebelum mengisi realisasi.`
+      );
+      return res.status(422).json(response.toResponse());
     }
 
     const user = await knex("users")
