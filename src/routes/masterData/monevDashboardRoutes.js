@@ -26,12 +26,6 @@ router.get(
   monevDashboardController.dashboardInfo
 );
 
-router.get(
-  "/:id",
-  requirePermission(["view.monev_dashboard"]),
-  monevDashboardController.getDashboard
-);
-
 router.post(
   "/create",
   requirePermission(["create.monev_dashboard"]),

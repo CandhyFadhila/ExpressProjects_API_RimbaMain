@@ -9,47 +9,6 @@ const WithoutDataResource = require("../../resources/WithoutDataResource");
 const monevDashboardResource = require("../../resources/masterData/monevDashboardResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 
-exports.getDashboard = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const dashboard = await knex("monev_dashboards")
-      .select("*")
-      .where("id", id)
-      .first();
-    if (!dashboard) {
-      const response = new WithoutDataResource(
-        200,
-        "DATA_NOT_FOUND",
-        "Data Tidak Ditemukan",
-        `Data dashboard dengan ID '${id}' tidak ditemukan.`
-      );
-      return res.status(200).json(response.toResponse());
-    }
-
-    const data = await monevDashboardResource(dashboard);
-    const response = new WithDataResource(
-      200,
-      "SUCCESS_GET_DATA",
-      "Berhasil Mengambil Data",
-      "Detail data dashboard berhasil didapatkan.",
-      data
-    );
-    return res.status(200).json(response.toResponse());
-  } catch (error) {
-    logger.error(
-      `| Dashboard MONEV | - Error function getDahsboard: ${error.message}`
-    );
-    const response = new WithoutDataResource(
-      500,
-      "SERVER_ERROR",
-      "Server Sedang Error",
-      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
-    );
-    res.status(500).json(response.toResponse());
-  }
-};
-
 exports.dashboardInfo = async (req, res) => {
   try {
     const rawYear =
@@ -60,6 +19,7 @@ exports.dashboardInfo = async (req, res) => {
         ? parsed
         : new Date().getFullYear();
 
+    const dashboard = await getDashboardInfo();
     const avgPhysicalTarget = await getAvgPhysicalTargetByYear(targetYear);
     const avgProgressRealization = await getAvgProgressRealizationByYear(
       targetYear
@@ -85,6 +45,7 @@ exports.dashboardInfo = async (req, res) => {
       "Data Ditemukan",
       "Data dashboard MONEV berhasil didapatkan.",
       {
+        dashboard,
         avgPhysicalTarget,
         avgProgressRealization,
         totalActivityPackages,
@@ -617,4 +578,15 @@ async function getTotalActivityCalendarCreatedByYear(year) {
     .first();
 
   return Number(row?.total ?? 0);
+}
+
+async function getDashboardInfo() {
+  const dashboard = await knex("monev_dashboards")
+    .select("*")
+    .where("id", 1)
+    .first();
+  if (!dashboard) return null;
+
+  const data = await monevDashboardResource(dashboard);
+  return data;
 }
