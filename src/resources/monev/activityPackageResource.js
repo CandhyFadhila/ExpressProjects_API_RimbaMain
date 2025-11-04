@@ -73,6 +73,9 @@ async function activityPackageResource(activity) {
   );
   const avgProgress = calcAvgProgress(originalMonthRealizations);
 
+  const pendingTarget = pendingTargets.length > 0;
+  const pendingRealization = pendingMonthRealizations.length > 0;
+
   return {
     id: activity.id,
     createdUser: createdUser ? await UserResource(createdUser) : null,
@@ -101,6 +104,8 @@ async function activityPackageResource(activity) {
       monevMonthlyRealizationOriginal,
       monevMonthlyRealizationPendingUpdate,
     },
+    pendingTarget,
+    pendingRealization,
     createdAt: activity.created_at,
     updatedAt: activity.updated_at,
     deletedAt: activity.deleted_at,
