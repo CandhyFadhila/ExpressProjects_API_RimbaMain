@@ -785,7 +785,7 @@ async function verifyMonthlyRealization(trx, { monthlyId, payload, userId }) {
       updated_at: now,
     };
 
-    await trx("monev_monthly_realizations").where("id", id).update(patch);
+    await trx("monev_monthly_realizations").where("id", monthlyId).update(patch);
 
     // Soft-delete semua pending aktif milik monthlyRealization ini
     await trx("monev_monthly_realization_pending_updates")
@@ -819,7 +819,7 @@ async function verifyMonthlyRealization(trx, { monthlyId, payload, userId }) {
     updated_at: now,
   };
 
-  await trx("monev_monthly_realizations").where("id", id).update(patchReject);
+  await trx("monev_monthly_realizations").where("id", monthlyId).update(patchReject);
 
   // Soft-delete seluruh pending aktif agar bersih
   await trx("monev_monthly_realization_pending_updates")
