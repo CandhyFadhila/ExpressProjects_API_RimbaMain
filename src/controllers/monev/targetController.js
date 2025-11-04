@@ -156,7 +156,7 @@ exports.verification = async (req, res) => {
     rejectionReason: req.body.rejectionReason,
   };
   const userId = activityLogHelper.fromReq(req);
-  const id = req.params.id;
+  const pendingId = req.params.id;
 
   try {
     const errors = validationResult(req);
@@ -205,7 +205,7 @@ exports.verification = async (req, res) => {
       "monev_target_pending_updates"
     )
       .select(["id", "monev_target_id"])
-      .where("id", id)
+      .where("id", pendingId)
       .whereNull("deleted_at")
       .forUpdate()
       .first();
@@ -220,6 +220,8 @@ exports.verification = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
+    const targetId = pendingTarget.monev_target_id;
+
     const existing = await trx("monev_targets")
       .select([
         "id",
@@ -231,7 +233,7 @@ exports.verification = async (req, res) => {
         "validation_status",
         "rejection_message",
       ])
-      .where("id", pendingTarget.monev_target_id)
+      .where("id", targetId)
       .forUpdate()
       .first();
     if (!existing) {
@@ -290,7 +292,7 @@ exports.verification = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const result = await verifyTarget(trx, { id, payload, userId });
+    const result = await verifyTarget(trx, { targetId, payload, userId });
     const periodTextResult = formatPeriodeID(result.month, result.year);
 
     await trx.commit();
@@ -534,13 +536,13 @@ async function updateTarget(trx, { id, payload, userId, userRoleId }) {
  * - Reject  (3): tidak salin nilai; set validate_by/validate_at/status, isi rejection_message.
  * - Keduanya: soft-delete seluruh pending aktif untuk target agar tidak menumpuk.
  */
-async function verifyTarget(trx, { id, payload, userId }) {
+async function verifyTarget(trx, { targetId, payload, userId }) {
   const now = trx.fn.now();
 
   // Ambil target + pending terbaru (jika ada)
   const target = await trx("monev_targets")
     .select(["id", "month", "year"])
-    .where("id", id)
+    .where("id", targetId)
     .first();
   if (!target) {
     const err = new Error("Target not found");
@@ -551,7 +553,7 @@ async function verifyTarget(trx, { id, payload, userId }) {
 
   // Pending terbaru (kalau ada)
   const latestPending = await trx("monev_target_pending_updates")
-    .where({ monev_target_id: id })
+    .where({ monev_target_id: targetId })
     .whereNull("deleted_at")
     .orderBy("created_at", "desc")
     .first();
@@ -576,11 +578,11 @@ async function verifyTarget(trx, { id, payload, userId }) {
       updated_at: now,
     };
 
-    await trx("monev_targets").where("id", id).update(patch);
+    await trx("monev_targets").where("id", targetId).update(patch);
 
     // Soft-delete semua pending aktif milik target ini
     await trx("monev_target_pending_updates")
-      .where({ monev_target_id: id })
+      .where({ monev_target_id: targetId })
       .whereNull("deleted_at")
       .update({ deleted_at: now, updated_at: now });
 
@@ -605,11 +607,11 @@ async function verifyTarget(trx, { id, payload, userId }) {
     updated_at: now,
   };
 
-  await trx("monev_targets").where("id", id).update(patchReject);
+  await trx("monev_targets").where("id", targetId).update(patchReject);
 
   // Soft-delete seluruh pending aktif agar bersih
   await trx("monev_target_pending_updates")
-    .where({ monev_target_id: id })
+    .where({ monev_target_id: targetId })
     .whereNull("deleted_at")
     .update({ deleted_at: now, updated_at: now });
 

@@ -312,7 +312,7 @@ exports.verification = async (req, res) => {
     rejectionReason: req.body.rejectionReason,
   };
   const userId = activityLogHelper.fromReq(req);
-  const id = req.params.id;
+  const pendingId = req.params.id;
 
   try {
     const errors = validationResult(req);
@@ -360,7 +360,7 @@ exports.verification = async (req, res) => {
       "monev_monthly_realization_pending_updates"
     )
       .select(["id", "monev_monthly_realization_id"])
-      .where("id", id)
+      .where("id", pendingId)
       .whereNull("deleted_at")
       .forUpdate()
       .first();
@@ -374,6 +374,8 @@ exports.verification = async (req, res) => {
       );
       return res.status(422).json(response.toResponse());
     }
+
+    const monthlyId = pendingRealization.monev_monthly_realization_id;
 
     const existing = await trx("monev_monthly_realizations")
       .select([
@@ -389,7 +391,7 @@ exports.verification = async (req, res) => {
         "validation_status",
         "rejection_message",
       ])
-      .where("id", pendingRealization.monev_monthly_realization_id)
+      .where("id", monthlyId)
       .forUpdate()
       .first();
     if (!existing) {
@@ -493,7 +495,11 @@ exports.verification = async (req, res) => {
       return res.status(422).json(resp.toResponse());
     }
 
-    const result = await verifyMonthlyRealization(trx, { id, payload, userId });
+    const result = await verifyMonthlyRealization(trx, {
+      monthlyId,
+      payload,
+      userId,
+    });
 
     await trx.commit();
 
@@ -723,7 +729,7 @@ async function updateMonthlyRealization(
  * - Reject  (3): tidak salin nilai; set validate_by/validate_at/status, isi rejection_message.
  * - Keduanya: soft-delete seluruh pending aktif untuk monthlyRealization agar tidak menumpuk.
  */
-async function verifyMonthlyRealization(trx, { id, payload, userId }) {
+async function verifyMonthlyRealization(trx, { monthlyId, payload, userId }) {
   const now = trx.fn.now();
 
   const J = (v) => {
@@ -738,7 +744,7 @@ async function verifyMonthlyRealization(trx, { id, payload, userId }) {
   // Ambil monthlyRealization + pending terbaru (jika ada)
   const monthlyRealization = await trx("monev_monthly_realizations")
     .select(["id", "month", "year"])
-    .where("id", id)
+    .where("id", monthlyId)
     .first();
   if (!monthlyRealization) {
     const err = new Error("Realisasi bulanan not found");
@@ -752,7 +758,7 @@ async function verifyMonthlyRealization(trx, { id, payload, userId }) {
 
   // Pending terbaru (kalau ada)
   const latestPending = await trx("monev_monthly_realization_pending_updates")
-    .where({ monev_monthly_realization_id: id })
+    .where({ monev_monthly_realization_id: monthlyId })
     .whereNull("deleted_at")
     .orderBy("created_at", "desc")
     .first();
@@ -783,7 +789,7 @@ async function verifyMonthlyRealization(trx, { id, payload, userId }) {
 
     // Soft-delete semua pending aktif milik monthlyRealization ini
     await trx("monev_monthly_realization_pending_updates")
-      .where({ monev_monthly_realization_id: id })
+      .where({ monev_monthly_realization_id: monthlyId })
       .whereNull("deleted_at")
       .update({ deleted_at: now, updated_at: now });
 
@@ -817,7 +823,7 @@ async function verifyMonthlyRealization(trx, { id, payload, userId }) {
 
   // Soft-delete seluruh pending aktif agar bersih
   await trx("monev_monthly_realization_pending_updates")
-    .where({ monev_monthly_realization_id: id })
+    .where({ monev_monthly_realization_id: monthlyId })
     .whereNull("deleted_at")
     .update({ deleted_at: now, updated_at: now });
 
