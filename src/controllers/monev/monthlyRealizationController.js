@@ -356,6 +356,25 @@ exports.verification = async (req, res) => {
       return res.status(403).json(response.toResponse());
     }
 
+    const pendingRealization = await trx(
+      "monev_monthly_realization_pending_updates"
+    )
+      .select(["id", "monev_monthly_realization_id"])
+      .where("id", id)
+      .whereNull("deleted_at")
+      .forUpdate()
+      .first();
+    if (!pendingRealization) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Realisasi bulanan data pending dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
     const existing = await trx("monev_monthly_realizations")
       .select([
         "id",
@@ -370,7 +389,7 @@ exports.verification = async (req, res) => {
         "validation_status",
         "rejection_message",
       ])
-      .where("id", id)
+      .where("id", pendingRealization.monev_monthly_realization_id)
       .forUpdate()
       .first();
     if (!existing) {

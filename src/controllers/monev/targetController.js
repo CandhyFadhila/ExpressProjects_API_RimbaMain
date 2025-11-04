@@ -201,6 +201,25 @@ exports.verification = async (req, res) => {
       return res.status(403).json(response.toResponse());
     }
 
+    const pendingTarget = await trx(
+      "monev_target_pending_updates"
+    )
+      .select(["id", "monev_target_id"])
+      .where("id", id)
+      .whereNull("deleted_at")
+      .forUpdate()
+      .first();
+    if (!pendingTarget) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data target pending dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
     const existing = await trx("monev_targets")
       .select([
         "id",
@@ -212,7 +231,7 @@ exports.verification = async (req, res) => {
         "validation_status",
         "rejection_message",
       ])
-      .where("id", id)
+      .where("id", pendingTarget.monev_target_id)
       .forUpdate()
       .first();
     if (!existing) {
