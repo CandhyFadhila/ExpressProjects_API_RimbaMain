@@ -586,6 +586,8 @@ async function updateMonthlyRealization(
     throw err;
   }
 
+  const periodText = formatPeriodeID(existing.month, existing.year);
+
   // ===========================
   // SUPER ADMIN → DIRECT UPDATE
   // ===========================
@@ -617,7 +619,7 @@ async function updateMonthlyRealization(
       {
         userId,
         module: "monev",
-        subject: `Realisasi Bulanan Kegiatan di Bulan '${existing.month} ${existing.year}' (update langsung oleh superadmin)`,
+        subject: `Realisasi Bulanan Kegiatan di Bulan '${periodText}' (update langsung oleh superadmin)`,
       },
       trx
     );
@@ -686,7 +688,7 @@ async function updateMonthlyRealization(
       {
         userId,
         module: "monev",
-        subject: `Realisasi Bulanan Kegiatan di Bulan '${existing.month} ${existing.year}' (pending update replaced)`,
+        subject: `Realisasi Bulanan Kegiatan di Bulan '${periodText}' (pending update replaced)`,
       },
       trx
     );
@@ -715,7 +717,7 @@ async function updateMonthlyRealization(
     {
       userId,
       module: "monev",
-      subject: `Realisasi Bulanan Kegiatan di Bulan '${existing.month} ${existing.year}' (pending update)`,
+      subject: `Realisasi Bulanan Kegiatan di Bulan '${periodText}' (pending update)`,
     },
     trx
   );
