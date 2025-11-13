@@ -401,7 +401,7 @@ exports.sendOTP = async (req, res) => {
     }
 
     const userId = Number(user.id);
-    if (!Number.isFinite(userId) || userId !== 1) {
+    if (!Number.isFinite(userId) || userId === 1) {
       const response = new WithoutDataResource(
         403,
         "FORBIDDEN_ROLE",
@@ -498,7 +498,7 @@ exports.verifyOTP = async (req, res) => {
     }
 
     const userId = Number(user.id);
-    if (!Number.isFinite(userId) || userId !== 1) {
+    if (!Number.isFinite(userId) || userId === 1) {
       const response = new WithoutDataResource(
         403,
         "FORBIDDEN_ROLE",
@@ -577,7 +577,7 @@ exports.resetPassword = async (req, res) => {
     }
 
     const userId = Number(user.id);
-    if (!Number.isFinite(userId) || userId !== 1) {
+    if (!Number.isFinite(userId) || userId === 1) {
       const response = new WithoutDataResource(
         403,
         "FORBIDDEN_ROLE",
