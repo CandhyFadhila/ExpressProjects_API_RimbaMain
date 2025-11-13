@@ -76,6 +76,58 @@ class StorageServerHelper {
     return this.token;
   }
 
+  static isTokenErrorCase(payload) {
+    if (!payload || typeof payload !== "object") return null;
+
+    const errCase = payload.case || payload?.data?.case || payload?.error?.case;
+
+    const tokenErrorCases = [
+      "TOKEN_BLACKLISTED",
+      "TOKEN_EXPIRED",
+      "LOGIN_EXPIRED",
+      "INVALID_TOKEN",
+    ];
+
+    if (errCase && tokenErrorCases.includes(errCase)) {
+      return errCase;
+    }
+
+    return null;
+  }
+
+  static async withTokenAutoRefresh(requestFn, allowRetry = true) {
+    this.init();
+    await this.ensureToken(); // pastikan token awal sudah ada
+
+    const exec = async (retry) => {
+      const currentToken = this.token; // token terbaru saat ini
+
+      const res = await requestFn(currentToken);
+      const payload =
+        typeof res.data === "string" ? safeJson(res.data) : res.data;
+
+      // Kalau 401 & terdeteksi error token, coba refresh token dan retry sekali
+      if (res.status === 401 && retry) {
+        const tokenCase = this.isTokenErrorCase(payload);
+        if (tokenCase) {
+          logger.warn(
+            `| Storage Server Helper | - Token bermasalah (${tokenCase}), mencoba login ulang & retry sekali.`
+          );
+
+          // Paksa login ulang
+          await this.ensureToken(true);
+
+          // Retry sekali dengan token baru
+          return exec(false);
+        }
+      }
+
+      return { res, payload };
+    };
+
+    return exec(allowRetry);
+  }
+
   static async login(force = false) {
     this.init();
     if (this.token && !force) return this.token;
@@ -139,6 +191,7 @@ class StorageServerHelper {
   }
 
   static async uploadToServer(files) {
+    this.init();
     await this.ensureToken();
 
     const normalized = normalizeFiles(files);
@@ -149,54 +202,62 @@ class StorageServerHelper {
       throw new Error("Tidak ada file yang dikirim untuk diunggah.");
     }
 
-    const form = new FormData();
+    const buildForm = () => {
+      const form = new FormData();
 
-    for (const f of normalized) {
-      const originalName = f.originalname;
-      const extFromName = path.extname(originalName || "").replace(/^\./, "");
-      const ext = extFromName
-        ? extFromName
-        : this.getExtensionFromMimeType(f.mimetype) || "bin";
+      for (const f of normalized) {
+        const originalName = f.originalname;
+        const extFromName = path.extname(originalName || "").replace(/^\./, "");
+        const ext = extFromName
+          ? extFromName
+          : this.getExtensionFromMimeType(f.mimetype) || "bin";
 
-      const filename = extFromName ? originalName : `${originalName}.${ext}`;
+        const filename = extFromName ? originalName : `${originalName}.${ext}`;
 
-      if (f.buffer && Buffer.isBuffer(f.buffer)) {
-        form.append(this.FILE_FIELD, f.buffer, {
-          filename,
-          contentType: f.mimetype || "application/octet-stream",
-        });
-      } else if (f.path && fs.existsSync(f.path)) {
-        form.append(this.FILE_FIELD, fs.createReadStream(f.path), {
-          filename,
-          contentType: f.mimetype || "application/octet-stream",
-        });
-      } else {
-        logger.warning(
-          `| Storage Server Helper | - File tidak valid/tiada buffer/path: ${f.originalname}`
-        );
+        if (f.buffer && Buffer.isBuffer(f.buffer)) {
+          form.append(this.FILE_FIELD, f.buffer, {
+            filename,
+            contentType: f.mimetype || "application/octet-stream",
+          });
+        } else if (f.path && fs.existsSync(f.path)) {
+          form.append(this.FILE_FIELD, fs.createReadStream(f.path), {
+            filename,
+            contentType: f.mimetype || "application/octet-stream",
+          });
+        } else {
+          logger.warn(
+            `| Storage Server Helper | - File tidak valid/tiada buffer/path: ${f.originalname}`
+          );
+        }
       }
-    }
 
-    if (!hasFormFile(form, this.FILE_FIELD)) {
+      return form;
+    };
+
+    const tmpForm = buildForm();
+    if (!hasFormFile(tmpForm, this.FILE_FIELD)) {
       logger.error(
         "| Storage Server Helper | - Tidak ada file valid untuk diunggah."
       );
       throw new Error("Tidak ada file valid untuk diunggah.");
     }
 
-    const headers = {
-      ...form.getHeaders(),
-      Authorization: `Bearer ${this.token}`,
-    };
+    const { res, payload } = await this.withTokenAutoRefresh(
+      async (token) => {
+        const form = buildForm(); // bangun ulang tiap attempt
+        const headers = {
+          ...form.getHeaders(),
+          Authorization: `Bearer ${token}`,
+        };
 
-    const res = await this.axios().post("/api/rimba/docs/upload-file", form, {
-      headers,
-      maxBodyLength: Infinity,
-      validateStatus: () => true,
-    });
-
-    const payload =
-      typeof res.data === "string" ? safeJson(res.data) : res.data;
+        return this.axios().post("/api/rimba/docs/upload-file", form, {
+          headers,
+          maxBodyLength: Infinity,
+          validateStatus: () => true,
+        });
+      },
+      true // allowRetry = true
+    );
 
     if (res.status >= 400) {
       logger.error(
@@ -225,7 +286,9 @@ class StorageServerHelper {
   }
 
   static async deleteFromServer(fileIds = []) {
+    this.init();
     await this.ensureToken();
+
     if (!Array.isArray(fileIds) || fileIds.length === 0) {
       logger.error(
         "| Storage Server Helper | - Tidak ada file_id yang dikirim untuk dihapus."
@@ -233,8 +296,6 @@ class StorageServerHelper {
       throw new Error("Tidak ada file_id yang dikirim untuk dihapus.");
     }
 
-    await this.login();
-    // normalisasi ke string & validasi dasar UUID v4 (opsional, untuk early-fail)
     const ids = fileIds.map(String).filter(Boolean);
     const uuidV4 =
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -243,16 +304,18 @@ class StorageServerHelper {
       throw new Error(`ID bukan UUID v4: ${bad.join(", ")}`);
     }
 
-    const payload = { document_ids: ids }; // <— WAJIB: server dokumen minta 'document_ids'
+    const bodyPayload = { document_ids: ids }; // <— WAJIB: server dokumen minta 'document_ids'
 
-    const res = await this.axios().delete("/api/rimba/docs/delete-file", {
-      headers: { Authorization: `Bearer ${this.token}` },
-      data: payload,
-      validateStatus: () => true,
-    });
-
-    const payloadRes =
-      typeof res.data === "string" ? safeJson(res.data) : res.data;
+    const { res, payload: payloadRes } = await this.withTokenAutoRefresh(
+      async (token) => {
+        return this.axios().delete("/api/rimba/docs/delete-file", {
+          headers: { Authorization: `Bearer ${token}` },
+          data: bodyPayload,
+          validateStatus: () => true,
+        });
+      },
+      true // allowRetry
+    );
 
     if (res.status >= 400) {
       logger.error(

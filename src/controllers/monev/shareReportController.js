@@ -452,7 +452,6 @@ exports.update = async (req, res) => {
   }
 };
 
-// TODO: Bugs, file gamau ke delete
 exports.destroy = async (req, res) => {
   const trx = await knex.transaction();
 
