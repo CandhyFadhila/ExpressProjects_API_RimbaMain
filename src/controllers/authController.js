@@ -400,13 +400,13 @@ exports.sendOTP = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const roleId = Number(user.role_id);
-    if (!Number.isFinite(roleId) || roleId !== 4) {
+    const userId = Number(user.id);
+    if (!Number.isFinite(userId) || userId !== 1) {
       const response = new WithoutDataResource(
         403,
         "FORBIDDEN_ROLE",
         "Akses Ditolak",
-        "Hanya akun dengan role 'Peserta' yang diperbolehkan untuk reset password."
+        "Reset kata sandi hanya dapat dilakukan oleh akun yang berwenang."
       );
       return res.status(403).json(response.toResponse());
     }
@@ -497,13 +497,13 @@ exports.verifyOTP = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const roleId = Number(user.role_id);
-    if (!Number.isFinite(roleId) || roleId !== 4) {
+    const userId = Number(user.id);
+    if (!Number.isFinite(userId) || userId !== 1) {
       const response = new WithoutDataResource(
         403,
         "FORBIDDEN_ROLE",
         "Akses Ditolak",
-        "Hanya akun dengan role 'Peserta' yang diperbolehkan untuk reset password."
+        "Reset kata sandi hanya dapat dilakukan oleh akun yang berwenang."
       );
       return res.status(403).json(response.toResponse());
     }
@@ -576,13 +576,13 @@ exports.resetPassword = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    const roleId = Number(user.role_id);
-    if (!Number.isFinite(roleId) || roleId !== 4) {
+    const userId = Number(user.id);
+    if (!Number.isFinite(userId) || userId !== 1) {
       const response = new WithoutDataResource(
         403,
         "FORBIDDEN_ROLE",
         "Akses Ditolak",
-        "Hanya akun dengan role 'Peserta' yang diperbolehkan untuk reset password."
+        "Reset kata sandi hanya dapat dilakukan oleh akun yang berwenang."
       );
       return res.status(403).json(response.toResponse());
     }
