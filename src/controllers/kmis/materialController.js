@@ -21,12 +21,35 @@ const materialResource = require("../../resources/kmis/materialResource");
 exports.index = async (req, res) => {
   const { search, topicId } = req.query;
   const topicIdAny = topicId ?? req.query["topicId[]"];
+  const userIdRaw =
+    req.auth?.userId ??
+    req.auth?.user_id ??
+    req.auth?.id ??
+    req.userId ??
+    req.user?.id;
+
+  const userId = Number(userIdRaw);
 
   try {
+    const user = await knex("users")
+      .select("id", "role_id")
+      .where({ id: userId })
+      .first();
+    if (!user) {
+      const response = new WithoutDataResource(
+        401,
+        "USER_NOT_FOUND",
+        "Akses Ditolak",
+        "Pengguna tidak ditemukan di sistem. Silakan hubungi admin."
+      );
+      return res.status(401).json(response.toResponse());
+    }
+
+    const roleId = Number(user.role_id);
+
     let query = knex("kmis_materials as material")
       .leftJoin("kmis_topics as topic", "topic.id", "material.kmis_topic_id")
       .select([
-        // kolom material (eksplisit agar tidak bentrok)
         "material.id",
         "material.kmis_topic_id",
         "material.created_by",
@@ -46,6 +69,10 @@ exports.index = async (req, res) => {
         "topic.id as topic_id",
         "topic.title as topic_title",
       ]);
+
+    if (!Number.isFinite(roleId) || roleId !== 1) {
+      query.where("material.created_by", userId);
+    }
 
     applyTrashedScope(query, req, "material.deleted_at");
 
