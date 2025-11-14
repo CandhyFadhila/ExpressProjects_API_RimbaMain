@@ -6,17 +6,17 @@ const UserResource = require("../../resources/auth/UserResource");
 const documentResource = require("../../resources/doc/documentResource");
 
 async function materialResource(material) {
-  const createdUser = material.created_by
-    ? await knex("users").where("id", material.created_by).first()
-    : null;
-
-  const uploadedUser = material.uploaded_by
-    ? await knex("users").where("id", material.uploaded_by).first()
-    : null;
-
-  const topic = material.kmis_topic_id
-    ? await knex("kmis_topics").where("id", material.kmis_topic_id).first()
-    : null;
+  const [createdUser, uploadedUser, topic] = await Promise.all([
+    material.created_by
+      ? await knex("users").where("id", material.created_by).first()
+      : null,
+    material.uploaded_by
+      ? await knex("users").where("id", material.uploaded_by).first()
+      : null,
+    material.kmis_topic_id
+      ? await knex("kmis_topics").where("id", material.kmis_topic_id).first()
+      : null,
+  ]);
 
   const file = await resolveArrayRelations(
     material.materials_file_ids,

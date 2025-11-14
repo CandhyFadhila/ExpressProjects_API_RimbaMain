@@ -2,7 +2,7 @@ const knex = require("../../config/database");
 const quizResource = require("../kmis/quizResource");
 
 async function quizResponseResource(quizResponse) {
-  const quiz = quizResponse?.kmis_quiz_id
+  const quiz = quizResponse.kmis_quiz_id
     ? await knex("kmis_quiz").where("id", quizResponse.kmis_quiz_id).first()
     : null;
 

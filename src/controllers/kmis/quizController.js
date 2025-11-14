@@ -27,9 +27,37 @@ const normalizeAnswer = (v) =>
 exports.index = async (req, res) => {
   const { search, topicId } = req.query;
   const topicIdAny = topicId ?? req.query["topicId[]"];
+  const userIdRaw =
+    req.auth?.userId ??
+    req.auth?.user_id ??
+    req.auth?.id ??
+    req.userId ??
+    req.user?.id;
+
+  const userId = Number(userIdRaw);
 
   try {
+    const user = await knex("users")
+      .select("id", "role_id")
+      .where({ id: userId })
+      .first();
+    if (!user) {
+      const response = new WithoutDataResource(
+        401,
+        "USER_NOT_FOUND",
+        "Akses Ditolak",
+        "Pengguna tidak ditemukan di sistem. Silakan hubungi admin."
+      );
+      return res.status(401).json(response.toResponse());
+    }
+
+    const roleId = Number(user.role_id);
+
     let query = knex("kmis_quiz as quiz").select("quiz.*");
+
+    if (!Number.isFinite(roleId) || roleId !== 1) {
+      query.where("quiz.created_by", userId);
+    }
 
     applyRelationIn(query, "quiz.kmis_topic_id", topicIdAny, {
       as: "number",
@@ -37,7 +65,12 @@ exports.index = async (req, res) => {
 
     applySearch(query, search, ["quiz.question"]);
 
-    applyLatestThenTrashed(query, "quiz.deleted_at", "quiz.created_at", "quiz.id");
+    applyLatestThenTrashed(
+      query,
+      "quiz.deleted_at",
+      "quiz.created_at",
+      "quiz.id"
+    );
 
     const paginationInfo = applyPagination(req.query);
 
@@ -91,6 +124,14 @@ exports.store = async (req, res) => {
     correctOption,
     explanation,
   } = req.body;
+
+  const userIdRaw =
+    req.auth?.userId ??
+    req.auth?.user_id ??
+    req.auth?.id ??
+    req.userId ??
+    req.user?.id;
+  const userId = Number(userIdRaw);
 
   try {
     const errors = validationResult(req);
@@ -157,6 +198,7 @@ exports.store = async (req, res) => {
 
     await trx("kmis_quiz")
       .insert({
+        created_by: userId,
         kmis_topic_id: topicId,
         question,
         answer_a: answerA,
@@ -732,6 +774,13 @@ exports.downloadTemplate = async (req, res) => {
 
 exports.importTemplate = async (req, res) => {
   const trx = await knex.transaction();
+  const userIdRaw =
+    req.auth?.userId ??
+    req.auth?.user_id ??
+    req.auth?.id ??
+    req.userId ??
+    req.user?.id;
+  const userId = Number(userIdRaw);
 
   try {
     if (!req.files || req.files.length === 0) {
@@ -1018,6 +1067,7 @@ exports.importTemplate = async (req, res) => {
     // --- 8) Insert batch dalam transaksi
     try {
       const toInsert = items.map((it) => ({
+        created_by: userId,
         kmis_topic_id: it.topicId,
         question: it.question,
         answer_a: it.answerA,
