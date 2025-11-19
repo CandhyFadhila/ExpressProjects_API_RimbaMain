@@ -631,9 +631,20 @@ exports.updateProgressLearningAttempt = async (req, res) => {
 
     // 2. Validasi jenis materi dan waktu
     const materialIdToCheck = requiredIds[completedIds.length];
+    if (!Number.isFinite(materialIdToCheck)) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "INVALID_MATERIAL_ID",
+        "ID Materi Tidak Valid",
+        "ID materi yang dicari tidak valid."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
     const material = await trx("kmis_materials")
       .where("id", materialIdToCheck)
-      // .whereNull("deleted_at")
+      .whereNull("deleted_at")
       .first();
     if (!material) {
       await trx.rollback();
