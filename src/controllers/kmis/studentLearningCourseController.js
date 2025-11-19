@@ -633,7 +633,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     const materialIdToCheck = requiredIds[completedIds.length];
     const material = await trx("kmis_materials")
       .where("id", materialIdToCheck)
-      .whereNull("deleted_at")
+      // .whereNull("deleted_at")
       .first();
     if (!material) {
       await trx.rollback();
