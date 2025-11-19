@@ -931,7 +931,6 @@ async function syncMaterialOrder() {
       .whereNull("deleted_at");
 
     for (const topic of topics) {
-      // 2. Ambil materi yang terkait dengan topicId
       const materials = await trx("kmis_materials")
         .select("id")
         .where("kmis_topic_id", topic.id)
@@ -952,7 +951,6 @@ async function syncMaterialOrder() {
       .whereNull("deleted_at");
 
     for (const attempt of learningAttempts) {
-      // Ambil materi yang terkait dengan topicId di learning attempt
       const materials = await trx("kmis_materials")
         .select("id")
         .where("kmis_topic_id", attempt.kmis_topic_id)
@@ -960,17 +958,14 @@ async function syncMaterialOrder() {
 
       const materialIds = materials.map((material) => Number(material.id));
 
-      // Ambil completed_material_ids yang ada pada attempt
       const completedIds = normIdArray(attempt.completed_material_ids, {
         as: "number",
       });
 
-      // Filter completed_material_ids untuk menghapus ID yang tidak ada di material_order_ids
       const updatedCompletedIds = completedIds.filter((id) =>
         materialIds.includes(id)
       );
 
-      // Update completed_material_ids pada learning attempt
       await trx("kmis_learning_attempts")
         .where("id", attempt.id)
         .update({
