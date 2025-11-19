@@ -735,18 +735,6 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    // Cek jika completed_material_ids kurang dari total materi
-    if (nextCompletedIds.length < requiredIds.length) {
-      await trx.rollback();
-      const response = new WithoutDataResource(
-        422,
-        "INVALID_PROGRESS",
-        "Progress Tidak Valid",
-        "Jumlah materi yang diselesaikan kurang dari jumlah materi yang ada."
-      );
-      return res.status(422).json(response.toResponse());
-    }
-
     const validCompletedMaterialIds = asJsonb(nextCompletedIds);
     await trx("kmis_learning_attempts")
       .where("id", id)
