@@ -347,7 +347,7 @@ exports.update = async (req, res) => {
       dbColumn: "report_file_ids",
       maxFilesAllowed: 5,
       allowedTypes,
-      sizeLimitBytes: 10 * 1024 * 1024, // 10MB
+      sizeLimitBytes: 50 * 1024 * 1024, // 50MB
     });
     if (!validation.ok) {
       const response = new WithoutDataResource(
@@ -501,8 +501,9 @@ exports.destroy = async (req, res) => {
     const allFileIds = [];
     for (const r of existing) {
       const arr = normJsonbArray(r?.report_file_ids);
-      const fileIds = normIdArray(arr, { as: "number" })
-        .filter(Number.isFinite);
+      const fileIds = normIdArray(arr, { as: "number" }).filter(
+        Number.isFinite
+      );
       allFileIds.push(...fileIds);
     }
     const uniqueFileIds = [...new Set(allFileIds)];
@@ -575,7 +576,7 @@ async function validateFilesQuotaAndTypesOnUpdate({
     "application/vnd.ms-powerpoint",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   ],
-  sizeLimitBytes = 10 * 1024 * 1024,
+  sizeLimitBytes = 50 * 1024 * 1024,
 }) {
   const currentIds = normIdArray(normJsonbArray(existingRow?.[dbColumn]), {
     as: "string",

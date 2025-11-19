@@ -513,7 +513,7 @@ exports.update = async (req, res) => {
       dbColumn: "thumbnail_ids",
       maxFilesAllowed: 1,
       allowedTypes,
-      sizeLimitBytes: 10 * 1024 * 1024, // 10MB
+      sizeLimitBytes: 50 * 1024 * 1024, // 50MB
     });
     if (!validation.ok) {
       const response = new WithoutDataResource(
@@ -880,7 +880,7 @@ async function validateFilesQuotaAndTypesOnUpdate({
   dbColumn = "thumbnail_ids",
   maxFilesAllowed = 1,
   allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
-  sizeLimitBytes = 10 * 1024 * 1024,
+  sizeLimitBytes = 50 * 1024 * 1024,
 }) {
   const currentIds = normIdArray(normJsonbArray(existingRow?.[dbColumn]), {
     as: "string",

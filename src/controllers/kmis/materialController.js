@@ -191,7 +191,7 @@ exports.store = async (req, res) => {
       "application/vnd.ms-powerpoint",
       "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     ];
-    const MAX_SIZE = 10 * 1024 * 1024;
+    const MAX_SIZE = 50 * 1024 * 1024;
 
     const toExtList = (mimes) =>
       [...new Set(mimes.map((m) => MIME_ALIAS[m] || m))].join(", ");
@@ -212,7 +212,7 @@ exports.store = async (req, res) => {
             422,
             "FILE_TOO_LARGE",
             "Ukuran File Terlalu Besar",
-            `Ukuran maksimal tiap file pada ${label} adalah 10MB.`
+            `Ukuran maksimal tiap file pada ${label} adalah 50mB.`
           );
         }
       }
@@ -478,7 +478,7 @@ exports.update = async (req, res) => {
       "application/vnd.ms-powerpoint",
       "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     ];
-    const MAX_SIZE = 10 * 1024 * 1024;
+    const MAX_SIZE = 50 * 1024 * 1024;
 
     const toExtList = (mimes) =>
       [...new Set(mimes.map((m) => MIME_ALIAS[m] || m))].join(", ");
@@ -499,7 +499,7 @@ exports.update = async (req, res) => {
             422,
             "FILE_TOO_LARGE",
             "Ukuran File Terlalu Besar",
-            `Ukuran maksimal tiap file pada ${label} adalah 10MB.`
+            `Ukuran maksimal tiap file pada ${label} adalah 50mB.`
           );
         }
       }

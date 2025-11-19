@@ -466,7 +466,7 @@ exports.update = async (req, res) => {
       dbColumn: "document_ids",
       maxFilesAllowed: 5,
       allowedTypes,
-      sizeLimitBytes: 20 * 1024 * 1024,
+      sizeLimitBytes: 50 * 1024 * 1024,
     });
     if (!validation.ok) {
       const response = new WithoutDataResource(
@@ -837,7 +837,7 @@ async function validateFilesQuotaAndTypesOnUpdate({
   dbColumn = "document_ids",
   maxFilesAllowed = 5,
   allowedTypes = ["application/pdf"],
-  sizeLimitBytes = 20 * 1024 * 1024,
+  sizeLimitBytes = 50 * 1024 * 1024,
 }) {
   const currentIds = normIdArray(normJsonbArray(existingRow?.[dbColumn]), {
     as: "string",

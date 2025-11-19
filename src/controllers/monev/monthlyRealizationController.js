@@ -235,7 +235,7 @@ exports.update = async (req, res) => {
       dbColumn: "evidence_file_ids",
       maxFilesAllowed: 1,
       allowedTypes,
-      sizeLimitBytes: 10 * 1024 * 1024, // 10MB
+      sizeLimitBytes: 50 * 1024 * 1024, // 50MB
     });
     if (!validation.ok) {
       const response = new WithoutDataResource(
@@ -867,7 +867,7 @@ async function validateFilesQuotaAndTypesOnUpdate({
     "application/zip",
     "application/x-zip-compressed",
   ],
-  sizeLimitBytes = 10 * 1024 * 1024,
+  sizeLimitBytes = 50 * 1024 * 1024,
 }) {
   const currentIds = normIdArray(normJsonbArray(existingRow?.[dbColumn]), {
     as: "string",
