@@ -600,7 +600,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     }
 
     // Cek jika progress sudah selesai
-    const completedIds = normIdArray(learningAttempt?.completed_material_ids, {
+    const completedIds = normIdArray(learningAttempt.completed_material_ids, {
       as: "number",
     });
     if (completedIds.length === requiredIds.length) {
