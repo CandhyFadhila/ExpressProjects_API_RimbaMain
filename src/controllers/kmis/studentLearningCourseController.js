@@ -1680,7 +1680,7 @@ async function attemptExamResponse(learningAttemptId) {
   // 1) Ambil attempt minimal
   const attempt = await knex("kmis_learning_attempts")
     .where("id", learningAttemptId)
-    .select(["id", "attempt_by", "kmis_topic_id", "quiz_started"])
+    .select(["id", "attempt_by", "kmis_topic_id", "quiz_started", "quiz_finished"])
     .whereNull("deleted_at")
     .first();
 
