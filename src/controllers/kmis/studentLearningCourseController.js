@@ -566,7 +566,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     // Ambil data learning attempt berdasarkan id
     const learningAttempt = await trx("kmis_learning_attempts")
       .where("id", id)
-      // .whereNull("deleted_at")
+      .whereNull("deleted_at")
       .forUpdate()
       .first();
     if (!learningAttempt) {
@@ -583,7 +583,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     // Ambil material_order_ids dari kmis_topics
     const topic = await trx("kmis_topics")
       .where("id", learningAttempt.kmis_topic_id)
-      // .whereNull("deleted_at")
+      .whereNull("deleted_at")
       .first();
     const requiredIds = normIdArray(topic?.material_order_ids, {
       as: "number",
@@ -598,6 +598,11 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       );
       return res.status(422).json(response.toResponse());
     }
+
+    console.log(
+      "Ini adalah urutan ID material dari Topics: ",
+      topic.material_order_ids
+    );
 
     // Cek jika progress sudah selesai
     const completedIds = normIdArray(learningAttempt?.completed_material_ids, {
@@ -629,6 +634,11 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       }
     }
 
+    console.log(
+      "Ini adalah urutan ID material yang sudah di selesaikan: ",
+      completedIds
+    );
+
     // 2. Validasi jenis materi dan waktu
     const materialIdToCheck = requiredIds[completedIds.length];
     if (!Number.isFinite(materialIdToCheck)) {
@@ -644,7 +654,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
 
     const material = await trx("kmis_materials")
       .where("id", materialIdToCheck)
-      // .whereNull("deleted_at")
+      .whereNull("deleted_at")
       .first();
     if (!material) {
       await trx.rollback();
