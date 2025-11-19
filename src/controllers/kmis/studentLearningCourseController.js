@@ -566,7 +566,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     // Ambil data learning attempt berdasarkan id
     const learningAttempt = await trx("kmis_learning_attempts")
       .where("id", id)
-      .whereNull("deleted_at")
+      // .whereNull("deleted_at")
       .forUpdate()
       .first();
     if (!learningAttempt) {
@@ -583,7 +583,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     // Ambil material_order_ids dari kmis_topics
     const topic = await trx("kmis_topics")
       .where("id", learningAttempt.kmis_topic_id)
-      .whereNull("deleted_at")
+      // .whereNull("deleted_at")
       .first();
     const requiredIds = normIdArray(topic?.material_order_ids, {
       as: "number",
@@ -600,7 +600,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
     }
 
     // Cek jika progress sudah selesai
-    const completedIds = normIdArray(learningAttempt.completed_material_ids, {
+    const completedIds = normIdArray(learningAttempt?.completed_material_ids, {
       as: "number",
     });
     if (completedIds.length === requiredIds.length) {
@@ -644,7 +644,7 @@ exports.updateProgressLearningAttempt = async (req, res) => {
 
     const material = await trx("kmis_materials")
       .where("id", materialIdToCheck)
-      .whereNull("deleted_at")
+      // .whereNull("deleted_at")
       .first();
     if (!material) {
       await trx.rollback();
@@ -1685,6 +1685,7 @@ async function attemptExamResponse(learningAttemptId) {
     attemptUser: lp.attemptUser || null,
     topic: lp.topic || null,
     quizStarted: lp.quizStarted || null,
+    quizFinished: lp.quizFinished || null,
   };
 
   // 3) Ambil total_quiz dari topik untuk target panjang array
