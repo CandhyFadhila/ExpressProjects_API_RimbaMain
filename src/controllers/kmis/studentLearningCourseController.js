@@ -634,13 +634,16 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       }
     }
 
+    // 2. Validasi jenis materi dan waktu
+    const materialIdToCheck = requiredIds[completedIds.length];
     console.log(
       "Ini adalah urutan ID material yang sudah di selesaikan: ",
       completedIds
     );
-
-    // 2. Validasi jenis materi dan waktu
-    const materialIdToCheck = requiredIds[completedIds.length];
+    console.log(
+      "Ini adalah hasil pengecekan material: ",
+      materialIdToCheck
+    );
     if (!Number.isFinite(materialIdToCheck)) {
       await trx.rollback();
       const response = new WithoutDataResource(
