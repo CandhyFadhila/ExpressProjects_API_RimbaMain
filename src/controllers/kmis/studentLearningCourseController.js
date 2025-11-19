@@ -634,16 +634,13 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       }
     }
 
-    // 2. Validasi jenis materi dan waktu
-    const materialIdToCheck = requiredIds[completedIds.length];
     console.log(
       "Ini adalah urutan ID material yang sudah di selesaikan: ",
       completedIds
     );
-    console.log(
-      "Ini adalah hasil pengecekan material yang belum di selesaikan: ",
-      requiredIds
-    );
+
+    // 2. Validasi jenis materi dan waktu
+    const materialIdToCheck = requiredIds[completedIds.length];
     if (!Number.isFinite(materialIdToCheck)) {
       await trx.rollback();
       const response = new WithoutDataResource(
@@ -734,6 +731,18 @@ exports.updateProgressLearningAttempt = async (req, res) => {
         "INVALID_PROGRESS",
         "Progress Tidak Valid",
         "Jumlah materi yang diselesaikan melebihi jumlah materi yang ada."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
+    // Cek jika completed_material_ids kurang dari total materi
+    if (nextCompletedIds.length < requiredIds.length) {
+      await trx.rollback();
+      const response = new WithoutDataResource(
+        422,
+        "INVALID_PROGRESS",
+        "Progress Tidak Valid",
+        "Jumlah materi yang diselesaikan kurang dari jumlah materi yang ada."
       );
       return res.status(422).json(response.toResponse());
     }

@@ -926,6 +926,7 @@ async function syncMaterialOrder() {
   const trx = await knex.transaction();
 
   try {
+    // 1. Ambil topics yang ada, dan id materi mereka
     const topics = await trx("kmis_topics")
       .select("id", "material_order_ids")
       .whereNull("deleted_at");
@@ -939,12 +940,46 @@ async function syncMaterialOrder() {
 
       const materialIds = materials.map((material) => Number(material.id));
 
+      // Update material_order_ids pada topic
       await trx("kmis_topics")
         .where("id", topic.id)
         .update({
           material_order_ids: asJsonb(materialIds),
           updated_at: trx.fn.now(),
         });
+
+      // 3. Sinkronisasi data completed_material_ids di kmis_learning_attempts
+      // Dapatkan semua learning attempt yang ada
+      const learningAttempts = await trx("kmis_learning_attempts")
+        .select("id", "completed_material_ids")
+        .whereNull("deleted_at");
+
+      for (const attempt of learningAttempts) {
+        // Ambil daftar completed_material_ids yang ada
+        const completedIds = normIdArray(attempt.completed_material_ids, {
+          as: "number",
+        });
+
+        // 4. Temukan materi yang dihapus, berdasarkan material_order_ids di topic
+        const deletedIds = completedIds.filter(
+          (id) => !materialIds.includes(id)
+        );
+
+        // Jika ada materi yang dihapus, kita akan menghapusnya dari completed_material_ids
+        if (deletedIds.length > 0) {
+          const updatedCompletedIds = completedIds.filter(
+            (id) => !deletedIds.includes(id)
+          );
+
+          // Update completed_material_ids pada learning attempt
+          await trx("kmis_learning_attempts")
+            .where("id", attempt.id)
+            .update({
+              completed_material_ids: asJsonb(updatedCompletedIds),
+              updated_at: trx.fn.now(),
+            });
+        }
+      }
     }
 
     await trx.commit();
