@@ -641,8 +641,8 @@ exports.updateProgressLearningAttempt = async (req, res) => {
       completedIds
     );
     console.log(
-      "Ini adalah hasil pengecekan material: ",
-      materialIdToCheck
+      "Ini adalah hasil pengecekan material yang belum di selesaikan: ",
+      requiredIds
     );
     if (!Number.isFinite(materialIdToCheck)) {
       await trx.rollback();
