@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const logger = require("../../utils/logger");
+const knex = require("../../config/database");
 const studentLearningCourseController = require("../../controllers/kmis/studentLearningCourseController");
 const {
   storeLearningAttemptValidator,
