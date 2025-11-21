@@ -270,7 +270,34 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
     }
 
     let learningAttempt;
-    if (topic.topic_type === "Pengetahuan" || userId) {
+    if (topic.topic_type === "Pengetahuan") {
+      // Jika topic_type adalah "Pengetahuan", ambil tanpa userId
+      learningAttempt = await knex("kmis_learning_attempts")
+        .select([
+          "id",
+          "attempt_by",
+          "certificate_ids",
+          "kmis_topic_id",
+          "completed_material_ids",
+          "quiz_attempt_status",
+          "quiz_assessment_status",
+          "total_material",
+          "learning_started",
+          "completed_quiz",
+          "quiz_started",
+          "quiz_finished",
+          "quiz_duration",
+          "score_total",
+          "feedback",
+          "feedback_comment",
+          "created_at",
+          "updated_at",
+          "deleted_at",
+        ])
+        .where("kmis_topic_id", id)
+        .first();
+    } else {
+      // Jika topic_type selain "Pengetahuan", ambil dengan userId
       learningAttempt = await knex("kmis_learning_attempts")
         .select([
           "id",
