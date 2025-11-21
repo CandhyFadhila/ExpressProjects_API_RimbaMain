@@ -38,8 +38,7 @@ async function learningParticipantResource(quizParticipant) {
       "title",
       "material_types",
       "material_data",
-      "description",
-      "is_public"
+      "description"
     )
     .orderByRaw(`array_position(?, id)`, [completedIds]);
 

@@ -52,7 +52,6 @@ async function materialResource(material) {
     materialType: material.material_types,
     materialUrl: material.material_data,
     description: material.description,
-    isPublic: material.is_public,
     createdAt: material.created_at,
     updatedAt: material.updated_at,
     deletedAt: material.deleted_at,

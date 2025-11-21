@@ -29,8 +29,7 @@ async function topicResource(topic) {
       "title",
       "material_types",
       "material_data",
-      "description",
-      "is_public"
+      "description"
     )
     .orderByRaw(
       `array_position(?, id)`,
@@ -47,6 +46,8 @@ async function topicResource(topic) {
     category: category ? await categoryResource(category) : null,
     topicCover: photos,
     materialOrder: materialResources,
+    topicType: topic.topic_type,
+    isPublic: topic.is_public,
     title: topic.title,
     description: topic.description,
     totalQuiz: topic.total_quiz,

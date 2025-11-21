@@ -9,14 +9,29 @@ exports.updateTopicValidator = [
     .withMessage("Kategori topik harus berupa angka.")
     .bail()
     .custom(async (value) => {
-      const category = await knex("kmis_categories")
-        .where("id", value)
-        .first();
+      const category = await knex("kmis_categories").where("id", value).first();
       if (!category) {
         throw new Error("Kategori topik yang Anda pilih tidak ditemukan.");
       }
       return true;
     }),
+
+  body("topicType")
+    .notEmpty()
+    .withMessage("Tipe topik tidak boleh kosong.")
+    .isIn(["Pengetahuan", "Pelatihan"])
+    .withMessage("Tipe topik harus salah satu dari Pengetahuan dan Pelatihan."),
+
+  body("isPublic")
+    .optional()
+    .bail()
+    .customSanitizer((value) => {
+      return String(value).toLowerCase() === "true";
+    })
+    .isBoolean()
+    .withMessage(
+      "Topik yang bisa diakses publik harus bernilai boolean (true atau false)."
+    ),
 
   body("title")
     .notEmpty()
@@ -36,20 +51,30 @@ exports.updateTopicValidator = [
     .withMessage("Deskripsi topik harus berupa teks."),
 
   body("totalQuiz")
-    .trim()
-    .notEmpty()
-    .withMessage("Jumlah soal pertanyaan tidak boleh kosong.")
-    .bail()
+    .optional({ checkFalsy: true })
     .isInt()
-    .withMessage("Jumlah soal pertanyaan harus berupa angka."),
+    .withMessage("Jumlah soal pertanyaan harus berupa angka.")
+    .custom((value, { req }) => {
+      if (req.body.topicType === "Pelatihan" && !value) {
+        throw new Error(
+          "Jumlah soal pertanyaan wajib diisi untuk tipe Pelatihan."
+        );
+      }
+      return true;
+    }),
 
   body("quizDuration")
-    .trim()
-    .notEmpty()
-    .withMessage("Waktu penyelesaian pertanyaan tidak boleh kosong.")
-    .bail()
+    .optional({ checkFalsy: true })
     .isInt()
     .withMessage(
       "Waktu penyelesaian pertanyaan harus berupa angka dan satuan detik."
-    ),
+    )
+    .custom((value, { req }) => {
+      if (req.body.topicType === "Pelatihan" && !value) {
+        throw new Error(
+          "Waktu penyelesaian pertanyaan wajib diisi untuk tipe Pelatihan."
+        );
+      }
+      return true;
+    }),
 ];

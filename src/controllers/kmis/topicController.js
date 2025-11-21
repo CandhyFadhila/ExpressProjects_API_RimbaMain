@@ -22,8 +22,9 @@ const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
 exports.index = async (req, res) => {
-  const { search, categoryId } = req.query;
+  const { search, categoryId, topicType } = req.query;
   const categoryIdAny = categoryId ?? req.query["categoryId[]"];
+  const topicTypeAny = topicType ?? req.query["topicType[]"];
 
   try {
     let query = knex("kmis_topics as topic")
@@ -38,6 +39,10 @@ exports.index = async (req, res) => {
 
     applyRelationIn(query, "topic.kmis_categories_id", categoryIdAny, {
       as: "number",
+    });
+
+    applyRelationIn(query, "topic.topic_type", topicTypeAny, {
+      as: "string",
     });
 
     applySearch(query, search, ["topic.title", "category.title"]);
@@ -91,7 +96,15 @@ exports.index = async (req, res) => {
 
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
-  const { title, description, totalQuiz, quizDuration, categoryId } = req.body;
+  const {
+    categoryId,
+    topicType,
+    isPublic,
+    title,
+    description,
+    totalQuiz,
+    quizDuration,
+  } = req.body;
 
   try {
     if (quizDuration < 300) {
@@ -102,6 +115,28 @@ exports.store = async (req, res) => {
         "Durasi quiz minimal adalah 5 menit (300 detik)."
       );
       return res.status(422).json(response.toResponse());
+    }
+
+    if (isPublic) {
+      if (topicType !== "Pengetahuan") {
+        const response = new WithoutDataResource(
+          422,
+          "INVALID_TOPIC_TYPE",
+          "Tipe Topik Salah",
+          "Jika isPublic true, topicType harus berisi 'Pengetahuan'."
+        );
+        return res.status(422).json(response.toResponse());
+      }
+    } else {
+      if (topicType !== "Pelatihan") {
+        const response = new WithoutDataResource(
+          422,
+          "INVALID_TOPIC_TYPE",
+          "Tipe Topik Salah",
+          "Jika isPublic false, topicType harus berisi 'Pelatihan'."
+        );
+        return res.status(422).json(response.toResponse());
+      }
     }
 
     const errors = validationResult(req);
@@ -190,6 +225,8 @@ exports.store = async (req, res) => {
       .insert({
         kmis_categories_id: categoryId,
         topic_cover_ids: asJsonb([coverId]),
+        topic_type: topicType,
+        is_public: isPublic,
         title,
         description,
         total_quiz: totalQuiz,
@@ -269,9 +306,11 @@ exports.show = async (req, res) => {
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
   const {
+    categoryId,
+    topicType,
+    isPublic,
     title,
     description,
-    categoryId,
     totalQuiz,
     quizDuration,
     materialOrderIds,
@@ -288,6 +327,28 @@ exports.update = async (req, res) => {
         "Durasi quiz minimal adalah 5 menit (300 detik)."
       );
       return res.status(422).json(response.toResponse());
+    }
+
+    if (isPublic) {
+      if (topicType !== "Pengetahuan") {
+        const response = new WithoutDataResource(
+          422,
+          "INVALID_TOPIC_TYPE",
+          "Tipe Topik Salah",
+          "Jika isPublic true, topicType harus berisi 'Pengetahuan'."
+        );
+        return res.status(422).json(response.toResponse());
+      }
+    } else {
+      if (topicType !== "Pelatihan") {
+        const response = new WithoutDataResource(
+          422,
+          "INVALID_TOPIC_TYPE",
+          "Tipe Topik Salah",
+          "Jika isPublic false, topicType harus berisi 'Pelatihan'."
+        );
+        return res.status(422).json(response.toResponse());
+      }
     }
 
     const errors = validationResult(req);
@@ -416,6 +477,8 @@ exports.update = async (req, res) => {
     const updateData = {
       kmis_categories_id: categoryId,
       topic_cover_ids: asJsonb(coverArr),
+      topic_type: topicType,
+      is_public: isPublic,
       title,
       description,
       total_quiz: totalQuiz,

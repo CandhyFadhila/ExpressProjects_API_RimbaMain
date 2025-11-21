@@ -73,11 +73,4 @@ exports.updateMaterialValidator = [
     .withMessage("materialUrl harus berupa teks.")
     .bail()
     .trim(),
-
-  // === isPublic (opsional) ===
-  body("isPublic")
-    .optional({ nullable: true })
-    .isBoolean()
-    .withMessage("isPublic harus berupa boolean.")
-    .toBoolean(),
 ];

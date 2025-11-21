@@ -17,7 +17,9 @@ exports.storeMaterialValidator = [
       return s === "teks" ? "text" : s;
     })
     .isIn(["text", "gambar", "video", "dokumen"])
-    .withMessage("Tipe materi hanya boleh berisikan text, gambar, video, atau dokumen."),
+    .withMessage(
+      "Tipe materi hanya boleh berisikan text, gambar, video, atau dokumen."
+    ),
 
   // === title (wajib untuk semua) ===
   body("title")
@@ -74,11 +76,4 @@ exports.storeMaterialValidator = [
     .withMessage("materialUrl harus berupa teks.")
     .bail()
     .trim(),
-
-  // === isPublic (opsional) ===
-  body("isPublic")
-    .optional({ nullable: true, checkFalsy: true })
-    .isBoolean()
-    .withMessage("isPublic harus berupa boolean.")
-    .toBoolean(),
 ];

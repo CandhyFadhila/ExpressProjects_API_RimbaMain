@@ -387,7 +387,6 @@ exports.getLearningAttemptMaterialbyId = async (req, res) => {
         "material_types",
         "material_data",
         "description",
-        "is_public",
         "created_at",
         "updated_at",
         "deleted_at"
@@ -791,7 +790,7 @@ exports.getAllQuizbyTopicId = async (req, res) => {
   try {
     const topic = await knex("kmis_topics")
       .where("id", id)
-      .select("id", "title")
+      .select("id", "title", "topic_type", "is_public")
       .whereNull("deleted_at")
       .first();
     if (!topic) {
@@ -800,6 +799,16 @@ exports.getAllQuizbyTopicId = async (req, res) => {
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
         `Data topik dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    if (topic.topic_type === "Pengetahuan" && topic.is_public === true) {
+      const response = new WithoutDataResource(
+        200,
+        "QUIZ_NOT_ACCESSIBLE",
+        "Kuis Tidak Dapat Diakses",
+        "Topik ini bersifat publik dan bertipe 'Pengetahuan', sehingga kuis tidak dapat diakses."
       );
       return res.status(200).json(response.toResponse());
     }
@@ -921,6 +930,31 @@ exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
         `Pembelajaran dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const topic = await knex("kmis_topics")
+      .where("id", attempt.kmis_topic_id)
+      .select("id", "topic_type", "is_public")
+      .whereNull("deleted_at")
+      .first();
+    if (!topic) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data topik dengan ID '${attempt.kmis_topic_id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    if (topic.topic_type === "Pengetahuan" && topic.is_public === true) {
+      const response = new WithoutDataResource(
+        200,
+        "QUIZ_NOT_ACCESSIBLE",
+        "Kuis Tidak Dapat Diakses",
+        "Topik ini bersifat publik dan bertipe 'Pengetahuan', sehingga kuis tidak dapat diakses."
       );
       return res.status(200).json(response.toResponse());
     }
@@ -1680,7 +1714,13 @@ async function attemptExamResponse(learningAttemptId) {
   // 1) Ambil attempt minimal
   const attempt = await knex("kmis_learning_attempts")
     .where("id", learningAttemptId)
-    .select(["id", "attempt_by", "kmis_topic_id", "quiz_started", "quiz_finished"])
+    .select([
+      "id",
+      "attempt_by",
+      "kmis_topic_id",
+      "quiz_started",
+      "quiz_finished",
+    ])
     .whereNull("deleted_at")
     .first();
 

@@ -181,8 +181,19 @@ exports.getCategorybyId = async (req, res) => {
 
 // Topic
 exports.getAllTopic = async (req, res) => {
-  const { search, categoryId } = req.query;
+  const { search, categoryId, topicType } = req.query;
   const categoryIdAny = categoryId ?? req.query["categoryId[]"];
+  const topicTypeAny = topicType ?? req.query["topicType[]"];
+
+  if (!topicTypeAny) {
+    const response = new WithoutDataResource(
+      422,
+      "MISSING_TOPIC_TYPE",
+      "Filter topicType wajib diisi",
+      "Filter topicType tidak diperbolehkan kosong. Silahkan tentukan tipe topik yang ingin dicari."
+    );
+    return res.status(422).json(response.toResponse());
+  }
 
   try {
     let query = knex("kmis_topics as topic")
@@ -191,6 +202,8 @@ exports.getAllTopic = async (req, res) => {
         "topic.material_order_ids",
         "topic.topic_cover_ids",
         "topic.kmis_categories_id",
+        "topic.topic_type",
+        "topic.is_public",
         "topic.title",
         "topic.description",
         "topic.total_quiz",
@@ -207,6 +220,10 @@ exports.getAllTopic = async (req, res) => {
 
     applyRelationIn(query, "topic.kmis_categories_id", categoryIdAny, {
       as: "number",
+    });
+
+    applyRelationIn(query, "topic.topic_type", topicTypeAny, {
+      as: "string",
     });
 
     applySearch(query, search, ["topic.title", "category.title"]);
@@ -263,6 +280,8 @@ exports.getTopicbyId = async (req, res) => {
         "topic_cover_ids",
         "material_order_ids",
         "kmis_categories_id",
+        "topic_type",
+        "is_public",
         "title",
         "description",
         "total_quiz",
@@ -316,6 +335,8 @@ exports.getTopicbyCategoryId = async (req, res) => {
         "topic.topic_cover_ids",
         "topic.material_order_ids",
         "topic.kmis_categories_id",
+        "topic.topic_type",
+        "topic.is_public",
         "topic.title",
         "topic.description",
         "topic.total_quiz",
@@ -1215,31 +1236,8 @@ exports.getMaterialbyMaterialTypes = async (req, res) => {
 
 exports.getMaterialbyIsPublic = async (req, res) => {
   const { search } = req.query;
-  const { isPublic } = req.body;
 
   try {
-    if (!Array.isArray(isPublic) || isPublic.length === 0) {
-      const response = new WithoutDataResource(
-        422,
-        "INVALID_INPUT",
-        "Format Data Tidak Sesuai Ketentuan",
-        "isPublic harus berupa array boolean, misalnya: [true] atau [true, false]."
-      );
-      return res.status(422).json(response.toResponse());
-    }
-    const allBoolean = isPublic.every((v) => typeof v === "boolean");
-    if (!allBoolean) {
-      const response = new WithoutDataResource(
-        422,
-        "INVALID_INPUT_TYPE",
-        "Format Data Tidak Sesuai Ketentuan",
-        "Setiap nilai pada isPublic harus bertipe boolean (true/false)."
-      );
-      return res.status(422).json(response.toResponse());
-    }
-
-    const normalized = [...new Set(isPublic)];
-
     let query = knex("kmis_materials as material")
       .leftJoin(
         "kmis_categories as category",
@@ -1257,7 +1255,6 @@ exports.getMaterialbyIsPublic = async (req, res) => {
         "material.kmis_categories_id",
         "material.kmis_topic_id",
       ])
-      .whereIn("material.is_public", normalized)
       .whereNull("material.deleted_at")
       .orderBy("material.created_at", "desc");
 

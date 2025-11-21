@@ -60,7 +60,6 @@ exports.index = async (req, res) => {
         "material.material_types",
         "material.material_data",
         "material.description",
-        "material.is_public",
         "material.deleted_at",
         "material.created_at",
         "material.updated_at",
@@ -131,8 +130,7 @@ exports.index = async (req, res) => {
 
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
-  const { materialType, title, description, topicId, materialUrl, isPublic } =
-    req.body;
+  const { materialType, title, description, topicId, materialUrl } = req.body;
   const userId =
     req.auth?.userId ??
     req.auth?.user_id ??
@@ -310,7 +308,6 @@ exports.store = async (req, res) => {
         material_data: normalizedUrl ?? null,
         materials_file_ids: fileIds?.length ? asJsonb(fileIds) : null,
         materials_cover_ids: coverIds?.length ? asJsonb(coverIds) : null,
-        is_public: typeof isPublic === "boolean" ? isPublic : undefined,
       })
       .returning("*");
 
@@ -405,7 +402,6 @@ exports.update = async (req, res) => {
     description,
     topicId,
     materialUrl,
-    isPublic,
     materialCovers,
     materialFiles,
     deleteCoverIds,
@@ -629,8 +625,6 @@ exports.update = async (req, res) => {
         material_data: normalizedUrl ?? existing.material_data,
         materials_cover_ids: asJsonb(newCoverIds),
         materials_file_ids: asJsonb(newFileIds),
-        is_public:
-          typeof isPublic === "boolean" ? isPublic : existing.is_public,
         updated_at: trx.fn.now(),
       });
 
