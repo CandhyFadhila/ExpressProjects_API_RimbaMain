@@ -298,6 +298,16 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
         .first();
     } else {
       // Jika topic_type selain "Pengetahuan", ambil dengan userId
+      if (!userId) {
+        const response = new WithoutDataResource(
+          401,
+          "UNAUTHORIZED",
+          "Akses Ditolak",
+          "Token tidak valid atau tidak memiliki ability."
+        );
+        return res.status(401).json(response.toResponse());
+      }
+
       learningAttempt = await knex("kmis_learning_attempts")
         .select([
           "id",
