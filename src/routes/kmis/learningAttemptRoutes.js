@@ -24,7 +24,10 @@ function authIfTrainingTopic(req, res, next) {
     ? [rawType]
     : [];
 
-  if (topicTypeList.includes("Pengetahuan")) {
+  if (
+    topicTypeList.includes("Pengetahuan") ||
+    topicTypeList.includes("Pelatihan")
+  ) {
     return next();
   }
 
