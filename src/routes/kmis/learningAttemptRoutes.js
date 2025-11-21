@@ -28,10 +28,6 @@ function authIfTrainingTopic(req, res, next) {
     return next();
   }
 
-  if (topicTypeList.includes("Pelatihan")) {
-    return authMiddleware(req, res, next);
-  }
-
   return next();
 }
 
