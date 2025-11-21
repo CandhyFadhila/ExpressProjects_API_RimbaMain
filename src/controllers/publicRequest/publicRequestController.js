@@ -195,21 +195,6 @@ exports.getAllTopic = async (req, res) => {
     return res.status(422).json(response.toResponse());
   }
 
-  // Middleware jika topicType adalah Pelatihan, maka userId wajib sudah login
-  const userId = req.userId ?? null;
-  const topicTypeList = Array.isArray(topicTypeAny)
-    ? topicTypeAny
-    : [topicTypeAny];
-  if (topicTypeList.includes("Pelatihan") && userId == null) {
-    const response = new WithoutDataResource(
-      401,
-      "UNAUTHORIZED",
-      "Akses Ditolak",
-      "Token tidak valid atau tidak memiliki ability."
-    );
-    return res.status(401).json(response.toResponse());
-  }
-
   try {
     let query = knex("kmis_topics as topic")
       .select([
