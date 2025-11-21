@@ -13,6 +13,13 @@ function authIfTrainingTopic(req, res, next) {
     ? [rawType]
     : [];
 
+  if (
+    topicTypeList.includes("Pelatihan") &&
+    topicTypeList.includes("Pengetahuan")
+  ) {
+    return next();
+  }
+
   if (topicTypeList.includes("Pelatihan")) {
     return authMiddleware(req, res, next);
   }
@@ -21,11 +28,7 @@ function authIfTrainingTopic(req, res, next) {
 }
 
 // Role
-router.get(
-  "/get-all-role",
-  rateLimiter,
-  publicRequestController.getAllRole
-);
+router.get("/get-all-role", rateLimiter, publicRequestController.getAllRole);
 
 // Category
 router.get(
@@ -48,11 +51,7 @@ router.get(
   publicRequestController.getAllTopic
 );
 
-router.get(
-  "/get-topic/:id",
-  rateLimiter,
-  publicRequestController.getTopicbyId
-);
+router.get("/get-topic/:id", rateLimiter, publicRequestController.getTopicbyId);
 
 router.get(
   "/get-topic-by-category/:id",
@@ -61,11 +60,7 @@ router.get(
 );
 
 // User
-router.get(
-  "/get-all-user",
-  rateLimiter,
-  publicRequestController.getAllUser
-);
+router.get("/get-all-user", rateLimiter, publicRequestController.getAllUser);
 
 router.get(
   "/get-all-user-educator",
@@ -85,11 +80,7 @@ router.get(
   publicRequestController.getAllUserbyRoleId
 );
 
-router.get(
-  "/get-user/:id",
-  rateLimiter,
-  publicRequestController.getUserbyId
-);
+router.get("/get-user/:id", rateLimiter, publicRequestController.getUserbyId);
 
 // Material
 router.get(
@@ -135,17 +126,9 @@ router.post(
 );
 
 // Quiz
-router.get(
-  "/get-all-quiz",
-  rateLimiter,
-  publicRequestController.getAllQuiz
-);
+router.get("/get-all-quiz", rateLimiter, publicRequestController.getAllQuiz);
 
-router.get(
-  "/get-quiz/:id",
-  rateLimiter,
-  publicRequestController.getQuizbyId
-);
+router.get("/get-quiz/:id", rateLimiter, publicRequestController.getQuizbyId);
 
 router.post(
   "/get-quiz-by-category-topic",
