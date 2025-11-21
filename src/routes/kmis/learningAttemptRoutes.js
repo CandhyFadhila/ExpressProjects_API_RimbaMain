@@ -61,7 +61,13 @@ router.get(
       }
 
       // Jika bukan Pengetahuan, jalankan authMiddleware
-      authMiddleware(req, res, next);
+      authMiddleware(req, res, (err) => {
+        if (err) return res.status(401).json({ message: err.message });
+        requireAbility("student")(req, res, (err) => {
+          if (err) return res.status(403).json({ message: err.message });
+          requirePermission(["view.kmis_learning_course"])(req, res, next);
+        });
+      });
     } catch (error) {
       logger.error(
         `| Topic KMIS | - Error checking topic type: ${error.message}`
@@ -71,8 +77,6 @@ router.get(
       });
     }
   },
-  requireAbility("student"),
-  requirePermission(["view.kmis_learning_course"]),
   studentLearningCourseController.getOrderMaterialLearningAttemptbyTopicId
 );
 
