@@ -1,7 +1,5 @@
 const express = require("express");
 const router = express.Router();
-const logger = require("../../utils/logger");
-const knex = require("../../config/database");
 const studentLearningCourseController = require("../../controllers/kmis/studentLearningCourseController");
 const {
   storeLearningAttemptValidator,
@@ -36,47 +34,9 @@ router.get(
 router.get(
   "/detail/:id",
   rateLimiter,
-  async (req, res, next) => {
-    try {
-      const { id } = req.params;
-
-      // Cek topic berdasarkan ID
-      const topic = await knex("kmis_topics")
-        .select("id", "material_order_ids", "topic_type")
-        .where("id", id)
-        .first();
-      if (!topic) {
-        const response = new WithoutDataResource(
-          422,
-          "TOPIC_INVALID",
-          "Topik Tidak Valid",
-          `Topik dengan ID '${id}' tidak ditemukan.`
-        );
-        return res.status(422).json(response.toResponse());
-      }
-
-      // Jika topic_type adalah "Pengetahuan", lewati authMiddleware
-      if (topic.topic_type === "Pengetahuan") {
-        return next();
-      }
-
-      // Jika bukan Pengetahuan, jalankan authMiddleware
-      authMiddleware(req, res, (err) => {
-        if (err) return res.status(401).json({ message: err.message });
-        requireAbility("student")(req, res, (err) => {
-          if (err) return res.status(403).json({ message: err.message });
-          requirePermission(["view.kmis_learning_course"])(req, res, next);
-        });
-      });
-    } catch (error) {
-      logger.error(
-        `| Topic KMIS | - Error checking topic type: ${error.message}`
-      );
-      return res.status(500).json({
-        message: "An error occurred while processing your request.",
-      });
-    }
-  },
+  authMiddleware,
+  requireAbility("student"),
+  requirePermission(["view.kmis_learning_course"]),
   studentLearningCourseController.getOrderMaterialLearningAttemptbyTopicId
 );
 
