@@ -252,7 +252,7 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
 // get detail kursus berdasarkan id topic (untuk order material, kondisi ketika mau belajar)
 exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
   const { id } = req.params;
-  const userId = req.userId;
+  const userId = req.userId ?? null;
 
   try {
     const learningAttempt = await knex("kmis_learning_attempts")
@@ -291,7 +291,7 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
     }
 
     const topic = await knex("kmis_topics")
-      .select("id", "material_order_ids")
+      .select("id", "material_order_ids", "topic_type")
       .where("id", learningAttempt.kmis_topic_id)
       .first();
     if (!topic || !topic.material_order_ids) {
@@ -304,42 +304,21 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    const materialOrderIdsStr = normIdArray(topic.material_order_ids, {
-      as: "string",
-    });
-    const materialOrderIdsNum = materialOrderIdsStr
-      .map((v) => Number(v))
-      .filter(Number.isFinite);
-    const completedSet = new Set(
-      normIdArray(learningAttempt.completed_material_ids, { as: "string" })
-    );
+    if (topic.topic_type === "Pengetahuan") {
+      return proceedWithFetchingMaterials(topic, userId, res);
+    }
 
-    const materials = await knex("kmis_materials")
-      .select("*")
-      .whereIn("id", materialOrderIdsNum)
-      .whereNull("deleted_at")
-      .orderByRaw(`array_position(?, id)`, [materialOrderIdsNum]);
+    if (!userId) {
+      const response = new WithoutDataResource(
+        401,
+        "UNAUTHORIZED",
+        "Akses Ditolak",
+        "Anda harus login untuk mengakses materi ini."
+      );
+      return res.status(401).json(response.toResponse());
+    }
 
-    const materialWithStatus = await Promise.all(
-      materials.map(async (material) => {
-        const materialDetails = await materialResource(material);
-        const isCompleted = completedSet.has(String(material.id));
-        return { ...materialDetails, isCompleted };
-      })
-    );
-
-    const learningParticipantData = await learningParticipantResource(
-      learningAttempt
-    );
-
-    const response = new WithDataResource(
-      200,
-      "SUCCESS_GET_DATA",
-      "Berhasil Mengambil Data",
-      `Detail materi berdasarkan urutan berhasil didapatkan.`,
-      { material: materialWithStatus, learningAttempt: learningParticipantData }
-    );
-    return res.status(200).json(response.toResponse());
+    return proceedWithFetchingMaterials(topic, userId, res);
   } catch (error) {
     logger.error(
       `| Learning Attempt KMIS | - Error function getOrderMaterialLearningAttemptbyTopicId : ${error.message}`
@@ -2231,4 +2210,77 @@ async function sendCertificateEmail({ attemptId, certFile, summary }) {
     );
     return false;
   }
+}
+
+async function proceedWithFetchingMaterials(topic, userId, res) {
+  const learningAttempt = await knex("kmis_learning_attempts")
+    .select([
+      "id",
+      "attempt_by",
+      "completed_material_ids",
+      "quiz_attempt_status",
+      "quiz_assessment_status",
+      "total_material",
+      "learning_started",
+      "completed_quiz",
+      "quiz_started",
+      "quiz_finished",
+      "quiz_duration",
+      "score_total",
+      "feedback",
+      "feedback_comment",
+      "created_at",
+      "updated_at",
+      "deleted_at",
+    ])
+    .where("kmis_topic_id", topic.id)
+    .where("attempt_by", userId)
+    .first();
+
+  if (!learningAttempt) {
+    const response = new WithoutDataResource(
+      200,
+      "DATA_NOT_FOUND",
+      "Data Tidak Ditemukan",
+      `Pembelajaran dengan topik ID '${topic.id}' tidak ditemukan.`
+    );
+    return res.status(200).json(response.toResponse());
+  }
+
+  const materialOrderIdsStr = normIdArray(topic.material_order_ids, {
+    as: "string",
+  });
+  const materialOrderIdsNum = materialOrderIdsStr
+    .map((v) => Number(v))
+    .filter(Number.isFinite);
+  const completedSet = new Set(
+    normIdArray(learningAttempt.completed_material_ids, { as: "string" })
+  );
+
+  const materials = await knex("kmis_materials")
+    .select("*")
+    .whereIn("id", materialOrderIdsNum)
+    .whereNull("deleted_at")
+    .orderByRaw(`array_position(?, id)`, [materialOrderIdsNum]);
+
+  const materialWithStatus = await Promise.all(
+    materials.map(async (material) => {
+      const materialDetails = await materialResource(material);
+      const isCompleted = completedSet.has(String(material.id));
+      return { ...materialDetails, isCompleted };
+    })
+  );
+
+  const learningParticipantData = await learningParticipantResource(
+    learningAttempt
+  );
+
+  const response = new WithDataResource(
+    200,
+    "SUCCESS_GET_DATA",
+    "Berhasil Mengambil Data",
+    `Detail materi berdasarkan urutan berhasil didapatkan.`,
+    { material: materialWithStatus, learningAttempt: learningParticipantData }
+  );
+  return res.status(200).json(response.toResponse());
 }

@@ -15,25 +15,6 @@ const requireAbility = require("../../middlewares/requireAbility");
 const multer = require("multer");
 const upload = multer();
 
-function authIfTrainingTopic(req, res, next) {
-  const rawType = req.query.topicType ?? req.query["topicType[]"];
-
-  const topicTypeList = Array.isArray(rawType)
-    ? rawType
-    : rawType
-    ? [rawType]
-    : [];
-
-  if (
-    topicTypeList.includes("Pengetahuan") ||
-    topicTypeList.includes("Pelatihan")
-  ) {
-    return next();
-  }
-
-  return next();
-}
-
 // Learning Attempt
 router.get(
   "/get-all-learning-attempt",
@@ -53,7 +34,7 @@ router.get(
 router.get(
   "/detail/:id",
   rateLimiter,
-  authIfTrainingTopic,
+  authMiddleware,
   requireAbility("student"),
   requirePermission(["view.kmis_learning_course"]),
   studentLearningCourseController.getOrderMaterialLearningAttemptbyTopicId
