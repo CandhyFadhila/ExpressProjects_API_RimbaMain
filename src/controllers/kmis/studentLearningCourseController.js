@@ -255,44 +255,9 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
   const userId = req.userId;
 
   try {
-    const learningAttempt = await knex("kmis_learning_attempts")
-      .select([
-        "id",
-        "attempt_by",
-        "certificate_ids",
-        "kmis_topic_id",
-        "completed_material_ids",
-        "quiz_attempt_status",
-        "quiz_assessment_status",
-        "total_material",
-        "learning_started",
-        "completed_quiz",
-        "quiz_started",
-        "quiz_finished",
-        "quiz_duration",
-        "score_total",
-        "feedback",
-        "feedback_comment",
-        "created_at",
-        "updated_at",
-        "deleted_at",
-      ])
-      .where("kmis_topic_id", id)
-      .where("attempt_by", userId)
-      .first();
-    if (!learningAttempt) {
-      const response = new WithoutDataResource(
-        200,
-        "DATA_NOT_FOUND",
-        "Data Tidak Ditemukan",
-        `Pembelajaran dengan topik ID '${id}' tidak ditemukan.`
-      );
-      return res.status(200).json(response.toResponse());
-    }
-
     const topic = await knex("kmis_topics")
-      .select("id", "material_order_ids", "topic_type")
-      .where("id", learningAttempt.kmis_topic_id)
+      .select("id", "material_order_ids")
+      .where("id", id)
       .first();
     if (!topic || !topic.material_order_ids) {
       const response = new WithoutDataResource(
@@ -302,6 +267,44 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
         "Tidak ada urutan materi yang tersedia pada topik ini."
       );
       return res.status(422).json(response.toResponse());
+    }
+
+    let learningAttempt;
+    if (topic.topic_type === "Pengetahuan" || userId) {
+      learningAttempt = await knex("kmis_learning_attempts")
+        .select([
+          "id",
+          "attempt_by",
+          "certificate_ids",
+          "kmis_topic_id",
+          "completed_material_ids",
+          "quiz_attempt_status",
+          "quiz_assessment_status",
+          "total_material",
+          "learning_started",
+          "completed_quiz",
+          "quiz_started",
+          "quiz_finished",
+          "quiz_duration",
+          "score_total",
+          "feedback",
+          "feedback_comment",
+          "created_at",
+          "updated_at",
+          "deleted_at",
+        ])
+        .where("kmis_topic_id", id)
+        .where("attempt_by", userId)
+        .first();
+    }
+    if (!learningAttempt) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Pembelajaran dengan topik ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
     }
 
     const materialOrderIdsStr = normIdArray(topic.material_order_ids, {
