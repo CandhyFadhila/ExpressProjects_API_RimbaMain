@@ -96,15 +96,8 @@ exports.index = async (req, res) => {
 
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
-  const {
-    categoryId,
-    topicType,
-    isPublic,
-    title,
-    description,
-    totalQuiz,
-    quizDuration,
-  } = req.body;
+  const { categoryId, topicType, title, description, totalQuiz, quizDuration } =
+    req.body;
 
   try {
     if (quizDuration < 300) {
@@ -115,28 +108,6 @@ exports.store = async (req, res) => {
         "Durasi quiz minimal adalah 5 menit (300 detik)."
       );
       return res.status(422).json(response.toResponse());
-    }
-
-    if (isPublic) {
-      if (topicType !== "Pengetahuan") {
-        const response = new WithoutDataResource(
-          422,
-          "INVALID_TOPIC_TYPE",
-          "Tipe Topik Salah",
-          "Jika isPublic true, topicType harus berisi 'Pengetahuan'."
-        );
-        return res.status(422).json(response.toResponse());
-      }
-    } else {
-      if (topicType !== "Pelatihan") {
-        const response = new WithoutDataResource(
-          422,
-          "INVALID_TOPIC_TYPE",
-          "Tipe Topik Salah",
-          "Jika isPublic false, topicType harus berisi 'Pelatihan'."
-        );
-        return res.status(422).json(response.toResponse());
-      }
     }
 
     const errors = validationResult(req);
@@ -226,7 +197,6 @@ exports.store = async (req, res) => {
         kmis_categories_id: categoryId,
         topic_cover_ids: asJsonb([coverId]),
         topic_type: topicType,
-        is_public: isPublic,
         title,
         description,
         total_quiz: totalQuiz,
@@ -308,7 +278,6 @@ exports.update = async (req, res) => {
   const {
     categoryId,
     topicType,
-    isPublic,
     title,
     description,
     totalQuiz,
@@ -327,28 +296,6 @@ exports.update = async (req, res) => {
         "Durasi quiz minimal adalah 5 menit (300 detik)."
       );
       return res.status(422).json(response.toResponse());
-    }
-
-    if (isPublic) {
-      if (topicType !== "Pengetahuan") {
-        const response = new WithoutDataResource(
-          422,
-          "INVALID_TOPIC_TYPE",
-          "Tipe Topik Salah",
-          "Jika isPublic true, topicType harus berisi 'Pengetahuan'."
-        );
-        return res.status(422).json(response.toResponse());
-      }
-    } else {
-      if (topicType !== "Pelatihan") {
-        const response = new WithoutDataResource(
-          422,
-          "INVALID_TOPIC_TYPE",
-          "Tipe Topik Salah",
-          "Jika isPublic false, topicType harus berisi 'Pelatihan'."
-        );
-        return res.status(422).json(response.toResponse());
-      }
     }
 
     const errors = validationResult(req);
@@ -478,7 +425,6 @@ exports.update = async (req, res) => {
       kmis_categories_id: categoryId,
       topic_cover_ids: asJsonb(coverArr),
       topic_type: topicType,
-      is_public: isPublic,
       title,
       description,
       total_quiz: totalQuiz,

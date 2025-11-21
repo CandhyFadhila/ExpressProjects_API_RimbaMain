@@ -82,7 +82,7 @@ exports.index = async (req, res) => {
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
   const { name, description } = req.body;
-  const userId = activityLogHelper.fromReq(req);
+  const userId = req.userId;
 
   try {
     const errors = validationResult(req);
@@ -266,7 +266,7 @@ exports.update = async (req, res) => {
   const trx = await knex.transaction();
   const { name, description, deleteDocumentIds } = req.body;
   const id = req.params.id;
-  const userId = activityLogHelper.fromReq(req);
+  const userId = req.userId;
 
   try {
     const errors = validationResult(req);

@@ -47,7 +47,6 @@ async function topicResource(topic) {
     topicCover: photos,
     materialOrder: materialResources,
     topicType: topic.topic_type,
-    isPublic: topic.is_public,
     title: topic.title,
     description: topic.description,
     totalQuiz: topic.total_quiz,

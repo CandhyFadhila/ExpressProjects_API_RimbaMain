@@ -27,12 +27,7 @@ const activityLogResource = require("../resources/auth/activityLogResource");
 const activityLogHelper = require("../helpers/activityLogHelper");
 
 exports.getUserProfile = async (req, res) => {
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = req.userId;
 
   try {
     const user = await knex("users")
@@ -153,12 +148,7 @@ exports.updateUserData = async (req, res) => {
   const trx = await knex.transaction();
   const { name, email, birthDate, gender, phoneNumber, profession, address } =
     req.body;
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = req.userId;
   const isProvided = (v) => {
     if (v == null) return false;
     const s = String(v).trim();

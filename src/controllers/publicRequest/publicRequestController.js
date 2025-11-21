@@ -195,6 +195,21 @@ exports.getAllTopic = async (req, res) => {
     return res.status(422).json(response.toResponse());
   }
 
+  // Middleware jika topicType adalah Pelatihan, maka userId wajib sudah login
+  const userId = req.userId ?? null;
+  const topicTypeList = Array.isArray(topicTypeAny)
+    ? topicTypeAny
+    : [topicTypeAny];
+  if (topicTypeList.includes("Pelatihan") && userId == null) {
+    const response = new WithoutDataResource(
+      401,
+      "UNAUTHORIZED",
+      "Akses Ditolak",
+      "Token tidak valid atau tidak memiliki ability."
+    );
+    return res.status(401).json(response.toResponse());
+  }
+
   try {
     let query = knex("kmis_topics as topic")
       .select([
@@ -203,7 +218,6 @@ exports.getAllTopic = async (req, res) => {
         "topic.topic_cover_ids",
         "topic.kmis_categories_id",
         "topic.topic_type",
-        "topic.is_public",
         "topic.title",
         "topic.description",
         "topic.total_quiz",
@@ -281,7 +295,6 @@ exports.getTopicbyId = async (req, res) => {
         "material_order_ids",
         "kmis_categories_id",
         "topic_type",
-        "is_public",
         "title",
         "description",
         "total_quiz",
@@ -336,7 +349,6 @@ exports.getTopicbyCategoryId = async (req, res) => {
         "topic.material_order_ids",
         "topic.kmis_categories_id",
         "topic.topic_type",
-        "topic.is_public",
         "topic.title",
         "topic.description",
         "topic.total_quiz",

@@ -90,7 +90,7 @@ exports.update = async (req, res) => {
     problem: req.body.problem,
     deleteDocumentIds: req.body.deleteDocumentIds,
   };
-  const userId = activityLogHelper.fromReq(req);
+  const userId = req.userId;
   const id = req.params.id;
 
   try {
@@ -313,7 +313,7 @@ exports.verification = async (req, res) => {
     validationStatus: req.body.validationStatus,
     rejectionReason: req.body.rejectionReason,
   };
-  const userId = activityLogHelper.fromReq(req);
+  const userId = req.userId;
   const pendingId = req.params.id;
 
   try {

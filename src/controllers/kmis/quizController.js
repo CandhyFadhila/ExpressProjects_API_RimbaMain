@@ -27,14 +27,7 @@ const normalizeAnswer = (v) =>
 exports.index = async (req, res) => {
   const { search, topicId } = req.query;
   const topicIdAny = topicId ?? req.query["topicId[]"];
-  const userIdRaw =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
-
-  const userId = Number(userIdRaw);
+  const userId = Number(req.userId);
 
   try {
     const user = await knex("users")
@@ -125,13 +118,7 @@ exports.store = async (req, res) => {
     explanation,
   } = req.body;
 
-  const userIdRaw =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
-  const userId = Number(userIdRaw);
+  const userId = Number(req.userId);
 
   try {
     const errors = validationResult(req);
@@ -774,13 +761,7 @@ exports.downloadTemplate = async (req, res) => {
 
 exports.importTemplate = async (req, res) => {
   const trx = await knex.transaction();
-  const userIdRaw =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
-  const userId = Number(userIdRaw);
+  const userId = Number(req.userId);
 
   try {
     if (!req.files || req.files.length === 0) {

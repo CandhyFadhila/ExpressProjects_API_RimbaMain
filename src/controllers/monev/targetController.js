@@ -79,7 +79,7 @@ exports.update = async (req, res) => {
     physicalTarget: req.body.physicalTarget,
     description: req.body.description,
   };
-  const userId = activityLogHelper.fromReq(req);
+  const userId = req.userId;
   const id = req.params.id;
 
   try {
@@ -155,7 +155,7 @@ exports.verification = async (req, res) => {
     validationStatus: req.body.validationStatus,
     rejectionReason: req.body.rejectionReason,
   };
-  const userId = activityLogHelper.fromReq(req);
+  const userId = req.userId;
   const pendingId = req.params.id;
 
   try {
@@ -201,9 +201,7 @@ exports.verification = async (req, res) => {
       return res.status(403).json(response.toResponse());
     }
 
-    const pendingTarget = await trx(
-      "monev_target_pending_updates"
-    )
+    const pendingTarget = await trx("monev_target_pending_updates")
       .select(["id", "monev_target_id"])
       .where("id", pendingId)
       .whereNull("deleted_at")

@@ -6,12 +6,7 @@ const logger = require("../utils/logger");
 class documentHelper {
   static async uploadDocuments(files, req) {
     const documentIds = [];
-    const userId =
-      req.auth?.userId ??
-      req.auth?.user_id ??
-      req.auth?.id ??
-      req.userId ??
-      req.user?.id;
+    const userId = req.userId;
     try {
       const uploadedFiles = await StorageServerHelper.uploadToServer(files);
 

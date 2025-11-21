@@ -26,17 +26,6 @@ exports.storeTopicValidator = [
     .isIn(["Pengetahuan", "Pelatihan"])
     .withMessage("Tipe topik harus salah satu dari Pengetahuan dan Pelatihan."),
 
-  body("isPublic")
-    .optional()
-    .bail()
-    .customSanitizer((value) => {
-      return String(value).toLowerCase() === "true";
-    })
-    .isBoolean()
-    .withMessage(
-      "Topik yang bisa diakses publik harus bernilai boolean (true atau false)."
-    ),
-
   body("title")
     .notEmpty()
     .withMessage("Judul topik tidak boleh kosong.")
@@ -55,30 +44,24 @@ exports.storeTopicValidator = [
     .withMessage("Deskripsi topik harus berupa teks."),
 
   body("totalQuiz")
-    .optional({ checkFalsy: true })
+    .if(body("topicType").equals("Pelatihan"))
+    .notEmpty()
+    .withMessage(
+      "Jumlah soal pertanyaan wajib diisi untuk tipe topik Pelatihan."
+    )
+    .bail()
     .isInt()
-    .withMessage("Jumlah soal pertanyaan harus berupa angka.")
-    .custom((value, { req }) => {
-      if (req.body.topicType === "Pelatihan" && !value) {
-        throw new Error(
-          "Jumlah soal pertanyaan wajib diisi untuk tipe topik Pelatihan."
-        );
-      }
-      return true;
-    }),
+    .withMessage("Jumlah soal pertanyaan harus berupa angka."),
 
   body("quizDuration")
-    .optional({ checkFalsy: true })
+    .if(body("topicType").equals("Pelatihan"))
+    .notEmpty()
+    .withMessage(
+      "Waktu penyelesaian pertanyaan wajib diisi untuk tipe topik Pelatihan."
+    )
+    .bail()
     .isInt()
     .withMessage(
       "Waktu penyelesaian pertanyaan harus berupa angka dan satuan detik."
-    )
-    .custom((value, { req }) => {
-      if (req.body.topicType === "Pelatihan" && !value) {
-        throw new Error(
-          "Waktu penyelesaian pertanyaan wajib diisi untuk tipe topik Pelatihan."
-        );
-      }
-      return true;
-    }),
+    ),
 ];

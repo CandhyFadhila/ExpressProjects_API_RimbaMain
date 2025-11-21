@@ -270,7 +270,7 @@ exports.store = async (req, res) => {
     startedTime,
     finishedTime,
   } = req.body;
-  const userId = activityLogHelper.fromReq(req);
+  const userId = req.userId;
 
   try {
     const errors = validationResult(req);

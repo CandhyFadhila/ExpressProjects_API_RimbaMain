@@ -21,14 +21,7 @@ const materialResource = require("../../resources/kmis/materialResource");
 exports.index = async (req, res) => {
   const { search, topicId } = req.query;
   const topicIdAny = topicId ?? req.query["topicId[]"];
-  const userIdRaw =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
-
-  const userId = Number(userIdRaw);
+  const userId = Number(req.userId);
 
   try {
     const user = await knex("users")
@@ -131,12 +124,7 @@ exports.index = async (req, res) => {
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
   const { materialType, title, description, topicId, materialUrl } = req.body;
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = req.userId;
 
   try {
     const errors = validationResult(req);

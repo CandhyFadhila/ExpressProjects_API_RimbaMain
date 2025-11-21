@@ -63,12 +63,7 @@ const slugify = (s) =>
 
 exports.index = async (req, res) => {
   const { search } = req.query;
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = req.userId;
 
   try {
     const user = await knex("users")
@@ -190,7 +185,7 @@ exports.store = async (req, res) => {
     pagu,
     partner,
   } = req.body;
-  const userId = activityLogHelper.fromReq(req);
+  const userId = req.userId;
 
   try {
     const errors = validationResult(req);
@@ -575,12 +570,7 @@ exports.destroy = async (req, res) => {
 
 exports.export = async (req, res) => {
   const { startDate, endDate } = req.query;
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = req.userId;
 
   try {
     const user = await knex("users")

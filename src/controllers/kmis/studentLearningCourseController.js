@@ -35,12 +35,7 @@ exports.getListLearningAttempt = async (req, res) => {
   const { search, categoryId, finishedStatus } = req.query;
   const categoryIdAny = categoryId ?? req.query["categoryId[]"];
   const finishedStatusAny = finishedStatus ?? req.query["finishedStatus[]"];
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = req.userId;
 
   try {
     let query = knex("kmis_learning_attempts as quizParticipant")
@@ -257,12 +252,7 @@ exports.getDetailLearningAttemptbyTopicId = async (req, res) => {
 // get detail kursus berdasarkan id topic (untuk order material, kondisi ketika mau belajar)
 exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
   const { id } = req.params;
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = req.userId;
 
   try {
     const learningAttempt = await knex("kmis_learning_attempts")
@@ -367,12 +357,7 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
 // get detail materi berdasarkan id materi (untuk mendapatkan materi berdasarkan id yang ingin diperlajari)
 exports.getLearningAttemptMaterialbyId = async (req, res) => {
   const { id } = req.params;
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = req.userId;
 
   try {
     const material = await knex("kmis_materials")
@@ -456,12 +441,7 @@ exports.getLearningAttemptMaterialbyId = async (req, res) => {
 exports.storeLearningAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { topicId } = req.body;
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = req.userId;
 
   try {
     const errors = validationResult(req);
@@ -780,17 +760,12 @@ exports.updateProgressLearningAttempt = async (req, res) => {
 // get semua quiz berdasarkan id topik (ketika materi sudah selesai, dan quiz mau dikerjakan maka dapat diambil dahulu semua quiz dari topik tersebut)
 exports.getAllQuizbyTopicId = async (req, res) => {
   const { id } = req.params;
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = req.userId;
 
   try {
     const topic = await knex("kmis_topics")
       .where("id", id)
-      .select("id", "title", "topic_type", "is_public")
+      .select("id", "title", "topic_type")
       .whereNull("deleted_at")
       .first();
     if (!topic) {
@@ -803,7 +778,7 @@ exports.getAllQuizbyTopicId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    if (topic.topic_type === "Pengetahuan" && topic.is_public === true) {
+    if (topic.topic_type === "Pengetahuan") {
       const response = new WithoutDataResource(
         200,
         "QUIZ_NOT_ACCESSIBLE",
@@ -884,12 +859,7 @@ exports.getAllQuizbyTopicId = async (req, res) => {
 exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
   const trx = await knex.transaction();
   const { id } = req.params;
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = req.userId;
 
   try {
     // Validasi progress belajar
@@ -936,7 +906,7 @@ exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
 
     const topic = await knex("kmis_topics")
       .where("id", attempt.kmis_topic_id)
-      .select("id", "topic_type", "is_public")
+      .select("id", "topic_type")
       .whereNull("deleted_at")
       .first();
     if (!topic) {
@@ -949,7 +919,7 @@ exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    if (topic.topic_type === "Pengetahuan" && topic.is_public === true) {
+    if (topic.topic_type === "Pengetahuan") {
       const response = new WithoutDataResource(
         200,
         "QUIZ_NOT_ACCESSIBLE",
@@ -1016,12 +986,7 @@ exports.storeQuizAttempt = async (req, res) => {
     .toUpperCase();
   const isMarker = !!req.body.isMarker;
 
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = req.userId;
 
   try {
     // Validasi progress belajar
@@ -1254,12 +1219,7 @@ exports.storeQuizAttempt = async (req, res) => {
 exports.submitAllAttempt = async (req, res) => {
   const trx = await knex.transaction();
   const { learningAttemptId } = req.body;
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = req.userId;
 
   try {
     const errors = validationResult(req);
@@ -1401,12 +1361,7 @@ exports.submitAllAttempt = async (req, res) => {
 exports.getLearningAttemptCompletedById = async (req, res) => {
   const trx = await knex.transaction();
   const { id } = req.params;
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = req.userId;
 
   try {
     // 1) Ambil attempt milik user
@@ -1565,12 +1520,7 @@ exports.feedback = async (req, res) => {
   const trx = await knex.transaction();
   const { feedback, comment } = req.body;
   const { id } = req.params;
-  const userId =
-    req.auth?.userId ??
-    req.auth?.user_id ??
-    req.auth?.id ??
-    req.userId ??
-    req.user?.id;
+  const userId = req.userId;
 
   try {
     const errors = validationResult(req);
