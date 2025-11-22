@@ -187,12 +187,12 @@ exports.store = async (req, res) => {
         );
         return res.status(422).json(response.toResponse());
       }
-      if (file.size > 20 * 1024 * 1024) {
+      if (file.size > 50 * 1024 * 1024) {
         const response = new WithoutDataResource(
           422,
           "FILE_TOO_LARGE",
           "Ukuran File Terlalu Besar",
-          "Ukuran maksimal tiap file adalah 20MB."
+          "Ukuran maksimal tiap file adalah 50mB."
         );
         return res.status(422).json(response.toResponse());
       }
@@ -464,7 +464,7 @@ exports.update = async (req, res) => {
       deleteDocumentIds: deletedIds,
       files: Array.isArray(req.files) ? req.files : [],
       dbColumn: "document_ids",
-      maxFilesAllowed: 5,
+      maxFilesAllowed: 1,
       allowedTypes,
       sizeLimitBytes: 50 * 1024 * 1024,
     });
@@ -835,7 +835,7 @@ async function validateFilesQuotaAndTypesOnUpdate({
   deleteDocumentIds,
   files,
   dbColumn = "document_ids",
-  maxFilesAllowed = 5,
+  maxFilesAllowed = 1,
   allowedTypes = ["application/pdf"],
   sizeLimitBytes = 50 * 1024 * 1024,
 }) {

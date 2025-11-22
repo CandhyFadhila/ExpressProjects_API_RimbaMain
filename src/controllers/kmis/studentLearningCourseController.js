@@ -30,6 +30,74 @@ const materialResource = require("../../resources/kmis/materialResource");
 const quizResponseResource = require("../../resources/kmis/quizResponseResource");
 const QUIZ_STATUS = Object.freeze({ STARTED: 1, FINISHED: 2, ABANDONED: 3 });
 
+// get materi yang bersifat publik (tanpa middleware)
+exports.getPublicMaterialbyId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const material = await knex("kmis_materials")
+      .select("*")
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!material) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data materi dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const topic = await knex("kmis_topics")
+      .select("id", "topic_type")
+      .where("id", material.kmis_topic_id)
+      .whereNull("deleted_at")
+      .first();
+    if (!topic) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data topik dengan ID '${material.kmis_topic_id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    if (topic.topic_type === "Pelatihan") {
+      const response = new WithoutDataResource(
+        404,
+        "MATERIAL_NOT_FOUND",
+        "Materi Tidak Ditemukan",
+        "Materi dengan ID tersebut tidak ditemukan."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const data = await materialResource(material);
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      `Detail data materi '${material.title}' berhasil didapatkan.`,
+      data
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Learning Attempt KMIS | - Error function getPublicMaterialbyId : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
 // get kursus saya (kursus yang sudah selesai dan yang masih berlangsung)
 exports.getListLearningAttempt = async (req, res) => {
   const { search, categoryId, finishedStatus } = req.query;

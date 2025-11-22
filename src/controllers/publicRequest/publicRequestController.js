@@ -27,6 +27,7 @@ const contentResource = require("../../resources/cms/contentResource");
 const animalCompositionResource = require("../../resources/cms/animalCompositionResource");
 const legalDocumentResource = require("../../resources/cms/legalDocumentResource");
 const faqResource = require("../../resources/cms/faqResource");
+const { trackTopicViewsForReq } = require("../../helpers/viewTracker");
 
 // Role
 exports.getAllRole = async (req, res) => {
@@ -298,6 +299,11 @@ exports.getTopicbyId = async (req, res) => {
       );
       return res.status(200).json(response.toResponse());
     }
+
+    await trackTopicViewsForReq(
+      result.data.map((m) => m.id),
+      req
+    );
 
     const data = await topicResource(topic);
     const response = new WithDataResource(
@@ -793,12 +799,6 @@ exports.getMaterialbyId = async (req, res) => {
       );
       return res.status(200).json(response.toResponse());
     }
-
-    // Catat view unik per IP per HARI untuk semua materi yang tampil
-    await trackMaterialViewsForReq(
-      result.data.map((m) => m.id),
-      req
-    );
 
     const data = await materialResource(material);
     const response = new WithDataResource(

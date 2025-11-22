@@ -100,11 +100,11 @@ function validateFilesForType(type, files) {
         "Tipe File Salah",
         "File hanya diperbolehkan menggunakan format JPG, JPEG, PNG, SVG, atau WebP."
       );
-    if (f.size > 10 * ONE_MB)
+    if (f.size > 50 * ONE_MB)
       return err(
         "FILE_TOO_LARGE",
         "Ukuran File Terlalu Besar",
-        "Ukuran maksimal tiap gambar adalah 10MB."
+        "Ukuran maksimal tiap gambar adalah 50mB."
       );
     return null;
   }
@@ -182,11 +182,11 @@ function validateFilesForType(type, files) {
           "Tipe File Salah",
           "Semua gambar harus JPG, JPEG, atau PNG."
         );
-      if (f.size > 10 * ONE_MB)
+      if (f.size > 50 * ONE_MB)
         return err(
           "FILE_TOO_LARGE",
           "Ukuran File Terlalu Besar",
-          "Ukuran maksimal tiap gambar adalah 10MB."
+          "Ukuran maksimal tiap gambar adalah 50mB."
         );
     }
     return null;

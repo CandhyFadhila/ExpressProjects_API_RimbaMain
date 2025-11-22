@@ -37,6 +37,7 @@ async function materialResource(material) {
     topic: topic
       ? {
           id: topic.id,
+          topicType: topic.topic_type,
           title: topic.title,
           description: topic.description,
           totalQuiz: topic.total_quiz,

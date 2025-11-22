@@ -17,6 +17,12 @@ const upload = multer();
 
 // Learning Attempt
 router.get(
+  "/get-material-public/:id",
+  rateLimiter,
+  studentLearningCourseController.getPublicMaterialbyId
+);
+
+router.get(
   "/get-all-learning-attempt",
   rateLimiter,
   authMiddleware,

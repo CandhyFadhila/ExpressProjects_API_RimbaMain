@@ -193,12 +193,12 @@ exports.store = async (req, res) => {
         );
         return res.status(422).json(response.toResponse());
       }
-      if (file.size > 10 * 1024 * 1024) {
+      if (file.size > 50 * 1024 * 1024) {
         const response = new WithoutDataResource(
           422,
           "FILE_TOO_LARGE",
           "Ukuran File Terlalu Besar",
-          "Ukuran maksimal tiap file adalah 10MB."
+          "Ukuran maksimal tiap file adalah 50mB."
         );
         return res.status(422).json(response.toResponse());
       }
