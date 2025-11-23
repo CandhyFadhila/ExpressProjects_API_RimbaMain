@@ -4,29 +4,6 @@ const authMiddleware = require("../../middlewares/authMiddleware");
 const rateLimiter = require("../../middlewares/rateLimitMiddleware");
 const publicRequestController = require("../../controllers/publicRequest/publicRequestController");
 
-function authIfTrainingTopic(req, res, next) {
-  const rawType = req.query.topicType ?? req.query["topicType[]"];
-
-  const topicTypeList = Array.isArray(rawType)
-    ? rawType
-    : rawType
-    ? [rawType]
-    : [];
-
-  if (
-    topicTypeList.includes("Pelatihan") &&
-    topicTypeList.includes("Pengetahuan")
-  ) {
-    return next();
-  }
-
-  if (topicTypeList.includes("Pelatihan")) {
-    return authMiddleware(req, res, next);
-  }
-
-  return next();
-}
-
 // Role
 router.get("/get-all-role", rateLimiter, publicRequestController.getAllRole);
 
@@ -47,7 +24,6 @@ router.get(
 router.get(
   "/get-all-topic",
   rateLimiter,
-  authIfTrainingTopic,
   publicRequestController.getAllTopic
 );
 
