@@ -51,6 +51,13 @@ router.get(
   publicRequestController.getAllTopic
 );
 
+router.get(
+  "/get-all-topic-admin",
+  rateLimiter,
+  authMiddleware,
+  publicRequestController.getAllTopicWithAuth
+);
+
 router.get("/get-topic/:id", rateLimiter, publicRequestController.getTopicbyId);
 
 router.get(
@@ -63,10 +70,10 @@ router.get(
 router.get("/get-all-user", rateLimiter, publicRequestController.getAllUser);
 
 router.get(
-  "/get-all-user-educator",
+  "/get-all-user-educator-admin",
   rateLimiter,
   authMiddleware,
-  publicRequestController.getAllUserEducator
+  publicRequestController.getAllUserEducatorWithAuth
 );
 
 router.get(

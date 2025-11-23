@@ -22,68 +22,6 @@ const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
-exports.getAllUserEducator = async (req, res) => {
-  const { search } = req.query;
-
-  try {
-    let query = knex("users as user")
-      .select([
-        "user.id",
-        "user.name",
-        "user.email",
-        "user.role_id",
-        "user.photo_profile_ids",
-      ])
-      .where("user.account_status", 2)
-      .where("user.role_id", 2)
-      .leftJoin("roles as role", "user.role_id", "role.id")
-      .whereNull("user.deleted_at")
-      .orderBy("user.created_at", "desc");
-
-    applySearch(query, search, ["user.name", "role.name"]);
-
-    const paginationInfo = applyPagination(req.query);
-
-    const result = await formatPaginationResult(query, paginationInfo, knex);
-    if (result.data.length === 0) {
-      const response = new WithoutDataResource(
-        200,
-        "DATA_NOT_FOUND",
-        "Data Tidak Ditemukan",
-        "Tidak ada data yang sesuai dengan filter atau pencarian."
-      );
-      return res.status(200).json(response.toResponse());
-    }
-
-    const serializedData = await Promise.all(
-      result.data.map((user) => UserResource(user))
-    );
-
-    const response = new WithDataResource(
-      200,
-      "SUCCESS_GET_DATA",
-      "Berhasil Mengambil Data",
-      "Data pengajar berhasil diambil.",
-      {
-        data: serializedData,
-        pagination: result.pagination,
-      }
-    );
-    return res.status(200).json(response.toResponse());
-  } catch (error) {
-    logger.error(
-      `| Topic KMIS | - Error function getAllUserEducator : ${error.message}`
-    );
-    const response = new WithoutDataResource(
-      500,
-      "SERVER_ERROR",
-      "Server Sedang Error",
-      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
-    );
-    return res.status(500).json(response.toResponse());
-  }
-};
-
 exports.index = async (req, res) => {
   const { search, categoryId, topicType } = req.query;
   const categoryIdAny = categoryId ?? req.query["categoryId[]"];

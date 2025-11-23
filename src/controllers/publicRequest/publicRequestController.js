@@ -228,6 +228,96 @@ exports.getAllTopic = async (req, res) => {
       as: "string",
     });
 
+    applySearch(query, search, ["topic.title", "category.title"]);
+
+    const paginationInfo = applyPagination(req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((topic) => topicResource(topic))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data topik berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAllTopic : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getAllTopicWithAuth = async (req, res) => {
+  const { search, categoryId, topicType } = req.query;
+  const categoryIdAny = categoryId ?? req.query["categoryId[]"];
+  const topicTypeAny = topicType ?? req.query["topicType[]"];
+
+  if (!topicTypeAny) {
+    const response = new WithoutDataResource(
+      422,
+      "MISSING_TOPIC_TYPE",
+      "Filter topicType wajib diisi",
+      "Filter topicType tidak diperbolehkan kosong. Silahkan tentukan tipe topik yang ingin dicari."
+    );
+    return res.status(422).json(response.toResponse());
+  }
+
+  try {
+    let query = knex("kmis_topics as topic")
+      .select([
+        "topic.id",
+        "topic.user_pic",
+        "topic.material_order_ids",
+        "topic.topic_cover_ids",
+        "topic.kmis_categories_id",
+        "topic.topic_type",
+        "topic.title",
+        "topic.description",
+        "topic.total_quiz",
+        "topic.quiz_duration",
+        "topic.total_views",
+      ])
+      .leftJoin(
+        "kmis_categories as category",
+        "topic.kmis_categories_id",
+        "category.id"
+      )
+      .whereNull("topic.deleted_at")
+      .orderBy("topic.created_at", "desc");
+
+    applyRelationIn(query, "topic.kmis_categories_id", categoryIdAny, {
+      as: "number",
+    });
+
+    applyRelationIn(query, "topic.topic_type", topicTypeAny, {
+      as: "string",
+    });
+
     const { canSeeUserPic, userId } = await getUserPicFilterFlag(req);
 
     if (canSeeUserPic && userId != null) {
@@ -472,7 +562,7 @@ exports.getAllUser = async (req, res) => {
   }
 };
 
-exports.getAllUserEducator = async (req, res) => {
+exports.getAllUserEducatorWithAuth = async (req, res) => {
   const { search } = req.query;
 
   try {
