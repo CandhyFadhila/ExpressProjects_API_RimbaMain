@@ -5,6 +5,7 @@ const knex = require("../../config/database");
 const categoryResource = require("../../resources/kmis/categoryResource");
 const documentResource = require("../../resources/doc/documentResource");
 const materialResource = require("../../resources/kmis/materialResource");
+const UserResource = require("../../resources/auth/UserResource");
 
 async function topicResource(topic) {
   const category = topic.kmis_categories_id
@@ -21,28 +22,27 @@ async function topicResource(topic) {
 
   const materials = await knex("kmis_materials")
     .whereIn("id", topic.material_order_ids || [])
-    .select(
-      "id",
-      "kmis_topic_id",
-      "materials_file_ids",
-      "materials_cover_ids",
-      "title",
-      "material_types",
-      "material_data",
-      "description"
-    )
-    .orderByRaw(
-      `array_position(?, id)`,
-      [topic.material_order_ids]
-    );
+    .select("*")
+    .orderByRaw(`array_position(?, id)`, [topic.material_order_ids]);
+
+  const users = await knex("users")
+    .whereIn("id", topic.user_pic || [])
+    .select("*")
+    .orderByRaw(`array_position(?, id)`, [topic.user_pic]);
 
   // Map hasil query menjadi resource material
   const materialResources = await Promise.all(
-    materials.map((material) => materialResource(material)) // Apply materialResource here for each material
+    materials.map((material) => materialResource(material))
+  );
+
+  // Map hasil query menjadi resource user
+  const userPic = await Promise.all(
+    users.map((user) => UserResource(user))
   );
 
   return {
     id: topic.id,
+    userPic: userPic,
     category: category ? await categoryResource(category) : null,
     topicCover: photos,
     materialOrder: materialResources,

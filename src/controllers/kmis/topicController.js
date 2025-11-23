@@ -17,9 +17,72 @@ const documentHelper = require("../../helpers/documentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const topicResource = require("../../resources/kmis/topicResource");
+const UserResource = require("../../resources/auth/UserResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
+
+exports.getAllUserEducator = async (req, res) => {
+  const { search } = req.query;
+
+  try {
+    let query = knex("users as user")
+      .select([
+        "user.id",
+        "user.name",
+        "user.email",
+        "user.role_id",
+        "user.photo_profile_ids",
+      ])
+      .where("user.account_status", 2)
+      .where("user.role_id", 2)
+      .leftJoin("roles as role", "user.role_id", "role.id")
+      .whereNull("user.deleted_at")
+      .orderBy("user.created_at", "desc");
+
+    applySearch(query, search, ["user.name", "role.name"]);
+
+    const paginationInfo = applyPagination(req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((user) => UserResource(user))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data pengajar berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Topic KMIS | - Error function getAllUserEducator : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
 
 exports.index = async (req, res) => {
   const { search, categoryId, topicType } = req.query;
@@ -96,8 +159,18 @@ exports.index = async (req, res) => {
 
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
-  const { categoryId, topicType, title, description, totalQuiz, quizDuration } =
-    req.body;
+  const {
+    userPic,
+    categoryId,
+    topicType,
+    title,
+    description,
+    totalQuiz,
+    quizDuration,
+  } = req.body;
+  const userPicIds = toArray(userPic)
+    .map((v) => Number(v))
+    .filter((v) => Number.isInteger(v));
 
   try {
     if (quizDuration < 300) {
@@ -137,6 +210,37 @@ exports.store = async (req, res) => {
         `Judul topik '${title}' sudah digunakan. Silakan gunakan judul lain.`
       );
       return res.status(422).json(response.toResponse());
+    }
+
+    if (!userPic) {
+      const response = new WithoutDataResource(
+        422,
+        "INVALID_USER_PIC_FORMAT",
+        "Format User Pic Tidak Valid",
+        "Daftar userPic tidak boleh kosong."
+      );
+      return res.status(422).json(response.toResponse());
+    }
+
+    if (userPicIds.length > 0) {
+      const rows = await trx("users")
+        .whereIn("id", userPicIds)
+        .andWhere("account_status", 2)
+        .andWhere("role_id", 2)
+        .select("id");
+
+      const validIds = rows.map((u) => Number(u.id));
+      const invalidIds = userPicIds.filter((id) => !validIds.includes(id));
+
+      if (invalidIds.length > 0) {
+        const response = new WithoutDataResource(
+          422,
+          "INVALID_USER_PIC",
+          "Pengajar Tidak Ditemukan",
+          "Sebagian pengajar yang dipilih tidak ditemukan. Pastikan pengguna yang dipilih adalah pengajar dan belum dinonaktifkan."
+        );
+        return res.status(422).json(response.toResponse());
+      }
     }
 
     if (!req.files || req.files.length === 0) {
@@ -194,6 +298,7 @@ exports.store = async (req, res) => {
 
     await trx("kmis_topics")
       .insert({
+        user_pic: asJsonb(userPicIds),
         kmis_categories_id: categoryId,
         topic_cover_ids: asJsonb([coverId]),
         topic_type: topicType,
@@ -276,6 +381,7 @@ exports.show = async (req, res) => {
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
   const {
+    userPic,
     categoryId,
     topicType,
     title,
@@ -286,6 +392,9 @@ exports.update = async (req, res) => {
     deleteDocumentIds,
   } = req.body;
   const id = req.params.id;
+  const userPicIds = toArray(userPic)
+    .map((v) => Number(v))
+    .filter((v) => Number.isInteger(v));
 
   try {
     if (quizDuration < 300) {
@@ -311,6 +420,39 @@ exports.update = async (req, res) => {
         message
       );
       return res.status(422).json(response.toResponse());
+    }
+
+    if (typeof userPic !== "undefined") {
+      if (userPicIds && userPicIds.length === 0) {
+        const response = new WithoutDataResource(
+          422,
+          "INVALID_USER_PIC_FORMAT",
+          "Format User Pic Tidak Valid",
+          "Daftar userPic tidak boleh kosong."
+        );
+        return res.status(422).json(response.toResponse());
+      }
+
+      if (userPicIds.length > 0) {
+        const rows = await trx("users")
+          .whereIn("id", userPicIds)
+          .andWhere("account_status", 2)
+          .andWhere("role_id", 2)
+          .select("id");
+
+        const validIds = rows.map((u) => Number(u.id));
+        const invalidIds = userPicIds.filter((id) => !validIds.includes(id));
+
+        if (invalidIds.length > 0) {
+          const response = new WithoutDataResource(
+            422,
+            "INVALID_USER_PIC",
+            "Pengajar Tidak Ditemukan",
+            "Sebagian pengajar yang dipilih tidak ditemukan. Pastikan pengguna yang dipilih adalah pengajar dan belum dinonaktifkan."
+          );
+          return res.status(422).json(response.toResponse());
+        }
+      }
     }
 
     const incomingMaterialOrderIds = toArray(materialOrderIds).map(String);
@@ -434,6 +576,10 @@ exports.update = async (req, res) => {
 
     if (materialOrderIds !== undefined) {
       updateData.material_order_ids = knex.raw("?", [materialOrderIds]);
+    }
+
+    if (typeof userPic !== "undefined") {
+      updateData.user_pic = asJsonb(userPicIds);
     }
 
     await trx("kmis_topics").where("id", id).update(updateData);

@@ -10,6 +10,7 @@ const {
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
 const { normIdArray, isPlainObject } = require("../../helpers/inputNorm");
+const { getUserPicFilterFlag } = require("../../helpers/topicUserPicHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
 const UserResource = require("../../resources/auth/UserResource");
@@ -200,6 +201,7 @@ exports.getAllTopic = async (req, res) => {
     let query = knex("kmis_topics as topic")
       .select([
         "topic.id",
+        "topic.user_pic",
         "topic.material_order_ids",
         "topic.topic_cover_ids",
         "topic.kmis_categories_id",
@@ -225,6 +227,14 @@ exports.getAllTopic = async (req, res) => {
     applyRelationIn(query, "topic.topic_type", topicTypeAny, {
       as: "string",
     });
+
+    const { canSeeUserPic, userId } = await getUserPicFilterFlag(req);
+
+    if (canSeeUserPic && userId != null) {
+      query = query.whereRaw("topic.user_pic @> ?", [
+        JSON.stringify([Number(userId)]),
+      ]);
+    }
 
     applySearch(query, search, ["topic.title", "category.title"]);
 
@@ -409,6 +419,7 @@ exports.getAllUser = async (req, res) => {
       .where("user.account_status", 2)
       .leftJoin("roles as role", "user.role_id", "role.id")
       .select([
+        "user.id",
         "user.name",
         "user.email",
         "user.role_id",
@@ -467,6 +478,7 @@ exports.getAllUserEducator = async (req, res) => {
   try {
     let query = knex("users as user")
       .select([
+        "user.id",
         "user.name",
         "user.email",
         "user.role_id",
@@ -531,6 +543,7 @@ exports.getAllUserStudent = async (req, res) => {
       .where("user.role_id", 4)
       .leftJoin("roles as role", "user.role_id", "role.id")
       .select([
+        "user.id",
         "user.name",
         "user.email",
         "user.role_id",
@@ -594,6 +607,7 @@ exports.getAllUserbyRoleId = async (req, res) => {
       .where("user.role_id", id)
       .leftJoin("roles as role", "user.role_id", "role.id")
       .select([
+        "user.id",
         "user.name",
         "user.email",
         "user.role_id",

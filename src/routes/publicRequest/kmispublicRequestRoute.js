@@ -65,6 +65,7 @@ router.get("/get-all-user", rateLimiter, publicRequestController.getAllUser);
 router.get(
   "/get-all-user-educator",
   rateLimiter,
+  authMiddleware,
   publicRequestController.getAllUserEducator
 );
 
