@@ -358,7 +358,7 @@ exports.getAllTopicWithAuth = async (req, res) => {
     return res.status(200).json(response.toResponse());
   } catch (error) {
     logger.error(
-      `| Public Request | - Error function getAllTopic : ${error.message}`
+      `| Public Request | - Error function getAllTopicWithAuth : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -612,7 +612,7 @@ exports.getAllUserEducatorWithAuth = async (req, res) => {
     return res.status(200).json(response.toResponse());
   } catch (error) {
     logger.error(
-      `| Public Request | - Error function getAllUserEducator : ${error.message}`
+      `| Public Request | - Error function getAllUserEducatorWithAuth : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,

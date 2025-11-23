@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const authMiddleware = require("../../middlewares/authMiddleware");
 const rateLimiter = require("../../middlewares/rateLimitMiddleware");
 const publicRequestController = require("../../controllers/publicRequest/publicRequestController");
 
@@ -18,9 +19,10 @@ router.get(
 );
 
 router.get(
-  "/get-all-user-educator",
+  "/get-all-user-educator-admin",
   rateLimiter,
-  publicRequestController.getAllUserEducator
+  authMiddleware,
+  publicRequestController.getAllUserEducatorWithAuth
 );
 
 router.get(
