@@ -73,24 +73,43 @@ app.get("/", (req, res) => {
 // Cek db
 app.get("/check-db", async (req, res) => {
   try {
-    // Cek koneksi berdasarkan environment (Linux/Windows)
-    const env = process.env.PG_ENV || "windows";
-    const database = require("./config/database"); // ini file database.js
+    const [metaResult, tablesResult] = await Promise.all([
+      knex.raw(`
+        SELECT
+          current_database() AS database,
+          current_schema()   AS schema,
+          current_user       AS "user",
+          current_setting('port') AS port,
+          NOW()              AS server_time
+      `),
+      knex.raw(`
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = current_schema()
+          AND table_type = 'BASE TABLE'
+        ORDER BY table_name
+      `),
+    ]);
 
-    // Panggil query untuk cek waktu server database
-    const result = await database.raw("SELECT NOW()");
+    const meta = metaResult.rows[0];
+    const tables = tablesResult.rows.map((row) => row.table_name);
 
     res.json({
       status: "success",
-      message: `Koneksi database (${env}) berhasil.`,
-      server_time: result.rows[0].now,
+      message: "Koneksi database berhasil.",
+      database: meta.database,
+      schema: meta.schema,
+      user: meta.user,
+      port: Number(meta.port),
+      server_time: meta.server_time,
+      tables_count: tables.length,
+      tables,
     });
   } catch (error) {
     logger.error("DB Connection Error:", error.message);
     res.status(500).json({
       status: "error",
-      message:
-        "Gagal terhubung ke database. Pastikan environment sudah benar dan database sudah dijalankan.",
+      message: "Gagal terhubung ke database.",
       error: error.message,
     });
   }
