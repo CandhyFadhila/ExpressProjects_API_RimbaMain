@@ -6,4 +6,6 @@ src/public/storage
 
 .env
 
+logger.log
+
 dist
