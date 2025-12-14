@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const morgan = require("morgan");
+const knex = require("./config/database");
 const corsMiddleware = require("./middlewares/cors");
 const logger = require("./utils/logger");
 const publicRequestRoute = require("./routes/publicRequest/publicRequestRoute");
