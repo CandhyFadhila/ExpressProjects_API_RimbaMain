@@ -2947,7 +2947,7 @@ exports.getAllContent = async (req, res) => {
 
     // Legal Docs
     const legalDocumentRows = await knex("cms_legal_documents")
-      .select(["title", "description", "document_ids", "created_at"])
+      .select(["id", "title", "description", "document_ids", "created_at"])
       .whereNull("deleted_at")
       .orderBy("created_at", "desc");
 
