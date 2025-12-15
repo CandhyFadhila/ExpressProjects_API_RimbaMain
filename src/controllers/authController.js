@@ -16,7 +16,7 @@ const { stripTitlesOnly } = require("../helpers/credentialHelper");
 const renderEmailTemplate = require("../utils/emailOTP/renderEmailTemplate");
 const UserResource = require("../resources/auth/UserResource");
 const dateHelper = require("../helpers/dateHelper");
-const JWT_SECRET = process.env.JWT_SECRET_KEY || "secretkey";
+const JWT_SECRET = process.env.JWT_SECRET_KEY;
 
 // ========== CREATE ACCOUNT ==========
 function getGoogleIdToken(req) {

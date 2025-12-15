@@ -49,16 +49,16 @@ if (isLinux()) {
 }
 
 const PORT = Number(process.env.PORT);
-if (!Number.isInteger(PORT)) {
-  throw new Error('"PORT" belum diisi atau bukan integer pada file .env.');
-}
 const DOCS_PORT = Number(process.env.DOC_SERVER_PORT);
-if (!Number.isInteger(DOCS_PORT)) {
-  throw new Error('"DOC_SERVER_PORT" belum diisi atau bukan integer pada file .env.');
-}
 
-app.locals.baseUrl = resolvePublicBaseUrl("app", { app: PORT, docs: DOCS_PORT });
-app.locals.storageBaseUrl = resolvePublicBaseUrl("docs", { app: PORT, docs: DOCS_PORT });
+app.locals.baseUrl = resolvePublicBaseUrl("app", {
+  app: PORT,
+  docs: DOCS_PORT,
+});
+app.locals.storageBaseUrl = resolvePublicBaseUrl("docs", {
+  app: PORT,
+  docs: DOCS_PORT,
+});
 
 // Middleware
 app.use(corsMiddleware);

@@ -3,7 +3,7 @@ const WithoutDataResource = require("../resources/WithoutDataResource");
 const { isTokenBlacklisted, blacklistToken } = require("../utils/tokenBlacklist");
 const logger = require("../utils/logger");
 const knex = require("../config/database");
-const JWT_SECRET = process.env.JWT_SECRET_KEY || "secretkey";
+const JWT_SECRET = process.env.JWT_SECRET_KEY;
 
 // Middleware untuk autentikasi menggunakan JWT
 const authMiddleware = async (req, res, next) => {
