@@ -37,38 +37,38 @@ const targetRoutes = require("./routes/monev/targetRoutes");
 const monthlyRealizationRoutes = require("./routes/monev/monthlyRealizationRoutes");
 const activityCalendarRoutes = require("./routes/monev/activityCalendarRoutes");
 const shareReportRoutes = require("./routes/monev/shareReportRoutes");
+const { isLinux, resolvePublicBaseUrl } = require("./utils/baseUrl");
 
 const app = express();
-
-app.set('trust proxy', 1);
-
-function isLinux() {
-  return (
-    String(process.env.PG_ENV || "windows")
-      .trim()
-      .toLowerCase() === "linux"
-  );
-}
-
-function resolvePublicBaseUrl(port) {
-  return isLinux() ? "https://rimbaexium.org" : `http://localhost:${port}`;
-}
-
-// Middleware
-app.use(corsMiddleware);
-app.use(express.json());
-app.use(morgan("dev"));
 
 if (isLinux()) {
   app.set("trust proxy", 1);
 }
 
 const PORT = 4000;
-app.locals.baseUrl = resolvePublicBaseUrl(PORT);
+
+app.locals.baseUrl = resolvePublicBaseUrl("app", { app: PORT, docs: 4001 });
+app.locals.storageBaseUrl = resolvePublicBaseUrl("docs", {
+  app: PORT,
+  docs: 4001,
+});
+
+// Middleware
+app.use(corsMiddleware);
+app.use(express.json());
+app.use(morgan("dev"));
 
 // Cek API root
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to the Rimba!" });
+});
+
+app.get("/debug/urls", (req, res) => {
+  res.json({
+    PG_ENV: process.env.PG_ENV,
+    baseUrl: app.locals.baseUrl,
+    storageBaseUrl: app.locals.storageBaseUrl,
+  });
 });
 
 // Cek db

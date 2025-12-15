@@ -3,6 +3,7 @@ const FormData = require("form-data");
 const fs = require("fs");
 const path = require("path");
 const logger = require("../utils/logger");
+const { resolvePublicBaseUrl } = require("../utils/baseUrl");
 
 class StorageServerHelper {
   static token = null;
@@ -20,32 +21,22 @@ class StorageServerHelper {
     };
   }
 
-  static resolveBaseURL() {
-    const env = String(process.env.PG_ENV || "windows")
-      .trim()
-      .toLowerCase();
-    switch (env) {
-      case "linux":
-        return "https://doc.rimbaexium.org";
-      case "windows":
-        return "http://localhost:4001";
-    }
-  }
-
   static init() {
     if (!this.baseURL) {
-      this.baseURL = this.resolveBaseURL();
+      this.baseURL = resolvePublicBaseUrl("docs", {
+        app: process.env.PORT || 4000,
+        docs: process.env.DOC_SERVER_PORT || 4001,
+      });
+
       const staticAcc = this.getStaticDocumentAccount();
       this.email = staticAcc.email;
       this.password = staticAcc.password;
 
       if (!this.baseURL || !this.email || !this.password) {
         logger.error(
-          `| Storage Server Helper | - Init error: ENV tidak lengkap. Pastikan DOCUMENT_SERVER_EMAIL, DOCUMENT_SERVER_PASSWORD terisi.`
+          "| Storage Server Helper | - Init error: konfigurasi tidak lengkap."
         );
-        throw new Error(
-          "ENV tidak lengkap. Pastikan DOCUMENT_SERVER_EMAIL, DOCUMENT_SERVER_PASSWORD terisi."
-        );
+        throw new Error("Konfigurasi tidak lengkap.");
       }
     }
   }
