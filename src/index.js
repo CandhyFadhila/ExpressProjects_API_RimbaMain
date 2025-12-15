@@ -1,4 +1,5 @@
 require("dotenv").config();
+const helmet = require("helmet");
 const express = require("express");
 const morgan = require("morgan");
 const knex = require("./config/database");
@@ -41,17 +42,23 @@ const { isLinux, resolvePublicBaseUrl } = require("./utils/baseUrl");
 
 const app = express();
 
+app.use(helmet());
+
 if (isLinux()) {
   app.set("trust proxy", 1);
 }
 
-const PORT = 4000;
+const PORT = Number(process.env.PORT);
+if (!Number.isInteger(PORT)) {
+  throw new Error('"PORT" belum diisi atau bukan integer pada file .env.');
+}
+const DOCS_PORT = Number(process.env.DOC_SERVER_PORT);
+if (!Number.isInteger(DOCS_PORT)) {
+  throw new Error('"DOC_SERVER_PORT" belum diisi atau bukan integer pada file .env.');
+}
 
-app.locals.baseUrl = resolvePublicBaseUrl("app", { app: PORT, docs: 4001 });
-app.locals.storageBaseUrl = resolvePublicBaseUrl("docs", {
-  app: PORT,
-  docs: 4001,
-});
+app.locals.baseUrl = resolvePublicBaseUrl("app", { app: PORT, docs: DOCS_PORT });
+app.locals.storageBaseUrl = resolvePublicBaseUrl("docs", { app: PORT, docs: DOCS_PORT });
 
 // Middleware
 app.use(corsMiddleware);
@@ -69,51 +76,6 @@ app.get("/debug/urls", (req, res) => {
     baseUrl: app.locals.baseUrl,
     storageBaseUrl: app.locals.storageBaseUrl,
   });
-});
-
-// Cek db
-app.get("/check-db", async (req, res) => {
-  try {
-    const [metaResult, tablesResult] = await Promise.all([
-      knex.raw(`
-        SELECT
-          current_database() AS database,
-          current_schema()   AS schema,
-          current_user       AS "user",
-          current_setting('port') AS port,
-          NOW()              AS server_time
-      `),
-      knex.raw(`
-        SELECT table_name
-        FROM information_schema.tables
-        WHERE table_schema = current_schema()
-          AND table_type = 'BASE TABLE'
-        ORDER BY table_name
-      `),
-    ]);
-
-    const meta = metaResult.rows[0];
-    const tables = tablesResult.rows.map((row) => row.table_name);
-
-    res.json({
-      status: "success",
-      message: "Koneksi database berhasil.",
-      database: meta.database,
-      schema: meta.schema,
-      user: meta.user,
-      port: Number(meta.port),
-      server_time: meta.server_time,
-      tables_count: tables.length,
-      tables,
-    });
-  } catch (error) {
-    logger.error("DB Connection Error:", error.message);
-    res.status(500).json({
-      status: "error",
-      message: "Gagal terhubung ke database.",
-      error: error.message,
-    });
-  }
 });
 
 // Auth
@@ -220,6 +182,4 @@ app.use("/api/master-data/monev-dashboard", monevDashboardRoutes);
 //! ======== MASTER DATA MODULE ========
 
 // Jalankan server
-app.listen(PORT, () => {
-  console.log(`Server berjalan di ${app.locals.baseUrl} (listen port ${PORT})`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

@@ -1,33 +1,49 @@
 const knex = require("knex");
 
-const env = (process.env.PG_ENV || "windows").toLowerCase();
+/**
+ * getRequiredEnv
+ * Mengambil env var wajib (string). Throw jika kosong/tidak ada.
+ */
+function getRequiredEnv(name) {
+  const v = process.env[name];
+  const s = (v ?? "").toString().trim();
+  if (!s) throw new Error(`ENV wajib "${name}" belum diisi.`);
+  return s;
+}
 
-const connections = {
-  windows: {
-    host: "localhost",
-    port: 5433,
-    user: "postgres",
-    password: "super.admin",
-    database: "rimba_main",
-  },
-  linux: {
-    host: "localhost",
-    port: 5432,
-    user: "user_rimba",
-    password: "password_kuat",
-    database: "main_rimba",
-  },
-};
+/**
+ * getRequiredIntEnv
+ * Mengambil env var wajib (int). Throw jika kosong/tidak valid.
+ */
+function getRequiredIntEnv(name) {
+  const raw = getRequiredEnv(name);
+  const n = Number(raw);
+  if (!Number.isInteger(n))
+    throw new Error(`ENV "${name}" harus integer. Dapat: "${raw}"`);
+  return n;
+}
 
-const connection = connections[env] || connections.windows;
+/**
+ * resolveDbConnection
+ * Membentuk config connection Knex dari env berbasis PG_ENV.
+ */
+function resolveDbConnection() {
+  const env = getRequiredEnv("PG_ENV").toLowerCase();
+  const suffix = env.toUpperCase();
+
+  return {
+    host: getRequiredEnv(`DB_HOST_${suffix}`),
+    port: getRequiredIntEnv(`DB_PORT_${suffix}`),
+    user: getRequiredEnv(`DB_USER_${suffix}`),
+    password: getRequiredEnv(`DB_PASSWORD_${suffix}`),
+    database: getRequiredEnv(`DB_NAME_${suffix}`),
+  };
+}
 
 const db = knex({
   client: "pg",
-  connection,
-  pool: {
-    min: 2,
-    max: 50,
-  },
+  connection: resolveDbConnection(),
+  pool: { min: 2, max: 50 },
   acquireConnectionTimeout: 10000,
 });
 
