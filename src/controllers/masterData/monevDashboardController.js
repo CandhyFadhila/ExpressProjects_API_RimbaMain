@@ -242,7 +242,7 @@ exports.store = async (req, res) => {
 
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
-  const { description, hibah, deleteFrameworkFileIds, deletePlanFileIds } =
+  const { description, hibahUSD, hibahIDR, deleteFrameworkFileIds, deletePlanFileIds } =
     req.body;
   const id = req.params.id;
 
@@ -389,7 +389,8 @@ exports.update = async (req, res) => {
     await trx("monev_dashboards")
       .where("id", id)
       .update({
-        networth_hibah: hibah ?? existing.networth_hibah,
+        networth_hibah_usd: hibahUSD ?? existing.networth_hibah_usd,
+        networth_hibah_idr: hibahIDR ?? existing.networth_hibah_idr,
         description: description ?? existing.description,
         framework_file_ids: asJsonb(newFrameworkIds),
         plan_file_ids: asJsonb(newPlanIds),
