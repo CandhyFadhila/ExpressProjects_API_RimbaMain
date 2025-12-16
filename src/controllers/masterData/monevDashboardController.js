@@ -73,7 +73,7 @@ exports.dashboardInfo = async (req, res) => {
 
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
-  const { description, hibah } = req.body;
+  const { description, hibahIDR, hibahUSD } = req.body;
 
   try {
     const errors = validationResult(req);
@@ -192,7 +192,8 @@ exports.store = async (req, res) => {
 
     await trx("monev_dashboards")
       .insert({
-        networth_hibah: hibah,
+        networth_hibah_usd: hibahUSD,
+        networth_hibah_idr: hibahIDR,
         description,
         framework_file_ids: frameworkIds?.length ? asJsonb(frameworkIds) : null,
         plan_file_ids: planIds?.length ? asJsonb(planIds) : null,
