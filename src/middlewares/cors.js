@@ -1,7 +1,7 @@
 const cors = require("cors");
 
 const corsOptions = {
-  origin: ["https://rimba.webgis.app", "https://rimba.webgis.app/kmis"],
+  origin: ["https://rimba.webgis.app", "https://rimba.webgis.app/kmis", "https://rimba-atrbpn.vercel.app", "https://rimba-atrbpn-admin.vercel.app"],
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
