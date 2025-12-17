@@ -31,6 +31,8 @@ exports.dashboardInfo = async (req, res) => {
     const statsBudgetRealization = await getStatsBudgetRealizationByYear(
       targetYear
     );
+    const chartBudget = await getChartBudgetByYear(targetYear);
+    const chartPhysical = await getChartPhysicalByYear(targetYear);
     const sumBudgetTarget = await getSumBudgetTargetByYear(targetYear);
     const sumBudgetRealization = await getSumBudgetRealizationByYear(
       targetYear
@@ -49,6 +51,8 @@ exports.dashboardInfo = async (req, res) => {
         avgPhysicalTarget,
         avgProgressRealization,
         totalActivityPackages,
+        chartBudget,
+        chartPhysical,
         statsBudgetTarget,
         statsBudgetRealization,
         sumBudgetTarget,
@@ -243,8 +247,13 @@ exports.store = async (req, res) => {
 
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
-  const { description, hibahUSD, hibahIDR, deleteFrameworkFileIds, deletePlanFileIds } =
-    req.body;
+  const {
+    description,
+    hibahUSD,
+    hibahIDR,
+    deleteFrameworkFileIds,
+    deletePlanFileIds,
+  } = req.body;
   const id = req.params.id;
 
   try {
@@ -454,6 +463,14 @@ function buildZeroMonthStats() {
   return Array.from({ length: 12 }, (_, i) => ({ month: i, value: 0 }));
 }
 
+function buildZeroChartBudget() {
+  return Array.from({ length: 12 }, (_, i) => ({
+    month: i,
+    target: 0,
+    realization: 0,
+  }));
+}
+
 async function getAvgPhysicalTargetByYear(year) {
   const row = await knex("monev_targets as mt")
     .where("mt.year", year)
@@ -537,6 +554,93 @@ async function getStatsBudgetRealizationByYear(year) {
     stats[i].value = byMonth.get(i + 1) ?? 0;
   }
   return stats;
+}
+
+/**
+ * getChartBudgetByYear
+ * Menghasilkan chartBudget: target (SUM budget_target) vs realization (SUM budget_realization[].value) per bulan pada tahun tertentu.
+ */
+async function getChartBudgetByYear(year) {
+  const targetRows = await knex("monev_targets as mt")
+    .where("mt.year", year)
+    .whereNull("mt.deleted_at")
+    .select("mt.month")
+    .select(knex.raw("COALESCE(SUM((mt.budget_target)::bigint), 0) AS total"))
+    .groupBy("mt.month");
+
+  const realizationRows = await knex("monev_monthly_realizations as mmr")
+    .where("mmr.year", year)
+    .whereNull("mmr.deleted_at")
+    .joinRaw(
+      "LEFT JOIN LATERAL jsonb_array_elements(COALESCE(mmr.budget_realization, '[]'::jsonb)) AS elem ON TRUE"
+    )
+    .select("mmr.month")
+    .select(
+      knex.raw(
+        "COALESCE(SUM(GREATEST((elem->>'value')::bigint, 0)), 0) AS total"
+      )
+    )
+    .groupBy("mmr.month");
+
+  const targetByMonth = new Map(
+    targetRows.map((r) => [Number(r.month), Number(r.total)])
+  );
+  const realizationByMonth = new Map(
+    realizationRows.map((r) => [Number(r.month), Number(r.total)])
+  );
+
+  const chart = buildZeroChartBudget();
+  for (let i = 0; i < 12; i++) {
+    chart[i].target = targetByMonth.get(i + 1) ?? 0;
+    chart[i].realization = realizationByMonth.get(i + 1) ?? 0;
+  }
+
+  return chart;
+}
+
+/**
+ * getChartPhysicalByYear
+ * Menghasilkan chartPhysical: target (AVG physical_target) vs realization (AVG progress) per bulan pada tahun tertentu.
+ */
+async function getChartPhysicalByYear(year) {
+  const targetRows = await knex("monev_targets as mt")
+    .where("mt.year", year)
+    .whereNull("mt.deleted_at")
+    .select("mt.month")
+    .select(
+      knex.raw(
+        "COALESCE(AVG(LEAST(GREATEST(mt.physical_target, 0), 100)), 0) AS total"
+      )
+    )
+    .groupBy("mt.month");
+
+  const realizationRows = await knex("monev_monthly_realizations as mmr")
+    .where("mmr.year", year)
+    .whereNull("mmr.deleted_at")
+    .select("mmr.month")
+    .select(
+      knex.raw(
+        "COALESCE(AVG(LEAST(GREATEST(mmr.progress, 0), 100)), 0) AS total"
+      )
+    )
+    .groupBy("mmr.month");
+
+  const round2 = (n) => Math.round(Number(n) * 100) / 100;
+
+  const targetByMonth = new Map(
+    targetRows.map((r) => [Number(r.month), round2(r.total)])
+  );
+  const realizationByMonth = new Map(
+    realizationRows.map((r) => [Number(r.month), round2(r.total)])
+  );
+
+  const chart = buildZeroChartPhysical();
+  for (let i = 0; i < 12; i++) {
+    chart[i].target = targetByMonth.get(i + 1) ?? 0;
+    chart[i].realization = realizationByMonth.get(i + 1) ?? 0;
+  }
+
+  return chart;
 }
 
 async function getSumBudgetTargetByYear(year) {
