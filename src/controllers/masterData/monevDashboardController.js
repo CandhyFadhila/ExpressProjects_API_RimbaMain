@@ -471,6 +471,14 @@ function buildZeroChartBudget() {
   }));
 }
 
+function buildZeroChartPhysical() {
+  return Array.from({ length: 12 }, (_, i) => ({
+    month: i,
+    target: 0,
+    realization: 0,
+  }));
+}
+
 async function getAvgPhysicalTargetByYear(year) {
   const row = await knex("monev_targets as mt")
     .where("mt.year", year)
