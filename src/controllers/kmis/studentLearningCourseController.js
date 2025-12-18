@@ -358,6 +358,21 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
+    const topic = await knex("kmis_topics")
+      .select("*")
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!topic) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Topik dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
     const materialOrderIdsStr = normIdArray(topic.material_order_ids, {
       as: "string",
     });
