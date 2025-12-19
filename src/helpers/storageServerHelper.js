@@ -125,7 +125,7 @@ class StorageServerHelper {
 
     try {
       const res = await this.axios().post(
-        "/api/rimba/docs/signin",
+        "/cms/api/rimba/docs/signin",
         { email: this.email, password: this.password },
         { validateStatus: () => true }
       );
@@ -170,7 +170,7 @@ class StorageServerHelper {
     if (!this.token) return;
 
     try {
-      await this.axios().get("/api/rimba/docs/signout", {
+      await this.axios().get("/cms/api/rimba/docs/signout", {
         headers: { Authorization: `Bearer ${this.token}` },
         validateStatus: () => true,
       });
@@ -241,7 +241,7 @@ class StorageServerHelper {
           Authorization: `Bearer ${token}`,
         };
 
-        return this.axios().post("/api/rimba/docs/upload-file", form, {
+        return this.axios().post("/cms/api/rimba/docs/upload-file", form, {
           headers,
           maxBodyLength: Infinity,
           validateStatus: () => true,
@@ -299,7 +299,7 @@ class StorageServerHelper {
 
     const { res, payload: payloadRes } = await this.withTokenAutoRefresh(
       async (token) => {
-        return this.axios().delete("/api/rimba/docs/delete-file", {
+        return this.axios().delete("/cms/api/rimba/docs/delete-file", {
           headers: { Authorization: `Bearer ${token}` },
           data: bodyPayload,
           validateStatus: () => true,
