@@ -33,6 +33,7 @@ const QUIZ_STATUS = Object.freeze({ STARTED: 1, FINISHED: 2, ABANDONED: 3 });
 // get materi yang bersifat publik (tanpa middleware)
 exports.getPublicMaterialbyId = async (req, res) => {
   const { id } = req.params;
+  const userId = req.userId;
 
   try {
     const material = await knex("kmis_materials")
@@ -70,8 +71,8 @@ exports.getPublicMaterialbyId = async (req, res) => {
         .trim()
         .toLowerCase() === "pelatihan"
     ) {
-      const authed = Boolean(req.userId);
-      console.log(`UserId: ${req.userId} => Authed: ${authed}`);
+      const authed = Boolean(userId);
+      console.log(`UserId: ${userId} => Authed: ${authed}`);
 
       if (!authed) {
         const response = new WithoutDataResource(
