@@ -1,12 +1,19 @@
 const { body } = require("express-validator");
 
 exports.updateMonevDashboardValidator = [
-  body("hibah")
+  body("hibahUSD")
     .notEmpty()
-    .withMessage("Hibah tidak boleh kosong.")
+    .withMessage("Hibah dalam USD tidak boleh kosong.")
     .bail()
     .isInt()
-    .withMessage("Hibah harus berupa angka."),
+    .withMessage("Hibah dalam USD harus berupa angka."),
+
+  body("hibahIDR")
+    .notEmpty()
+    .withMessage("Hibah dalam IDR tidak boleh kosong.")
+    .bail()
+    .isInt()
+    .withMessage("Hibah dalam IDR harus berupa angka."),
 
   body("description")
     .notEmpty()
