@@ -71,6 +71,7 @@ exports.getPublicMaterialbyId = async (req, res) => {
         .toLowerCase() === "pelatihan"
     ) {
       const authed = Boolean(req.userId);
+      console.log(`UserId: ${req.userId} => Authed: ${authed}`);
 
       if (!authed) {
         const response = new WithoutDataResource(
