@@ -390,7 +390,9 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
       .map((v) => Number(v))
       .filter(Number.isFinite);
     const completedSet = new Set(
-      normIdArray(learningAttempt.completed_material_ids, { as: "string" })
+      normIdArray(learningAttempt.completed_material_ids, { as: "string" }).map(
+        (v) => String(v).trim()
+      )
     );
 
     const materials = await knex("kmis_materials")
@@ -402,7 +404,7 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
     const materialWithStatus = await Promise.all(
       materials.map(async (material) => {
         const materialDetails = await materialResource(material);
-        const isCompleted = completedSet.has(String(material.id));
+        const isCompleted = completedSet.has(String(material.id).trim());
         return { ...materialDetails, isCompleted };
       })
     );
