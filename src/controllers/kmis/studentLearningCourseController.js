@@ -66,15 +66,16 @@ exports.getPublicMaterialbyId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    if (topic.topic_type === "Pelatihan") {
-      const response = new WithoutDataResource(
-        404,
-        "MATERIAL_NOT_FOUND",
-        "Materi Tidak Ditemukan",
-        "Materi dengan ID tersebut tidak ditemukan."
-      );
-      return res.status(200).json(response.toResponse());
-    }
+    console.log(`Ini adalah tipe topik: ${topic.topic_type}`);
+    // if (topic.topic_type === "Pelatihan") {
+    //   const response = new WithoutDataResource(
+    //     404,
+    //     "MATERIAL_NOT_FOUND",
+    //     "Materi Tidak Ditemukan",
+    //     "Materi dengan ID tersebut tidak ditemukan."
+    //   );
+    //   return res.status(200).json(response.toResponse());
+    // }
 
     const data = await materialResource(material);
     const response = new WithDataResource(
