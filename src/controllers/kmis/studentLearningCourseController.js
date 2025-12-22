@@ -410,7 +410,11 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
       `Detail materi berdasarkan urutan berhasil didapatkan.`,
-      { material: materialWithStatus, topic: topicDetails, learningAttempt: learningParticipantData }
+      {
+        material: materialWithStatus,
+        topic: topicDetails,
+        learningAttempt: learningParticipantData,
+      }
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
@@ -1823,7 +1827,10 @@ async function attemptExamResponse(learningAttemptId) {
     for (let i = 0; i < toPad; i++) exam.push(null);
   }
 
-  return { learningParticipant, exam };
+  // 9) Hapus null dari array
+  const filteredExam = exam.filter((item) => item !== null);
+
+  return { learningParticipant, exam: filteredExam };
 }
 
 async function handleFinalQuestion(trx, { learningAttemptId, topicId, req }) {
