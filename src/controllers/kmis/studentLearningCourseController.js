@@ -403,12 +403,14 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
       learningAttempt
     );
 
+    const topicDetails = await topicResource(topic);
+
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
       `Detail materi berdasarkan urutan berhasil didapatkan.`,
-      { material: materialWithStatus, learningAttempt: learningParticipantData }
+      { material: materialWithStatus, topic: topicDetails, learningAttempt: learningParticipantData }
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
