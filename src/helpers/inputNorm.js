@@ -20,35 +20,20 @@ const parseJsonSafe = (s) => {
  * - Menerima array → dikembalikan apa adanya
  * - null/undefined → []
  * - string JSON array → di-parse
- * - string PG array "{1,2,3}" / '{"1","2"}' → di-parse
  * - string biasa "a,b,c" → split-by-comma + trim
  * - tipe lain → []
  */
 function toArray(v) {
   if (Array.isArray(v)) return v;
   if (v == null) return [];
-
   if (typeof v === "string") {
-    const s = v.trim();
-    const j = parseJsonSafe(s);
+    const j = parseJsonSafe(v);
     if (Array.isArray(j)) return j;
-
-    const isPgArray = s.startsWith("{") && s.endsWith("}");
-    const body = isPgArray ? s.slice(1, -1).trim() : s;
-    if (!body) return [];
-
-    return body
+    return v
       .split(",")
-      .map((x) => x.trim())
-      .map((x) => {
-        if (x.length >= 2 && x.startsWith('"') && x.endsWith('"')) {
-          return x.slice(1, -1);
-        }
-        return x;
-      })
+      .map((s) => s.trim())
       .filter(Boolean);
   }
-
   return [];
 }
 
@@ -113,7 +98,7 @@ function normIdArray(value, opts = {}) {
         }
       }
       // default string
-      return String(v).trim();
+      return String(v);
     })
     .filter((v) => v != null);
 

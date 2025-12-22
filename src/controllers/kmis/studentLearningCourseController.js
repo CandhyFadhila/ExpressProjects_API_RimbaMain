@@ -66,23 +66,14 @@ exports.getPublicMaterialbyId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    if (
-      String(topic.topic_type || "")
-        .trim()
-        .toLowerCase() === "pelatihan"
-    ) {
-      const authed = Boolean(userId);
-      console.log(`UserId: ${userId} => Authed: ${authed}`);
-
-      if (!authed) {
-        const response = new WithoutDataResource(
-          404,
-          "MATERIAL_NOT_FOUND",
-          "Materi Tidak Ditemukan",
-          "Materi dengan ID tersebut tidak ditemukan."
-        );
-        return res.status(200).json(response.toResponse());
-      }
+    if (topic.topic_type === "Pelatihan") {
+      const response = new WithoutDataResource(
+        404,
+        "MATERIAL_NOT_FOUND",
+        "Materi Tidak Ditemukan",
+        "Materi dengan ID tersebut tidak ditemukan."
+      );
+      return res.status(200).json(response.toResponse());
     }
 
     const data = await materialResource(material);
@@ -390,9 +381,7 @@ exports.getOrderMaterialLearningAttemptbyTopicId = async (req, res) => {
       .map((v) => Number(v))
       .filter(Number.isFinite);
     const completedSet = new Set(
-      normIdArray(learningAttempt.completed_material_ids, { as: "string" }).map(
-        (v) => String(v).trim()
-      )
+      normIdArray(learningAttempt.completed_material_ids, { as: "string" })
     );
 
     const materials = await knex("kmis_materials")

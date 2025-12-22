@@ -9,7 +9,6 @@ const {
 } = require("../../validators/kmis/updateFeedbackValidator");
 const validate = require("../../middlewares/validate");
 const authMiddleware = require("../../middlewares/authMiddleware");
-const { authOptionalMiddleware } = require("../../middlewares/authMiddleware");
 const rateLimiter = require("../../middlewares/rateLimitMiddleware");
 const requirePermission = require("../../middlewares/requirePermission");
 const requireAbility = require("../../middlewares/requireAbility");
@@ -20,7 +19,6 @@ const upload = multer();
 router.get(
   "/get-material-public/:id",
   rateLimiter,
-  authOptionalMiddleware,
   studentLearningCourseController.getPublicMaterialbyId
 );
 

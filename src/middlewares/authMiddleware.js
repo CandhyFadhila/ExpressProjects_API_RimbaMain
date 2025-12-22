@@ -1,27 +1,19 @@
 const jwt = require("jsonwebtoken");
 const WithoutDataResource = require("../resources/WithoutDataResource");
-const {
-  isTokenBlacklisted,
-  blacklistToken,
-} = require("../utils/tokenBlacklist");
+const { isTokenBlacklisted, blacklistToken } = require("../utils/tokenBlacklist");
 const logger = require("../utils/logger");
 const knex = require("../config/database");
+const JWT_SECRET = process.env.JWT_SECRET_KEY;
 
-const JWT_SECRET = (process.env.JWT_SECRET_KEY || "").trim();
-if (!JWT_SECRET) {
-  throw new Error('ENV wajib "JWT_SECRET_KEY" belum diisi.');
-}
-
-/**
- * authMiddleware
- * Wajib auth. Jika token tidak ada/invalid → 401.
- */
+// Middleware untuk autentikasi menggunakan JWT
 const authMiddleware = async (req, res, next) => {
+  // Ambil token dari header Authorization
   const token = req.header("Authorization")?.replace("Bearer ", "");
 
+  // Jika tidak ada token
   if (!token) {
     const response = new WithoutDataResource(
-      401,
+      401, // HTTP Status Code: Unauthorized
       "TOKEN_NOT_FOUND",
       "Akses ditolak",
       "Token tidak ditemukan. Pastikan Anda sudah login dan menyertakan token dalam header request."
@@ -32,6 +24,7 @@ const authMiddleware = async (req, res, next) => {
     return res.status(401).json(response.toResponse());
   }
 
+  // Cek blacklist
   const blacklisted = await isTokenBlacklisted(token);
   if (blacklisted) {
     const response = new WithoutDataResource(
@@ -43,21 +36,24 @@ const authMiddleware = async (req, res, next) => {
     return res.status(401).json(response.toResponse());
   }
 
+  // Verifikasi token
   jwt.verify(token, JWT_SECRET, async (err, decoded) => {
     if (err && err.name === "TokenExpiredError") {
       const response = new WithoutDataResource(
-        401,
+        401, // HTTP Status Code: Unauthorized
         "TOKEN_EXPIRED",
         "Akses ditolak",
         "Token sudah kedaluwarsa. Silakan login kembali."
       );
-      logger.info(`| Auth | - Token expired, at ${new Date().toISOString()}`);
+      logger.info(
+        `| Auth | - Token expired for user with token: ${token}, at ${new Date().toISOString()}`
+      );
       return res.status(401).json(response.toResponse());
     }
 
     if (err) {
       const response = new WithoutDataResource(
-        401,
+        401, // HTTP Status Code: Unauthorized
         "INVALID_TOKEN",
         "Akses ditolak",
         "Token tidak valid. Silakan login kembali."
@@ -66,6 +62,7 @@ const authMiddleware = async (req, res, next) => {
       return res.status(401).json(response.toResponse());
     }
 
+    // Fungsi untuk cek last_login. jika lebih dari 3 hari, maka login ulang dan token di blacklist
     const userId = decoded.userId;
     req.userId = userId;
     req.auth = {
@@ -74,6 +71,7 @@ const authMiddleware = async (req, res, next) => {
       abilities: Array.isArray(decoded.abilities) ? decoded.abilities : [],
       ctx: decoded.ctx || null,
     };
+
 
     try {
       const user = await knex("users").where({ id: userId }).first();
@@ -92,7 +90,8 @@ const authMiddleware = async (req, res, next) => {
       const diffInDays = Math.floor((now - lastLogin) / (1000 * 60 * 60 * 24));
 
       if (diffInDays > 3) {
-        await blacklistToken(token, 86400);
+        // Masukkan token ke blacklist Redis
+        await blacklistToken(token, 86400); // expired 1 hari
 
         const response = new WithoutDataResource(
           401,
@@ -104,72 +103,24 @@ const authMiddleware = async (req, res, next) => {
         return res.status(401).json(response.toResponse());
       }
 
+      req.userId = userId;
       logger.info(
         `| Auth | - Token valid for userId: ${
           decoded.userId
         }, at ${new Date().toISOString()}`
       );
-      return next();
+      next();
     } catch (error) {
       logger.error(`| Auth | - Gagal mengecek last_login: ${error.message}`);
       const response = new WithoutDataResource(
-        500,
+        500, // HTTP Status Code: Internal Server Error
         "SERVER_ERROR",
         "Server Sedang Error",
         "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
       );
-      return res.status(500).json(response.toResponse());
+      res.status(500).json(response.toResponse());
     }
   });
 };
 
-/**
- * authOptionalMiddleware
- * Optional auth. Tidak memblok jika token tidak ada/invalid/expired/blacklisted.
- * Jika token valid → set req.userId & req.auth (sama seperti authMiddleware).
- */
-const authOptionalMiddleware = async (req, res, next) => {
-  const token = req.header("Authorization")?.replace("Bearer ", "");
-
-  if (!token) return next();
-
-  try {
-    const blacklisted = await isTokenBlacklisted(token);
-    if (blacklisted) return next();
-
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const userId = decoded.userId;
-
-    req.userId = userId;
-    req.auth = {
-      userId,
-      roleName: decoded.role || null,
-      abilities: Array.isArray(decoded.abilities) ? decoded.abilities : [],
-      ctx: decoded.ctx || null,
-    };
-
-    try {
-      const user = await knex("users").where({ id: userId }).first();
-      if (!user || !user.last_login) return next();
-
-      const lastLogin = new Date(user.last_login);
-      const now = new Date();
-      const diffInDays = Math.floor((now - lastLogin) / (1000 * 60 * 60 * 24));
-
-      if (diffInDays > 3) {
-        await blacklistToken(token, 86400);
-        return next();
-      }
-
-      return next();
-    } catch (e) {
-      logger.warn(`| Auth Optional | - Skip last_login check: ${e.message}`);
-      return next();
-    }
-  } catch (e) {
-    return next();
-  }
-};
-
 module.exports = authMiddleware;
-module.exports.authOptionalMiddleware = authOptionalMiddleware;
