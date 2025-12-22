@@ -102,7 +102,7 @@ exports.getPublicMaterialbyId = async (req, res) => {
 
 // get kursus saya (kursus yang sudah selesai dan yang masih berlangsung)
 exports.getListLearningAttempt = async (req, res) => {
-  const { search, categoryId, finishedStatus } = req.query;
+  const { search, categoryId, finishedStatus, topicType } = req.query;
   const categoryIdAny = categoryId ?? req.query["categoryId[]"];
   const finishedStatusAny = finishedStatus ?? req.query["finishedStatus[]"];
   const userId = req.userId;
@@ -143,6 +143,10 @@ exports.getListLearningAttempt = async (req, res) => {
     }
 
     applySearch(query, search, ["user.name", "topic.title"]);
+
+    if (topicType) {
+      query.andWhere("topic.topic_type", topicType);
+    }
 
     query.orderByRaw(`
       CASE "quizParticipant"."quiz_attempt_status"
