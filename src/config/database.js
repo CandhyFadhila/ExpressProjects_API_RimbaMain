@@ -43,7 +43,7 @@ function resolveDbConnection() {
 const db = knex({
   client: "pg",
   connection: resolveDbConnection(),
-  pool: { min: 2, max: 50 },
+  pool: { min: 0, max: 10 },
   acquireConnectionTimeout: 10000,
 });
 

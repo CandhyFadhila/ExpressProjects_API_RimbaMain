@@ -938,17 +938,14 @@ exports.getAllQuizbyTopicId = async (req, res) => {
 
 // get semua quiz beserta jawabannya berdasarkan id learning attempt
 exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
-  const trx = await knex.transaction();
   const { id } = req.params;
   const userId = req.userId;
 
   try {
-    // Validasi progress belajar
     let isProgressValid;
     try {
       isProgressValid = await validateLearningProgress(id);
     } catch (e) {
-      await trx.rollback();
       const response = new WithoutDataResource(
         422,
         "LEARNING_ATTEMPT_NOT_FOUND",
@@ -959,7 +956,6 @@ exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
     }
 
     if (!isProgressValid) {
-      await trx.rollback();
       const response = new WithoutDataResource(
         422,
         "LEARNING_PROGRESS_INCOMPLETE",
@@ -969,13 +965,11 @@ exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    // Ambil attempt & kunci baris
-    const attempt = await trx("kmis_learning_attempts")
+    const attempt = await knex("kmis_learning_attempts")
       .where("id", id)
       .whereNull("deleted_at")
       .first();
     if (!attempt) {
-      await trx.rollback();
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
@@ -1010,11 +1004,9 @@ exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
       return res.status(200).json(response.toResponse());
     }
 
-    // Kepemilikan
     const attemptByBig = BigInt(String(attempt.attempt_by));
     const userIdBig = BigInt(String(userId));
     if (attemptByBig !== userIdBig) {
-      await trx.rollback();
       const response = new WithoutDataResource(
         403,
         "FORBIDDEN_QUIZ_ACCESS",
@@ -1044,7 +1036,6 @@ exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
-    await trx.rollback();
     logger.error(
       `| Quiz Attempt KMIS | - Error function getQuizAttemptbylearningAttemptId: ${error.message}`
     );
@@ -1054,7 +1045,7 @@ exports.getQuizAttemptbylearningAttemptId = async (req, res) => {
       "Server Sedang Error",
       "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
     );
-    res.status(500).json(response.toResponse());
+    return res.status(500).json(response.toResponse());
   }
 };
 
