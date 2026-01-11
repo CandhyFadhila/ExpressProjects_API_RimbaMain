@@ -12,6 +12,7 @@ const { asJsonb } = require("../../helpers/dbJson");
 const {
   applyStartEndDateFilter,
   validateDateRangeRequiredBoth,
+  applyRelationIn,
   applyJsonbSearch,
   applyPagination,
   formatPaginationResult,
