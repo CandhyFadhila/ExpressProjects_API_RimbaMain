@@ -88,6 +88,18 @@ router.get(
 
 // Legal Document
 router.get(
+  "/get-all-legal-document-category",
+  rateLimiter,
+  publicRequestController.getAllLegalDocumentCategory
+);
+
+router.get(
+  "/get-legal-document-category/:id",
+  rateLimiter,
+  publicRequestController.getLegalDocumentCategorybyId
+);
+
+router.get(
   "/get-all-legal-document",
   rateLimiter,
   publicRequestController.getAllLegalDocument
@@ -97,6 +109,12 @@ router.get(
   "/get-legal-document/:id",
   rateLimiter,
   publicRequestController.getLegalDocumentbyId
+);
+
+router.get(
+  "/get-legal-document-by-category/:id",
+  rateLimiter,
+  publicRequestController.getLegalDocumentbyLegalDocumentCategoryId
 );
 
 // FAQs

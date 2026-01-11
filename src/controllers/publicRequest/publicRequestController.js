@@ -22,6 +22,7 @@ const quizResource = require("../../resources/kmis/quizResource");
 const newsCategoryResource = require("../../resources/masterData/newsCategoryResource");
 const newsResource = require("../../resources/cms/newsResource");
 const eventCategoryResource = require("../../resources/masterData/eventCategoryResource");
+const legalDocsCategoryResource = require("../../resources/masterData/legalDocsCategoryResource");
 const eventResource = require("../../resources/cms/eventResource");
 const animalCategoryResource = require("../../resources/masterData/animalCategoryResource");
 const contentResource = require("../../resources/cms/contentResource");
@@ -1750,6 +1751,127 @@ exports.getNewsCategorybyId = async (req, res) => {
   }
 };
 
+// TODO
+// 1. Buat getAllLegalDocsCategory
+// 2. Buat getLegalDocsCategorybyId
+// 3. Tambahkan payload categoryIds di getAllLegalDocument, getAllNews, getAllEvent
+
+// Legal Document Category (TextArray)
+exports.getAllLegalDocumentCategory = async (req, res) => {
+  const { search } = req.query;
+
+  try {
+    let query = knex("cms_legal_docs_categories as category")
+      .select(["category.id", "category.name", "category.description"])
+      .whereNull("category.deleted_at")
+      .orderBy("category.created_at", "desc");
+
+    applyJsonbSearch(
+      query,
+      search,
+      [
+        "category.name->>'id'",
+        "category.name->>'en'",
+        "category.description->>'id'",
+        "category.description->>'en'",
+      ],
+      {
+        mode: "or",
+        split: true,
+      }
+    );
+
+    const paginationInfo = applyPagination(req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((legalDocsCategory) =>
+        legalDocsCategoryResource(legalDocsCategory)
+      )
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data kategori dokumen hukum berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getAllLegalDocsCategory : ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silakan coba lagi nanti atau hubungi admin."
+    );
+    return res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getLegalDocumentCategorybyId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const category = await knex("cms_legal_docs_categories")
+      .select(["id", "name", "description"])
+      .where("id", id)
+      .whereNull("deleted_at")
+      .first();
+    if (!category) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        `Data kategori dokumen hukum dengan ID '${id}' tidak ditemukan.`
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const nameObj = isPlainObject(category.name)
+      ? category.name
+      : parseJsonSafe(category.name) || {};
+    const displayName = nameObj.id || nameObj.en || "Tanpa Nama";
+
+    const data = await legalDocsCategoryResource(category);
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      `Detail data kategori dokumen hukum '${category.name}' berhasil didapatkan.`,
+      data
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getLegalDocsCategorybyId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
 // Event Category (TextArray)
 exports.getAllEventCategory = async (req, res) => {
   const { search } = req.query;
@@ -1980,8 +2102,8 @@ exports.getAnimalCategorybyId = async (req, res) => {
 
 // Event (TextArray)
 exports.getAllEvent = async (req, res) => {
-  const { search, eventCategoryId } = req.query;
-  const eventCategoryIdAny = eventCategoryId ?? req.query["eventCategoryId[]"];
+  const { search, categoryIds } = req.query;
+  const categoryIdsAny = categoryIds ?? req.query["categoryIds[]"];
 
   try {
     let query = knex("cms_events as event")
@@ -1997,7 +2119,7 @@ exports.getAllEvent = async (req, res) => {
       .whereNull("event.deleted_at")
       .orderBy("event.created_at", "desc");
 
-    applyRelationIn(query, "event.cms_event_category_id", eventCategoryIdAny, {
+    applyRelationIn(query, "event.cms_event_category_id", categoryIdsAny, {
       as: "number",
     });
 
@@ -2178,8 +2300,8 @@ exports.getEventbyEventCategoryId = async (req, res) => {
 
 // News (TextArray)
 exports.getAllNews = async (req, res) => {
-  const { search, newsCategoryId } = req.query;
-  const newsCategoryIdAny = newsCategoryId ?? req.query["newsCategoryId[]"];
+  const { search, categoryIds } = req.query;
+  const categoryIdsAny = categoryIds ?? req.query["categoryIds[]"];
 
   try {
     let query = knex("cms_news as news")
@@ -2196,7 +2318,7 @@ exports.getAllNews = async (req, res) => {
       .whereNull("news.deleted_at")
       .orderBy("news.created_at", "desc");
 
-    applyRelationIn(query, "news.cms_news_category_id", newsCategoryIdAny, {
+    applyRelationIn(query, "news.cms_news_category_id", categoryIdsAny, {
       as: "number",
     });
 
@@ -2639,7 +2761,8 @@ exports.getAnimalCompositionbyAnimalCategoryId = async (req, res) => {
 
 // Legal Document (TextArray)
 exports.getAllLegalDocument = async (req, res) => {
-  const { search, start_date, end_date } = req.query;
+  const { search, start_date, end_date, categoryIds } = req.query;
+  const categoryIdsAny = categoryIds ?? req.query["categoryIds[]"];
 
   try {
     const dr = validateDateRangeRequiredBoth(start_date, end_date);
@@ -2668,6 +2791,10 @@ exports.getAllLegalDocument = async (req, res) => {
         inclusiveEnd: true,
       }
     );
+
+    applyRelationIn(query, "document.cms_legal_docs_categories_id", categoryIdsAny, {
+      as: "number",
+    });
 
     applyJsonbSearch(
       query,
@@ -2757,6 +2884,71 @@ exports.getLegalDocumentbyId = async (req, res) => {
   } catch (error) {
     logger.error(
       `| Public Request | - Error function getLegalDocumentbyId: ${error.message}`
+    );
+    const response = new WithoutDataResource(
+      500,
+      "SERVER_ERROR",
+      "Server Sedang Error",
+      "Terjadi kesalahan pada sistem, silahkan coba lagi nanti atau hubungi admin."
+    );
+    res.status(500).json(response.toResponse());
+  }
+};
+
+exports.getLegalDocumentbyLegalDocumentCategoryId = async (req, res) => {
+  const { search } = req.query;
+  const { id } = req.params;
+
+  try {
+    let query = knex("cms_legal_documents as document")
+      .leftJoin(
+        "cms_legal_docs_categories as category",
+        "category.id",
+        "document.cms_legal_docs_categories_id"
+      )
+      .select([
+        "document.id",
+        "document.cms_legal_docs_categories_id",
+        "document.name",
+        "document.description",
+      ])
+      .whereNull("document.deleted_at")
+      .where("document.cms_legal_docs_categories_id", id)
+      .orderBy("document.created_at", "desc");
+
+    applySearch(query, search, ["document.name", "category.name"]);
+
+    const paginationInfo = applyPagination(req.query);
+
+    const result = await formatPaginationResult(query, paginationInfo, knex);
+    if (result.data.length === 0) {
+      const response = new WithoutDataResource(
+        200,
+        "DATA_NOT_FOUND",
+        "Data Tidak Ditemukan",
+        "Tidak ada data yang sesuai dengan filter atau pencarian."
+      );
+      return res.status(200).json(response.toResponse());
+    }
+
+    const serializedData = await Promise.all(
+      result.data.map((document) => legalDocumentResource(document))
+    );
+
+    const response = new WithDataResource(
+      200,
+      "SUCCESS_GET_DATA",
+      "Berhasil Mengambil Data",
+      "Data dokumen hukum berdasarkan kategori berhasil diambil.",
+      {
+        data: serializedData,
+        pagination: result.pagination,
+      }
+    );
+    return res.status(200).json(response.toResponse());
+  } catch (error) {
+    logger.error(
+      `| Public Request | - Error function getLegalDocumentbyLegalDocumentCategoryId: ${error.message}`
     );
     const response = new WithoutDataResource(
       500,

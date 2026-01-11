@@ -543,7 +543,7 @@ exports.restore = async (req, res) => {
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        "Tidak ada data kategori satwa terhapus yang cocok untuk direstore."
+        "Tidak ada data kategori dokumen hukum terhapus yang cocok untuk direstore."
       );
       return res.status(200).json(response.toResponse());
     }
