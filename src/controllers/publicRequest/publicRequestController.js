@@ -1751,11 +1751,6 @@ exports.getNewsCategorybyId = async (req, res) => {
   }
 };
 
-// TODO
-// 1. Buat getAllLegalDocsCategory
-// 2. Buat getLegalDocsCategorybyId
-// 3. Tambahkan payload categoryIds di getAllLegalDocument, getAllNews, getAllEvent
-
 // Legal Document Category (TextArray)
 exports.getAllLegalDocumentCategory = async (req, res) => {
   const { search } = req.query;
