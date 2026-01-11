@@ -2,79 +2,46 @@ const { validationResult } = require("express-validator");
 const knex = require("../../config/database");
 const logger = require("../../utils/logger");
 const {
-  toArray,
-  normJsonbArray,
-  normIdArray,
   isPlainObject,
+  normIdArray,
   handleLocalizedText,
 } = require("../../helpers/inputNorm");
-const { asJsonb } = require("../../helpers/dbJson");
 const {
-  applyStartEndDateFilter,
-  validateDateRangeRequiredBoth,
   applyJsonbSearch,
   applyPagination,
   formatPaginationResult,
 } = require("../../helpers/queryHelper");
-const documentHelper = require("../../helpers/documentHelper");
 const WithDataResource = require("../../resources/WithDataResource");
 const WithoutDataResource = require("../../resources/WithoutDataResource");
-const legalDocumentResource = require("../../resources/cms/legalDocumentResource");
+const legalDocsCategoryResource = require("../../resources/masterData/legalDocsCategoryResource");
 const activityLogHelper = require("../../helpers/activityLogHelper");
 const { applyTrashedScope } = require("../../helpers/roleAbilityCheckHelper");
 const { applyLatestThenTrashed } = require("../../helpers/queryOrderHelper");
 
 exports.index = async (req, res) => {
-  const { search, start_date, end_date, legalDocsCategoryId } = req.query;
-  const legalDocsCategoryIdAny =
-    legalDocsCategoryId ?? req.query["legalDocsCategoryId[]"];
+  const { search } = req.query;
 
   try {
-    const dr = validateDateRangeRequiredBoth(start_date, end_date);
-    if (!dr.ok) {
-      const response = new WithoutDataResource(422, dr.code, dr.title, dr.desc);
-      return res.status(422).json(response.toResponse());
-    }
+    let query = knex("cms_legal_docs_categories as category").select("category.*");
 
-    let query = knex("cms_legal_documents as document").select("document.*");
-
-    applyTrashedScope(query, req, "document.deleted_at");
-
-    applyStartEndDateFilter(
-      query,
-      "document.created_at",
-      start_date,
-      end_date,
-      {
-        inclusiveEnd: true,
-      }
-    );
-
-    applyRelationIn(
-      query,
-      "document.cms_legal_docs_categories_id",
-      legalDocsCategoryIdAny,
-      {
-        as: "number",
-      }
-    );
+    applyTrashedScope(query, req, "category.deleted_at");
 
     applyJsonbSearch(
       query,
       search,
-      ["document.title->>'id'", "document.title->>'en'"],
+      [
+        "category.name->>'id'",
+        "category.name->>'en'",
+        "category.description->>'id'",
+        "category.description->>'en'",
+      ],
       {
         mode: "or",
         split: true,
       }
     );
 
-    applyLatestThenTrashed(
-      query,
-      "document.deleted_at",
-      "document.created_at",
-      "document.id"
-    );
+    applyLatestThenTrashed(query, "category.deleted_at", "category.created_at", "category.id");
 
     const paginationInfo = applyPagination(req.query);
 
@@ -90,14 +57,14 @@ exports.index = async (req, res) => {
     }
 
     const serializedData = await Promise.all(
-      result.data.map((document) => legalDocumentResource(document))
+      result.data.map((category) => legalDocsCategoryResource(category))
     );
 
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      "Data dokumen hukum berhasil diambil.",
+      "Data kategori dokumen hukum berhasil diambil.",
       {
         data: serializedData,
         pagination: result.pagination,
@@ -106,7 +73,7 @@ exports.index = async (req, res) => {
     return res.status(200).json(response.toResponse());
   } catch (error) {
     logger.error(
-      `| Legal Document CMS | - Error function index : ${error.message}`
+      `| Legal Docs Category Master | - Error function index : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -120,7 +87,7 @@ exports.index = async (req, res) => {
 
 exports.store = async (req, res) => {
   const trx = await knex.transaction();
-  const { categoryId, title, description } = req.body;
+  const { name, description } = req.body;
 
   try {
     const errors = validationResult(req);
@@ -138,17 +105,17 @@ exports.store = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    const titleNorm = handleLocalizedText(title, {
+    const nameNorm = handleLocalizedText(name, {
       allowPartial: false,
       maxLen: undefined,
-      fieldLabel: "title",
+      fieldLabel: "name",
     });
-    if (titleNorm.error) {
+    if (nameNorm.error) {
       const r = new WithoutDataResource(
         422,
         "INVALID_CONTENT_FORMAT",
         "Format Konten Salah",
-        titleNorm.error.message
+        nameNorm.error.message
       );
       return res.status(422).json(r.toResponse());
     }
@@ -168,86 +135,35 @@ exports.store = async (req, res) => {
       return res.status(422).json(r.toResponse());
     }
 
-    if (!req.files || req.files.length === 0) {
-      const response = new WithoutDataResource(
-        422,
-        "FILES_NOT_FOUND",
-        "File Tidak Ditemukan",
-        "File thumbnail wajib diunggah."
-      );
-      return res.status(422).json(response.toResponse());
-    }
-    if (req.files.length > 5) {
-      const response = new WithoutDataResource(
-        422,
-        "MAX_FILES",
-        "Terlalu Banyak File",
-        "Maksimal upload adalah 5 file."
-      );
-      return res.status(422).json(response.toResponse());
-    }
-
-    for (const file of req.files) {
-      const allowedTypes = ["application/pdf"];
-      if (!allowedTypes.includes(file.mimetype)) {
-        const response = new WithoutDataResource(
-          422,
-          "INVALID_FILE_TYPE",
-          "Tipe File Salah",
-          "File File hanya boleh PDF."
-        );
-        return res.status(422).json(response.toResponse());
-      }
-      if (file.size > 50 * 1024 * 1024) {
-        const response = new WithoutDataResource(
-          422,
-          "FILE_TOO_LARGE",
-          "Ukuran File Terlalu Besar",
-          "Ukuran maksimal tiap file adalah 50mB."
-        );
-        return res.status(422).json(response.toResponse());
-      }
-    }
-
-    const exists = await trx("cms_legal_documents")
+    const exists = await trx("cms_legal_docs_categories")
       .whereNull("deleted_at")
       .andWhere(function () {
-        this.whereRaw("lower(title->>'id') = lower(?)", [
-          titleNorm.value.id,
-        ]).orWhereRaw("lower(title->>'en') = lower(?)", [titleNorm.value.en]);
+        this.whereRaw("lower(name->>'id') = lower(?)", [
+          nameNorm.value.id,
+        ]).orWhereRaw("lower(name->>'en') = lower(?)", [nameNorm.value.en]);
       })
       .first();
     if (exists) {
+      await trx.rollback();
       const response = new WithoutDataResource(
         422,
-        "DUPLICATE_TITLE",
+        "DUPLICATE_NAME",
         "Duplikat Data",
-        "Judul dokumen hukum (ID/EN) sudah digunakan. Silakan gunakan judul lain."
+        "Nama kategori dokumen hukum ini sudah digunakan pada kategori lain."
       );
       return res.status(422).json(response.toResponse());
     }
 
-    const uploadedDocuments = await documentHelper.uploadDocuments(
-      req.files,
-      req
-    );
-    const firstId = uploadedDocuments?.[0];
-    const documentId = Number(firstId);
-
-    await trx("cms_legal_documents")
-      .insert({
-        cms_legal_docs_categories_id: categoryId,
-        document_ids: asJsonb([documentId]),
-        title: { id: titleNorm.value.id, en: titleNorm.value.en },
-        description: { id: descNorm.value.id, en: descNorm.value.en },
-      })
-      .returning("*");
+    await trx("cms_legal_docs_categories").insert({
+      name: { id: nameNorm.value.id, en: nameNorm.value.en },
+      description: { id: descNorm.value.id, en: descNorm.value.en },
+    });
 
     await activityLogHelper.logCreate(
       {
         userId: activityLogHelper.fromReq(req),
-        module: "cms",
-        subject: "List Dokumen Hukum",
+        module: "master_data",
+        subject: "List kategori dokumen hukum",
       },
       trx
     );
@@ -258,13 +174,13 @@ exports.store = async (req, res) => {
       201,
       "SUCCESS_CREATE_DATA",
       "Berhasil Menyimpan Data",
-      `Data dokumen hukum '${titleNorm.value.id}' berhasil ditambahkan.`
+      `Data kategori dokumen hukum '${nameNorm.value.id}' berhasil ditambahkan.`
     );
     return res.status(201).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
     logger.error(
-      `| Legal Document CMS | - Error function store: ${error.message}`
+      `| Legal Docs Category Master | - Error function store: ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -280,37 +196,32 @@ exports.show = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const document = await knex("cms_legal_documents")
+    const category = await knex("cms_legal_docs_categories")
       .select("*")
       .where("id", id)
       .first();
-    if (!document) {
+    if (!category) {
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Data dokumen hukum dengan ID '${id}' tidak ditemukan.`
+        `Data kategori dokumen hukum dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
 
-    const titleObj = isPlainObject(document.title)
-      ? document.title
-      : parseJsonSafe(document.title) || {};
-    const displayName = titleObj.id || titleObj.en || "Tanpa Nama";
-
-    const data = await legalDocumentResource(document);
+    const data = await legalDocsCategoryResource(category);
     const response = new WithDataResource(
       200,
       "SUCCESS_GET_DATA",
       "Berhasil Mengambil Data",
-      `Detail data dokumen hukum '${displayName}' berhasil didapatkan.`,
+      `Detail data kategori dokumen hukum '${category.name}' berhasil didapatkan.`,
       data
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     logger.error(
-      `| Legal Document CMS | - Error function show: ${error.message}`
+      `| Legal Docs Category Master | - Error function show: ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -324,7 +235,7 @@ exports.show = async (req, res) => {
 
 exports.update = async (req, res) => {
   const trx = await knex.transaction();
-  const { categoryId, title, description, deleteDocumentIds } = req.body;
+  const { name, description } = req.body;
   const id = req.params.id;
 
   try {
@@ -343,94 +254,96 @@ exports.update = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    const existing = await trx("cms_legal_documents").where("id", id).first();
+    const existing = await trx("cms_legal_docs_categories").where("id", id).first();
     if (!existing) {
       const response = new WithoutDataResource(
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Data dokumen hukum dengan ID '${id}' tidak ditemukan.`
+        `Data kategori dokumen hukum dengan ID '${id}' tidak ditemukan.`
       );
       return res.status(200).json(response.toResponse());
     }
 
-    const exTitle = isPlainObject(existing.title)
-      ? existing.title
-      : parseJsonSafe(existing.title) ?? { id: "", en: "" };
+    const exName = isPlainObject(existing.name)
+      ? existing.name
+      : parseJsonSafe(existing.name) ?? { id: "", en: "" };
+
     const exDesc = isPlainObject(existing.description)
       ? existing.description
       : parseJsonSafe(existing.description) ?? { id: "", en: "" };
 
-    let nextTitle = exTitle;
-    if (typeof title !== "undefined") {
-      const t = handleLocalizedText(title, {
+    let nextName = exName;
+    if (typeof name !== "undefined") {
+      const norm = handleLocalizedText(name, {
         allowPartial: true,
         maxLen: undefined,
-        fieldLabel: "title",
+        fieldLabel: "nama",
       });
-      if (t.error) {
+      if (norm.error) {
         const r = new WithoutDataResource(
           422,
           "INVALID_CONTENT_FORMAT",
           "Format Konten Salah",
-          t.error.message
+          norm.error.message
         );
         return res.status(422).json(r.toResponse());
       }
-      const merged = { ...exTitle, ...t.value };
+      const n = { ...exName, ...norm.value };
+      // abaikan string kosong yang dikirim
       if (
-        Object.prototype.hasOwnProperty.call(t.value, "id") &&
-        String(t.value.id).trim() === ""
+        Object.prototype.hasOwnProperty.call(norm.value, "id") &&
+        String(norm.value.id).trim() === ""
       )
-        merged.id = exTitle.id;
+        n.id = exName.id;
       if (
-        Object.prototype.hasOwnProperty.call(t.value, "en") &&
-        String(t.value.en).trim() === ""
+        Object.prototype.hasOwnProperty.call(norm.value, "en") &&
+        String(norm.value.en).trim() === ""
       )
-        merged.en = exTitle.en;
-      if (!merged.id || !merged.en) {
+        n.en = exName.en;
+
+      // pastikan id & en akhir tidak kosong
+      if (!n.id || !n.en) {
         const r = new WithoutDataResource(
           422,
           "INVALID_CONTENT_FORMAT",
           "Format Konten Salah",
-          "Judul harus memiliki id dan en yang tidak kosong."
+          "Nama harus memiliki id dan en yang tidak kosong."
         );
         return res.status(422).json(r.toResponse());
       }
-      nextTitle = {
-        id: String(merged.id).trim(),
-        en: String(merged.en).trim(),
-      };
+      nextName = { id: String(n.id).trim(), en: String(n.en).trim() };
     }
 
     let nextDescription = exDesc;
     if (typeof description !== "undefined") {
-      const d = handleLocalizedText(description, {
+      const norm = handleLocalizedText(description, {
         allowPartial: true,
-        maxLen: undefined,
-        fieldLabel: "description",
+        maxLen: undefined, // deskripsi bebas
+        fieldLabel: "deskripsi",
       });
-      if (d.error) {
+      if (norm.error) {
         const r = new WithoutDataResource(
           422,
           "INVALID_CONTENT_FORMAT",
           "Format Konten Salah",
-          d.error.message
+          norm.error.message
         );
         return res.status(422).json(r.toResponse());
       }
-      const merged = { ...exDesc, ...d.value };
+      const d = { ...exDesc, ...norm.value };
       if (
-        Object.prototype.hasOwnProperty.call(d.value, "id") &&
-        String(d.value.id).trim() === ""
+        Object.prototype.hasOwnProperty.call(norm.value, "id") &&
+        String(norm.value.id).trim() === ""
       )
-        merged.id = exDesc.id;
+        d.id = exDesc.id;
       if (
-        Object.prototype.hasOwnProperty.call(d.value, "en") &&
-        String(d.value.en).trim() === ""
+        Object.prototype.hasOwnProperty.call(norm.value, "en") &&
+        String(norm.value.en).trim() === ""
       )
-        merged.en = exDesc.en;
-      if (!merged.id || !merged.en) {
+        d.en = exDesc.en;
+
+      if (!d.id || !d.en) {
         const r = new WithoutDataResource(
           422,
           "INVALID_CONTENT_FORMAT",
@@ -439,89 +352,45 @@ exports.update = async (req, res) => {
         );
         return res.status(422).json(r.toResponse());
       }
-      nextDescription = {
-        id: String(merged.id).trim(),
-        en: String(merged.en).trim(),
-      };
+      nextDescription = { id: String(d.id).trim(), en: String(d.en).trim() };
     }
 
-    const titleChanged =
-      (nextTitle.id ?? "").toLowerCase() !== (exTitle.id ?? "").toLowerCase() ||
-      (nextTitle.en ?? "").toLowerCase() !== (exTitle.en ?? "").toLowerCase();
-    if (titleChanged) {
-      const duplicate = await trx("cms_legal_documents")
+    const nameChanged =
+      (nextName.id ?? "").toLowerCase() !== (exName.id ?? "").toLowerCase() ||
+      (nextName.en ?? "").toLowerCase() !== (exName.en ?? "").toLowerCase();
+
+    if (nameChanged) {
+      const duplicate = await trx("cms_legal_docs_categories")
         .whereNull("deleted_at")
         .whereNot("id", id)
         .andWhere(function () {
-          this.whereRaw("lower(title->>'id') = lower(?)", [
-            nextTitle.id,
-          ]).orWhereRaw("lower(title->>'en') = lower(?)", [nextTitle.en]);
+          this.whereRaw("lower(name->>'id') = lower(?)", [
+            nextName.id,
+          ]).orWhereRaw("lower(name->>'en') = lower(?)", [nextName.en]);
         })
         .first();
       if (duplicate) {
         const response = new WithoutDataResource(
           422,
-          "DUPLICATE_TITLE",
+          "DUPLICATE_NAME",
           "Duplikat Data",
-          "Judul dokumen hukum (ID/EN) sudah digunakan pada dokumen hukum lain."
+          "Nama kategori dokumen hukum (ID/EN) sudah digunakan pada kategori lain."
         );
         return res.status(422).json(response.toResponse());
       }
     }
 
-    const deletedIds = toArray(deleteDocumentIds).map(String);
-    const allowedTypes = ["application/pdf"];
-    const validation = await validateFilesQuotaAndTypesOnUpdate({
-      existingRow: existing,
-      deleteDocumentIds: deletedIds,
-      files: Array.isArray(req.files) ? req.files : [],
-      dbColumn: "document_ids",
-      maxFilesAllowed: 1,
-      allowedTypes,
-      sizeLimitBytes: 50 * 1024 * 1024,
+    await trx("cms_legal_docs_categories").where("id", id).update({
+      name: nextName,
+      description: nextDescription,
+      updated_at: trx.fn.now(),
     });
-    if (!validation.ok) {
-      const response = new WithoutDataResource(
-        validation.http,
-        validation.code,
-        validation.title,
-        validation.desc
-      );
-      return res.status(validation.http).json(response.toResponse());
-    }
-
-    const oldCoverIds = normJsonbArray(existing.document_ids);
-    const oldDocId = normIdArray(oldCoverIds, { as: "number" })[0] ?? null;
-
-    let finalDocId = oldDocId;
-    if (finalDocId != null && deletedIds.includes(String(finalDocId))) {
-      await documentHelper.deleteDocuments([finalDocId]);
-      finalDocId = null;
-    }
-
-    let uploadIds = null;
-    if (Array.isArray(req.files) && req.files.length > 0) {
-      uploadIds = await documentHelper.uploadDocuments(req.files, req);
-    }
-
-    const documentId = uploadIds?.[0] ?? finalDocId ?? null;
-    const documentArr = documentId != null ? [Number(documentId)] : [];
-
-    await trx("cms_legal_documents")
-      .where("id", id)
-      .update({
-        cms_legal_docs_categories_id: categoryId,
-        document_ids: asJsonb(documentArr),
-        title: nextTitle,
-        description: nextDescription,
-        updated_at: trx.fn.now(),
-      });
 
     await activityLogHelper.logUpdate(
       {
         userId: activityLogHelper.fromReq(req),
-        module: "cms",
-        subject: "List Dokumen Hukum",
+        module: "master_data",
+        subject: "List kategori dokumen hukum",
       },
       trx
     );
@@ -532,13 +401,13 @@ exports.update = async (req, res) => {
       200,
       "SUCCESS_UPDATE_DATA",
       "Berhasil Memperbarui",
-      `Data dokumen hukum '${nextTitle.id}' berhasil diperbarui.`
+      `Data kategori dokumen hukum '${nextName.id}' berhasil diperbarui.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
     logger.error(
-      `| Legal Document CMS | - Error function update : ${error.message}`
+      `| Legal Docs Category Master | - Error function update : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -580,8 +449,8 @@ exports.destroy = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    const existing = await trx("cms_legal_documents")
-      .select("id", "title")
+    const existing = await trx("cms_legal_docs_categories")
+      .select("id", "name")
       .whereIn("id", ids)
       .whereNull("deleted_at");
     if (existing.length === 0) {
@@ -590,22 +459,22 @@ exports.destroy = async (req, res) => {
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        `Tidak ada data dokumen hukum yang cocok atau sudah terhapus.`
+        `Tidak ada data kategori dokumen hukum yang cocok atau sudah terhapus.`
       );
       return res.status(200).json(response.toResponse());
     }
 
     const existingIds = existing.map((r) => r.id);
 
-    await trx("cms_legal_documents").whereIn("id", existingIds).update({
+    await trx("cms_legal_docs_categories").whereIn("id", existingIds).update({
       deleted_at: trx.fn.now(),
     });
 
     await activityLogHelper.logDelete(
       {
         userId: activityLogHelper.fromReq(req),
-        module: "cms",
-        subject: "List Dokumen Hukum",
+        module: "master_data",
+        subject: "List kategori dokumen hukum",
       },
       trx
     );
@@ -616,13 +485,13 @@ exports.destroy = async (req, res) => {
       200,
       "SUCCESS_DELETE_DATA",
       "Berhasil Menghapus Data",
-      `Berhasil menghapus (soft delete) ${existingIds.length} data dokumen hukum.`
+      `Berhasil menghapus (soft delete) ${existingIds.length} data kategori dokumen hukum.`
     );
     return res.status(200).json(response.toResponse());
   } catch (error) {
     await trx.rollback();
     logger.error(
-      `| Legal Document CMS | - Error function destroy : ${error.message}`
+      `| Legal Docs Category Master | - Error function destroy : ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -664,8 +533,8 @@ exports.restore = async (req, res) => {
       return res.status(422).json(response.toResponse());
     }
 
-    const softDeleted = await trx("cms_legal_documents")
-      .select("id", "title")
+    const softDeleted = await trx("cms_legal_docs_categories")
+      .select("id", "name")
       .whereIn("id", ids)
       .whereNotNull("deleted_at");
     if (softDeleted.length === 0) {
@@ -674,12 +543,12 @@ exports.restore = async (req, res) => {
         200,
         "DATA_NOT_FOUND",
         "Data Tidak Ditemukan",
-        "Tidak ada data dokumen hukum terhapus yang cocok untuk direstore."
+        "Tidak ada data kategori satwa terhapus yang cocok untuk direstore."
       );
       return res.status(200).json(response.toResponse());
     }
 
-    // --- Ambil pasangan title.id / title.en dari record terhapus
+    // --- Ambil pasangan name.id / name.en dari record terhapus
     const parseName = (v) => {
       const obj = isPlainObject(v) ? v : parseJsonSafe(v) || {};
       const id = typeof obj.id === "string" ? obj.id.trim() : "";
@@ -688,28 +557,28 @@ exports.restore = async (req, res) => {
     };
 
     const deletedNames = softDeleted.map((r) => {
-      const n = parseName(r.title);
+      const n = parseName(r.name);
       return { rowId: r.id, ...n };
     });
-    const titlesIdLower = deletedNames.map((x) => x.idLower).filter(Boolean);
-    const titlesEnLower = deletedNames.map((x) => x.enLower).filter(Boolean);
+    const namesIdLower = deletedNames.map((x) => x.idLower).filter(Boolean);
+    const namesEnLower = deletedNames.map((x) => x.enLower).filter(Boolean);
 
     // --- Cek bentrok judul dengan entri aktif (dua bahasa)
     let activeWithSameTitle = [];
-    if (titlesIdLower.length || titlesEnLower.length) {
-      activeWithSameTitle = await trx("cms_legal_documents")
-        .select("id", "title")
+    if (namesIdLower.length || namesEnLower.length) {
+      activeWithSameTitle = await trx("cms_legal_docs_categories")
+        .select("id", "name")
         .whereNull("deleted_at")
         .andWhere(function () {
           let hasCond = false;
-          if (titlesIdLower.length) {
+          if (namesIdLower.length) {
             hasCond = true;
-            this.whereIn(knex.raw("lower(title->>'id')"), titlesIdLower);
+            this.whereIn(knex.raw("lower(name->>'id')"), namesIdLower);
           }
-          if (titlesEnLower.length) {
+          if (namesEnLower.length) {
             if (hasCond)
-              this.orWhereIn(knex.raw("lower(title->>'en')"), titlesEnLower);
-            else this.whereIn(knex.raw("lower(title->>'en')"), titlesEnLower);
+              this.orWhereIn(knex.raw("lower(name->>'en')"), namesEnLower);
+            else this.whereIn(knex.raw("lower(name->>'en')"), namesEnLower);
           }
         });
     }
@@ -717,7 +586,7 @@ exports.restore = async (req, res) => {
     // Kumpulkan semua "label bentrok" aktif (id/en)
     const conflictActive = new Set();
     for (const row of activeWithSameTitle) {
-      const n = parseName(row.title);
+      const n = parseName(row.name);
       if (n.idLower) conflictActive.add(`id:${n.idLower}`);
       if (n.enLower) conflictActive.add(`en:${n.enLower}`);
     }
@@ -760,7 +629,7 @@ exports.restore = async (req, res) => {
       if (hasActiveConflict || hasBatchDup || emptyBoth) {
         skippedConflicts.push({
           id: r.id,
-          title: { id: r.idLower, en: r.enLower },
+          name: { id: r.idLower, en: r.enLower },
         });
         continue;
       }
@@ -772,7 +641,7 @@ exports.restore = async (req, res) => {
       ) {
         skippedConflicts.push({
           id: r.id,
-          title: { id: r.idLower, en: r.enLower },
+          name: { id: r.idLower, en: r.enLower },
         });
         continue;
       }
@@ -786,7 +655,7 @@ exports.restore = async (req, res) => {
     let restoredCount = 0;
     if (restorable.length > 0) {
       const idsToRestore = restorable.map((r) => r.rowId);
-      await trx("cms_legal_documents")
+      await trx("cms_legal_docs_categories")
         .whereIn("id", idsToRestore)
         .update({ deleted_at: null, updated_at: trx.fn.now() });
       restoredCount = idsToRestore.length;
@@ -795,8 +664,8 @@ exports.restore = async (req, res) => {
     await activityLogHelper.logRestore(
       {
         userId: activityLogHelper.fromReq(req),
-        module: "cms",
-        subject: "List Dokumen Hukum",
+        module: "master_data",
+        subject: "List kategori dokumen hukum",
       },
       trx
     );
@@ -831,7 +700,7 @@ exports.restore = async (req, res) => {
     return res.status(200).json(response.toResponse());
   } catch (error) {
     logger.error(
-      `| Legal Document CMS | - Error function restore: ${error.message}`
+      `| Legal Docs Category Master | - Error function restore: ${error.message}`
     );
     const response = new WithoutDataResource(
       500,
@@ -842,82 +711,3 @@ exports.restore = async (req, res) => {
     res.status(500).json(response.toResponse());
   }
 };
-
-async function validateFilesQuotaAndTypesOnUpdate({
-  existingRow,
-  deleteDocumentIds,
-  files,
-  dbColumn = "document_ids",
-  maxFilesAllowed = 1,
-  allowedTypes = ["application/pdf"],
-  sizeLimitBytes = 50 * 1024 * 1024,
-}) {
-  const currentIds = normIdArray(normJsonbArray(existingRow?.[dbColumn]), {
-    as: "string",
-  });
-
-  const toDelete = toArray(deleteDocumentIds).map(String);
-  const currentAfterDelete = currentIds.filter(
-    (id) => !toDelete.includes(String(id))
-  );
-
-  const incomingCount = Array.isArray(files) ? files.length : 0;
-
-  if (currentIds.length === 0 && incomingCount === 0) {
-    return {
-      ok: false,
-      http: 422,
-      code: "FILES_NOT_FOUND",
-      title: "File Tidak Ditemukan",
-      desc: "File wajib diunggah untuk pertama kali.",
-    };
-  }
-
-  const currentCount = currentAfterDelete.length;
-  const remaining = Math.max(maxFilesAllowed - currentCount, 0);
-
-  if (remaining === 0 && incomingCount > 0) {
-    return {
-      ok: false,
-      http: 422,
-      code: "MAX_CAPACITY",
-      title: "Kapasitas Sudah Penuh",
-      desc: "Kapasitas file untuk data ini sudah terpenuhi. Tidak ada slot tersisa.",
-    };
-  }
-
-  if (incomingCount > remaining) {
-    return {
-      ok: false,
-      http: 422,
-      code: "UPLOAD_LIMIT_EXCEEDED",
-      title: "Terlalu Banyak File",
-      desc: `File yang diperbolehkan diupload adalah ${remaining} file.`,
-    };
-  }
-
-  for (const f of files || []) {
-    if (!allowedTypes.includes(f.mimetype)) {
-      return {
-        ok: false,
-        http: 422,
-        code: "INVALID_FILE_TYPE",
-        title: "Tipe File Salah",
-        desc: `File hanya boleh bertipe PDF.`,
-      };
-    }
-    if (f.size > sizeLimitBytes) {
-      return {
-        ok: false,
-        http: 422,
-        code: "FILE_TOO_LARGE",
-        title: "Ukuran File Terlalu Besar",
-        desc: `Ukuran maksimal tiap file adalah ${Math.floor(
-          sizeLimitBytes / (1024 * 1024)
-        )}mB.`,
-      };
-    }
-  }
-
-  return { ok: true, remaining };
-}

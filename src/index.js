@@ -2,9 +2,7 @@ require("dotenv").config();
 const helmet = require("helmet");
 const express = require("express");
 const morgan = require("morgan");
-const knex = require("./config/database");
 const corsMiddleware = require("./middlewares/cors");
-const logger = require("./utils/logger");
 const publicRequestRoute = require("./routes/publicRequest/publicRequestRoute");
 const cmspublicRequestRoute = require("./routes/publicRequest/cmspublicRequestRoute");
 const kmispublicRequestRoute = require("./routes/publicRequest/kmispublicRequestRoute");
@@ -21,6 +19,7 @@ const learningAttemptRoutes = require("./routes/kmis/learningAttemptRoutes");
 const quizAttemptRoutes = require("./routes/kmis/quizAttemptRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const newsCategoryRoutes = require("./routes/masterData/newsCategoryRoutes");
+const legalDocsCategoryRoutes = require("./routes/masterData/legalDocsCategoryRoutes");
 const eventCategoryRoutes = require("./routes/masterData/eventCategoryRoutes");
 const animalCategoryRoutes = require("./routes/masterData/animalCategoryRoutes");
 const activityCategoryRoutes = require("./routes/masterData/activityCategoryRoutes");
@@ -164,6 +163,9 @@ app.use("/api/monev/share-report", shareReportRoutes);
 //! ======== MASTER DATA MODULE ========
 // MASTER DATA News Category
 app.use("/api/master-data/news-category", newsCategoryRoutes);
+
+// MASTER DATA Legal Document Category
+app.use("/api/master-data/legal-docs-category", legalDocsCategoryRoutes);
 
 // MASTER DATA Event Category
 app.use("/api/master-data/event-category", eventCategoryRoutes);
