@@ -2,6 +2,7 @@ const {
   resolveArrayRelations,
 } = require("../../helpers/resolveArrayRelations");
 const legalDocsCategoryResource = require("../masterData/legalDocsCategoryResource");
+const knex = require("../../config/database");
 const documentResource = require("../../resources/doc/documentResource");
 
 async function legalDocumentResource(legalDocument) {

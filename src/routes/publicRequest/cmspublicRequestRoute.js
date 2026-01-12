@@ -88,13 +88,13 @@ router.get(
 
 // Legal Document
 router.get(
-  "/get-all-legal-document-category",
+  "/get-all-docs-category",
   rateLimiter,
   publicRequestController.getAllLegalDocumentCategory
 );
 
 router.get(
-  "/get-legal-document-category/:id",
+  "/get-docs-category/:id",
   rateLimiter,
   publicRequestController.getLegalDocumentCategorybyId
 );
