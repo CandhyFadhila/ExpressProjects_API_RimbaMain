@@ -2769,6 +2769,7 @@ exports.getAllLegalDocument = async (req, res) => {
     let query = knex("cms_legal_documents as document")
       .select([
         "document.id",
+        "document.cms_legal_docs_categories_id",
         "document.document_ids",
         "document.title",
         "document.description",
@@ -2787,9 +2788,14 @@ exports.getAllLegalDocument = async (req, res) => {
       }
     );
 
-    applyRelationIn(query, "document.cms_legal_docs_categories_id", categoryIdsAny, {
-      as: "number",
-    });
+    applyRelationIn(
+      query,
+      "document.cms_legal_docs_categories_id",
+      categoryIdsAny,
+      {
+        as: "number",
+      }
+    );
 
     applyJsonbSearch(
       query,
@@ -2848,7 +2854,14 @@ exports.getLegalDocumentbyId = async (req, res) => {
 
   try {
     const document = await knex("cms_legal_documents")
-      .select(["id", "document_ids", "title", "description", "created_at"])
+      .select([
+        "id",
+        "cms_legal_docs_categories_id",
+        "document_ids",
+        "title",
+        "description",
+        "created_at",
+      ])
       .where("id", id)
       .whereNull("deleted_at")
       .first();
@@ -2904,6 +2917,7 @@ exports.getLegalDocumentbyLegalDocumentCategoryId = async (req, res) => {
       .select([
         "document.id",
         "document.cms_legal_docs_categories_id",
+        "document.document_ids",
         "document.name",
         "document.description",
       ])
